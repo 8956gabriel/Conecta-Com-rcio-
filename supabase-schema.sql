@@ -1,3 +1,4 @@
+sql
 -- =============================================================================
 -- CONECTA COMÉRCIO — Schema Supabase (PostgreSQL)
 -- Rode isto no SQL Editor do seu projeto Supabase (supabase.com/dashboard).
@@ -199,4 +200,105 @@ insert into public.feira_config (id) values (1);
 
 -- -----------------------------------------------------------------------------
 -- CALENDÁRIO DE EVENTOS — feiras especiais, cursos e eventos institucionais.
--- Editável só pelo
+-- Editável só pelo admin; aparece no site principal (calendário público).
+-- -----------------------------------------------------------------------------
+create table public.eventos_calendario (
+  id uuid primary key default gen_random_uuid(),
+  titulo text not null,
+  descricao text,
+  data_inicio date not null,
+  data_fim date,
+  local text,
+  tipo text not null check (tipo in ('feira','curso','institucional','outro')) default 'outro',
+  criado_em timestamptz not null default now()
+);
+
+-- =============================================================================
+-- ROW LEVEL SECURITY (RLS)
+-- =============================================================================
+alter table public.perfis enable row level security;
+alter table public.empresas enable row level security;
+alter table public.produtos enable row level security;
+alter table public.promocoes enable row level security;
+alter table public.vagas enable row level security;
+alter table public.candidaturas enable row level security;
+alter table public.cursos enable row level security;
+alter table public.noticias enable row level security;
+alter table public.banners enable row level security;
+alter table public.favoritos enable row level security;
+alter table public.notificacoes enable row level security;
+alter table public.feirantes enable row level security;
+alter table public.servicos_empreendedor enable row level security;
+alter table public.feira_config enable row level security;
+alter table public.eventos_calendario enable row level security;
+
+-- Leitura pública do conteúdo aprovado
+create policy "leitura publica empresas aprovadas" on public.empresas
+  for select using (status = 'aprovada');
+create policy "leitura publica produtos" on public.produtos for select using (true);
+create policy "leitura publica vagas" on public.vagas for select using (status = 'aberta');
+create policy "leitura publica cursos" on public.cursos for select using (true);
+create policy "leitura publica noticias" on public.noticias for select using (true);
+create policy "leitura publica banners" on public.banners for select using (ativo = true);
+create policy "leitura publica feirantes aprovados" on public.feirantes for select using (status = 'aprovado');
+create policy "leitura publica servicos do empreendedor" on public.servicos_empreendedor for select using (ativo = true);
+create policy "admin gerencia servicos do empreendedor" on public.servicos_empreendedor
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
+create policy "qualquer um pode se cadastrar como feirante" on public.feirantes for insert with check (true);
+create policy "leitura publica feira_config" on public.feira_config for select using (true);
+create policy "admin gerencia feira_config" on public.feira_config
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
+create policy "leitura publica eventos_calendario" on public.eventos_calendario for select using (true);
+create policy "admin gerencia eventos_calendario" on public.eventos_calendario
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
+create policy "admin modera feirantes" on public.feirantes
+  for update using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
+
+-- Empresário só edita a própria empresa
+create policy "empresario edita sua empresa" on public.empresas
+  for update using (auth.uid() = dono_id);
+create policy "empresario cadastra empresa" on public.empresas
+  for insert with check (auth.uid() = dono_id);
+create policy "empresario gerencia seus produtos" on public.produtos
+  for all using (
+    exists (select 1 from public.empresas e where e.id = empresa_id and e.dono_id = auth.uid())
+  );
+create policy "empresario gerencia suas vagas" on public.vagas
+  for all using (
+    exists (select 1 from public.empresas e where e.id = empresa_id and e.dono_id = auth.uid())
+  );
+
+-- Favoritos são privados de cada usuário
+create policy "usuario ve seus favoritos" on public.favoritos
+  for all using (auth.uid() = usuario_id);
+
+-- Perfis: cada um vê e edita o próprio
+create policy "usuario ve seu perfil" on public.perfis for select using (auth.uid() = id);
+create policy "usuario edita seu perfil" on public.perfis for update using (auth.uid() = id);
+
+-- Admin: acesso total (ajuste conforme sua estratégia de roles/claims)
+create policy "admin acesso total empresas" on public.empresas
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
+create policy "admin modera produtos" on public.produtos
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
+
+-- =============================================================================
+-- STORAGE (logos, fotos de empresas e produtos)
+-- Rode isto na aba Storage > Policies, após criar os buckets pelo dashboard.
+-- =============================================================================
+-- Buckets sugeridos: 'logos', 'fotos-empresas', 'fotos-produtos', 'banners',
+-- 'fotos-feirantes' (até 5 fotos por cadastro de feirante)
+-- Todos podem ser públicos para leitura (select) e restritos para upload
+-- (insert) ao dono autenticado da empresa correspondente.
