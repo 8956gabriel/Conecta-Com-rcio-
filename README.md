@@ -23,7 +23,44 @@ backend (autenticação e banco de dados).
 1. Na pasta do projeto, copie o arquivo `.env.example` para um novo arquivo
    chamado `.env`.
 2. Cole a URL e a chave que você copiou no passo anterior:
-<img width="1877" height="892" alt="image" src="https://github.com/user-attachments/assets/442e463e-abf4-48e4-a881-64a69b66aa2a" />
+   ```
+   VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+   VITE_SUPABASE_ANON_KEY=sua-chave-anon
+   ```
+
+### 3. Testar localmente (opcional, mas recomendado)
+Com Node.js instalado no seu computador:
+```bash
+npm install
+npm run dev
+```
+Abra o endereço que aparecer no terminal (algo como `http://localhost:5173`).
+Teste criar uma conta — ela já vai cair de verdade no seu banco Supabase.
+
+### 4. Publicar (deploy) — ~5 min
+Forma mais simples, sem precisar de servidor próprio:
+1. Suba esta pasta para um repositório novo no **GitHub**.
+2. Acesse **vercel.com** (ou **netlify.com**) → **Add New Project** → importe
+   esse repositório.
+3. Em **Environment Variables**, adicione as mesmas duas variáveis do `.env`
+   (`VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`).
+4. Clique em **Deploy**. Em cerca de 1 minuto você recebe um endereço público,
+   por exemplo `conecta-comercio-ivatuba.vercel.app`.
+5. Se quiser um domínio próprio (ex: `comercio.ivatuba.pr.gov.br` ou um domínio
+   novo comprado à parte), isso é configurado em **Project Settings → Domains**
+   na Vercel/Netlify — é só apontar o DNS conforme a instrução que eles mostram.
+
+### 5. Ativar o chatbot com IA (opcional)
+O botão flutuante de assistente já está pronto na plataforma. Para ele
+responder de verdade:
+1. Acesse **console.anthropic.com** → crie uma conta → **Get API Keys** →
+   **Create Key**. Copie a chave (começa com `sk-ant-...`).
+2. Adicione um pequeno saldo em **Billing** (o uso de um chatbot para uma
+   cidade pequena costuma custar poucos reais por mês).
+3. No seu `.env` local, adicione:
+   ```
+   ANTHROPIC_API_KEY=sk-ant-sua-chave-aqui
+   ```
 4. Na Vercel/Netlify, adicione essa mesma variável em **Environment Variables**
    (sem o prefixo `VITE_` — ela precisa ficar só no servidor, nunca exposta
    no navegador, por isso o código já separa isso automaticamente).
@@ -90,3 +127,4 @@ já existe e cria só o que é novo (as duas tabelas novas usam `create table`, 
 já existirem vai dar erro "already exists" nelas especificamente — nesse caso é só
 rodar cada bloco novo separado, copiando a partir do comentário
 `-- FEIRA REGULAR (Feira do Empreendedor)` até o fim do arquivo).
+
