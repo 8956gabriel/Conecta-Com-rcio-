@@ -23,44 +23,7 @@ backend (autenticação e banco de dados).
 1. Na pasta do projeto, copie o arquivo `.env.example` para um novo arquivo
    chamado `.env`.
 2. Cole a URL e a chave que você copiou no passo anterior:
-   ```
-   VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-   VITE_SUPABASE_ANON_KEY=sua-chave-anon
-   ```
-
-### 3. Testar localmente (opcional, mas recomendado)
-Com Node.js instalado no seu computador:
-```bash
-npm install
-npm run dev
-```
-Abra o endereço que aparecer no terminal (algo como `http://localhost:5173`).
-Teste criar uma conta — ela já vai cair de verdade no seu banco Supabase.
-
-### 4. Publicar (deploy) — ~5 min
-Forma mais simples, sem precisar de servidor próprio:
-1. Suba esta pasta para um repositório novo no **GitHub**.
-2. Acesse **vercel.com** (ou **netlify.com**) → **Add New Project** → importe
-   esse repositório.
-3. Em **Environment Variables**, adicione as mesmas duas variáveis do `.env`
-   (`VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`).
-4. Clique em **Deploy**. Em cerca de 1 minuto você recebe um endereço público,
-   por exemplo `conecta-comercio-ivatuba.vercel.app`.
-5. Se quiser um domínio próprio (ex: `comercio.ivatuba.pr.gov.br` ou um domínio
-   novo comprado à parte), isso é configurado em **Project Settings → Domains**
-   na Vercel/Netlify — é só apontar o DNS conforme a instrução que eles mostram.
-
-### 5. Ativar o chatbot com IA (opcional)
-O botão flutuante de assistente já está pronto na plataforma. Para ele
-responder de verdade:
-1. Acesse **console.anthropic.com** → crie uma conta → **Get API Keys** →
-   **Create Key**. Copie a chave (começa com `sk-ant-...`).
-2. Adicione um pequeno saldo em **Billing** (o uso de um chatbot para uma
-   cidade pequena costuma custar poucos reais por mês).
-3. No seu `.env` local, adicione:
-   ```
-   ANTHROPIC_API_KEY=sk-ant-sua-chave-aqui
-   ```
+<img width="1877" height="892" alt="image" src="https://github.com/user-attachments/assets/442e463e-abf4-48e4-a881-64a69b66aa2a" />
 4. Na Vercel/Netlify, adicione essa mesma variável em **Environment Variables**
    (sem o prefixo `VITE_` — ela precisa ficar só no servidor, nunca exposta
    no navegador, por isso o código já separa isso automaticamente).
@@ -87,20 +50,43 @@ por IA continuam funcionando normalmente, pois usam só a Anthropic).
 - Cadastro de conta (cliente ou empresário) grava no Supabase Auth + tabela `perfis`
 - Empresário que se cadastra já cria um registro em `empresas` com status `pendente`
 - Login real por e-mail e senha
+- **Links diretos de acesso**: o administrador entra por `seusite.com/#/admin` e o
+  empresário (vendedor) por `seusite.com/#/empresa` — são links reais, dá pra copiar
+  e mandar por WhatsApp. Quem visita o site em `/` (sem nada depois) navega e usa
+  tudo sem precisar se cadastrar; só cai numa tela de login se tentar abrir um
+  desses dois painéis
 - Listagem de empresas na home busca da tabela `empresas` (aprovadas); enquanto
   não houver nenhuma aprovada, mostra dados de exemplo para a página não ficar vazia
 - Chatbot com IA (botão flutuante) — funciona assim que a `ANTHROPIC_API_KEY` for configurada
-- No cadastro de produto (Painel Empresário), a IA gera a descrição de vendas e dá dicas
-  sobre a foto real enviada — usa a mesma `ANTHROPIC_API_KEY`, nenhuma chave extra necessária
+- No cadastro de produto (Painel Empresário), a ferramenta de IA já está ativa: gera a
+  descrição de vendas, dá dicas sobre a foto real enviada e pode gerar uma imagem
+  ilustrativa opcional — usa a `ANTHROPIC_API_KEY` (e `OPENAI_API_KEY` só para a imagem)
 - Painéis Admin e Empresário exigem login: quem não estiver logado é levado para a
   tela de Entrar/Cadastro automaticamente, e só entra quem tiver o perfil certo
   (`tipo = 'admin'` ou `tipo = 'empresario'` na tabela `perfis`)
+- **Editar perfil (Painel Empresário)**: nome, WhatsApp, Instagram, endereço e horário
+  de atendimento agora leem e gravam de verdade na tabela `empresas`
+- **Painel Admin — Comerciantes**: aprovar, recusar e editar empresa gravam no banco
+- **Painel Admin — Produtos**: publicar/despublicar e remover gravam no banco
+- **Painel Admin — Feira do Empreendedor**: editar a feira regular (dia/horário/local),
+  cadastrar e divulgar feiras especiais, e aprovar/recusar cadastros de feirante
+- **Painel Admin — Calendário de eventos**: cadastro completo (criar/remover) de eventos;
+  só o administrador edita, e o calendário aparece no site principal para todo mundo ver
 
 ### O que ainda é só interface (próximo passo)
-- Painel administrativo (aprovar empresa, notícias, banners, enquetes)
-- Painel do empresário (produtos, promoções, vagas, visualizações)
-- Upload de imagens (logo, fotos)
+- Painel do empresário: produtos (editar/excluir existentes), promoções, vagas, visualizações
+- Notícias, banners e enquetes no Painel Admin
+- Upload de imagens (logo, fotos de empresa)
 
-Esses painéis já têm todo o design pronto — falta ligar cada ação aos comandos
-do Supabase (a mesma lógica usada no cadastro/login serve de modelo). Me chame
-quando quiser seguir com isso.
+Esses pontos já têm todo o design pronto — falta ligar cada ação aos comandos
+do Supabase (a mesma lógica usada nos painéis já ativados serve de modelo). Me
+chame quando quiser seguir com isso.
+
+### Depois de atualizar o banco
+Se você já tinha rodado o `supabase-schema.sql` antes, rode de novo só a parte nova
+(tabelas `feira_config` e `eventos_calendario`, mais as políticas de RLS que vêm logo
+depois) — pode colar o arquivo inteiro de novo no SQL Editor, o Supabase ignora o que
+já existe e cria só o que é novo (as duas tabelas novas usam `create table`, então se
+já existirem vai dar erro "already exists" nelas especificamente — nesse caso é só
+rodar cada bloco novo separado, copiando a partir do comentário
+`-- FEIRA REGULAR (Feira do Empreendedor)` até o fim do arquivo).
