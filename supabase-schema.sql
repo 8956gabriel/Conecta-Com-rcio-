@@ -1,4 +1,3 @@
-sql
 -- =============================================================================
 -- CONECTA COMÉRCIO — Schema Supabase (PostgreSQL)
 -- Rode isto no SQL Editor do seu projeto Supabase (supabase.com/dashboard).
