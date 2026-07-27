@@ -7,7 +7,8 @@ import {
   CheckCircle2, Image as ImageIcon, Users, TrendingUp, Send, PlusCircle,
   Pencil, Trash2, Tag, UserCircle2, ChevronLeft, ShieldCheck, BarChart3, Vote, Sparkles,
   FileText, Receipt, ClipboardList, HandCoins, ExternalLink,
-  Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette
+  Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
+  Leaf, ArrowUp, ArrowDown
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
@@ -192,6 +193,57 @@ const categorias = [
   { nome: "Mercado & Varejo", icon: Store, count: 29 },
 ];
 
+// Ícones disponíveis pra categoria — o admin escolhe pelo nome, e a gente
+// resolve pro componente de ícone de verdade na hora de desenhar.
+const ICONES_CATEGORIA = [
+  { nome: "Utensils", Icon: Utensils, label: "Alimentação" },
+  { nome: "Shirt", Icon: Shirt, label: "Moda" },
+  { nome: "Wrench", Icon: Wrench, label: "Serviços" },
+  { nome: "Stethoscope", Icon: Stethoscope, label: "Saúde" },
+  { nome: "Scissors", Icon: Scissors, label: "Beleza" },
+  { nome: "Laptop", Icon: Laptop, label: "Tecnologia" },
+  { nome: "Hammer", Icon: Hammer, label: "Construção" },
+  { nome: "Store", Icon: Store, label: "Mercado & Varejo" },
+  { nome: "Leaf", Icon: Leaf, label: "Agricultura" },
+  { nome: "Tag", Icon: Tag, label: "Outra" },
+];
+const resolverIconeCategoria = (nome) => (ICONES_CATEGORIA.find((i) => i.nome === nome) || ICONES_CATEGORIA[ICONES_CATEGORIA.length - 1]).Icon;
+
+// Hook reutilizado nos formulários e na home: busca as categorias reais
+// (ativas, em ordem) e cai pras categorias de exemplo enquanto não existir
+// nenhuma cadastrada de verdade.
+function useCategoriasReais() {
+  const [categoriasReais, setCategoriasReais] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("categorias").select("*").eq("ativa", true).order("ordem")
+      .then(({ data, error }) => { if (!error && data && data.length > 0) setCategoriasReais(data); });
+  }, []);
+  return categoriasReais;
+}
+
+// "Editor rico" leve pro conteúdo de notícias: sem depender de nenhuma
+// biblioteca, interpreta **negrito**, *itálico* e ## título por linha, e
+// preserva as quebras de linha normais como parágrafos.
+function renderizarConteudoNoticia(texto) {
+  if (!texto) return null;
+  return texto.split("\n").filter((linha) => linha.trim() !== "").map((linha, i) => {
+    if (linha.trim().startsWith("## ")) {
+      return <p key={i} className="font-display font-bold text-base mt-3 mb-1" style={{ color: C.ink }}>{linha.trim().slice(3)}</p>;
+    }
+    const partes = linha.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(Boolean);
+    return (
+      <p key={i} className="font-body text-sm leading-relaxed mb-2" style={{ color: "#425A70" }}>
+        {partes.map((parte, j) => {
+          if (parte.startsWith("**") && parte.endsWith("**")) return <strong key={j}>{parte.slice(2, -2)}</strong>;
+          if (parte.startsWith("*") && parte.endsWith("*")) return <em key={j}>{parte.slice(1, -1)}</em>;
+          return <span key={j}>{parte}</span>;
+        })}
+      </p>
+    );
+  });
+}
+
 const empresas = [
   { nome: "Padaria Pão Nosso", cat: "Alimentação", bairro: "Centro", cidade: "Ivatuba", itens: 16, cartaoServidor: false, rating: 4.8 },
   { nome: "Auto Peças Ivatuba", cat: "Serviços", bairro: "Vila Nova", cidade: "Ivatuba", itens: 12, cartaoServidor: false, rating: 4.6 },
@@ -346,7 +398,7 @@ function LogoMark({ size = 40, iconSize, url }) {
   if (url) {
     return (
       <span className="rounded-full overflow-hidden shrink-0" style={{ width: size, height: size }}>
-        <img src={url} alt="Logo" className="w-full h-full object-cover" />
+        <img loading="lazy" decoding="async" src={url} alt="Logo" className="w-full h-full object-cover" />
       </span>
     );
   }
@@ -389,33 +441,44 @@ function SectionHeader({ eyebrow, title, sub, linkLabel }) {
 }
 
 function CategoryCard({ cat }) {
-  const Icon = cat.icon;
+  const Icon = cat.icon || resolverIconeCategoria(cat.icone);
+  const cor = cat.cor || C.blue;
   return (
     <button className="glow-card group flex flex-col items-start gap-3 p-4 rounded-2xl border text-left"
       style={{ borderColor: C.line, background: "#fff" }}>
       <span className="flex items-center justify-center w-11 h-11 rounded-xl transition-colors"
-        style={{ background: C.blueTint, color: C.blue }}>
+        style={{ background: `${cor}1a`, color: cor }}>
         <Icon size={20} />
       </span>
       <div>
         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{cat.nome}</p>
-        <p className="font-body text-xs mt-0.5" style={{ color: "#7E93A7" }}>{cat.count} empresas</p>
+        {cat.count !== undefined && <p className="font-body text-xs mt-0.5" style={{ color: "#7E93A7" }}>{cat.count} empresas</p>}
       </div>
     </button>
   );
 }
 
 function EmpresaCard({ e, fav, onFav }) {
+  const linkWhats = e.whatsapp ? `https://wa.me/55${String(e.whatsapp).replace(/\D/g, "")}` : null;
   return (
     <div className="glow-card rounded-2xl border overflow-hidden bg-white flex flex-col" style={{ borderColor: C.line }}>
-      <div className="h-24 relative flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
-        <Building2 className="text-white/90" size={30} />
+      <div className="h-24 relative flex items-center justify-center overflow-hidden" style={{ background: e.banner_url ? undefined : `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
+        {e.banner_url ? (
+          <img loading="lazy" decoding="async" src={e.banner_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <Building2 className="text-white/90" size={30} />
+        )}
         <button onClick={onFav} className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
           <Heart size={15} fill={fav ? C.amber : "none"} color={fav ? C.amber : C.blueDark} />
         </button>
         <span className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-white/95 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ color: C.amberDark }}>
           <Star size={11} fill={C.amber} color={C.amber} /> {e.rating}
         </span>
+        {e.destaque && (
+          <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ background: C.amber, color: C.blueDeep }}>
+            Destaque
+          </span>
+        )}
       </div>
       <div className="p-4 flex flex-col gap-1.5 flex-1">
         <p className="font-display font-bold text-sm leading-snug" style={{ color: C.ink }}>{e.nome}</p>
@@ -428,11 +491,17 @@ function EmpresaCard({ e, fav, onFav }) {
             <BadgeCheck size={11} /> Aceita Cartão Servidor
           </span>
         )}
+        {(e.facebook || e.site) && (
+          <div className="flex gap-2 mt-0.5">
+            {e.facebook && <a href={e.facebook} target="_blank" rel="noreferrer" className="font-body text-[11px] font-semibold" style={{ color: C.blue }}>Facebook</a>}
+            {e.site && <a href={e.site} target="_blank" rel="noreferrer" className="font-body text-[11px] font-semibold" style={{ color: C.blue }}>Site</a>}
+          </div>
+        )}
         <div className="mt-auto flex gap-2 pt-2">
-          <button className="glow-btn flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold font-body text-white"
+          <a href={linkWhats || "#"} target={linkWhats ? "_blank" : undefined} rel="noreferrer" className="glow-btn flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold font-body text-white"
             style={{ background: "#25A85B" }}>
             <MessageCircle size={14} /> WhatsApp
-          </button>
+          </a>
           <button className="flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-xs font-bold font-body border"
             style={{ borderColor: C.line, color: C.blue }}>
             <MapPin size={14} /> Ver Mapa
@@ -451,7 +520,7 @@ function PrestadorCard({ p }) {
       style={{ borderColor: C.line, background: "rgba(255,255,255,0.7)", backdropFilter: "blur(10px)" }}>
       <div className="h-24 relative flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
         {p.foto_url ? (
-          <img src={p.foto_url} alt={p.nome} className="w-full h-full object-cover" />
+          <img loading="lazy" decoding="async" src={p.foto_url} alt={p.nome} className="w-full h-full object-cover" />
         ) : (
           <Wrench className="text-white/90" size={26} />
         )}
@@ -482,52 +551,108 @@ function PrestadorCard({ p }) {
 }
 
 function ProdutoCard({ p }) {
+  const esgotado = p.estoque != null && Number(p.estoque) <= 0;
+  const poucoEstoque = p.estoque != null && Number(p.estoque) > 0 && Number(p.estoque) <= 3;
+  const linkWhats = p.whatsapp ? `https://wa.me/55${(p.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vi o produto "${p.nome}" no Conecta Comércio e queria saber mais.`)}` : null;
   return (
     <div className="glow-card rounded-2xl border bg-white overflow-hidden flex flex-col" style={{ borderColor: C.line }}>
-      <div className="h-28 flex items-center justify-center" style={{ background: C.blueTint }}>
-        <ShoppingBag size={26} color={C.blue} />
+      <div className="h-28 flex items-center justify-center relative overflow-hidden" style={{ background: C.blueTint }}>
+        {p.foto_url ? <img loading="lazy" decoding="async" src={p.foto_url} alt={p.nome} className="w-full h-full object-cover" /> : <ShoppingBag size={26} color={C.blue} />}
+        {esgotado && (
+          <span className="absolute top-2 right-2 font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#FBEAE5", color: "#B4462F" }}>Esgotado</span>
+        )}
+        {!esgotado && poucoEstoque && (
+          <span className="absolute top-2 right-2 font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#FFF6E9", color: "#8A5A12" }}>Últimas unidades</span>
+        )}
       </div>
       <div className="p-3.5 flex flex-col gap-1">
         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
         <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{p.empresa}</p>
-        <p className="font-display font-extrabold text-base mt-1" style={{ color: C.blue }}>{p.preco}</p>
-        <button className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold font-body"
-          style={{ background: C.blueTint, color: C.blue }}>
-          <MessageCircle size={13} /> Chamar no WhatsApp
-        </button>
+        {p.precoPromocional ? (
+          <div className="flex items-center gap-2 mt-1">
+            <p className="font-display font-extrabold text-base" style={{ color: "#B4462F" }}>{p.precoPromocional}</p>
+            <p className="font-body text-xs line-through" style={{ color: "#B7C6D6" }}>{p.preco}</p>
+          </div>
+        ) : (
+          <p className="font-display font-extrabold text-base mt-1" style={{ color: C.blue }}>{p.preco}</p>
+        )}
+        {linkWhats ? (
+          <a href={linkWhats} target="_blank" rel="noopener noreferrer"
+            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold font-body"
+            style={{ background: C.blueTint, color: C.blue }}>
+            <MessageCircle size={13} /> Chamar no WhatsApp
+          </a>
+        ) : (
+          <span className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold font-body opacity-50"
+            style={{ background: C.blueTint, color: C.blue }}>
+            <MessageCircle size={13} /> Chamar no WhatsApp
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
 function VagaCard({ v }) {
+  const linkWhats = v.whatsapp ? `https://wa.me/55${(v.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vi a vaga de "${v.cargo}" no Conecta Comércio e gostaria de me candidatar.`)}` : null;
+  const prazoFormatado = v.prazo ? v.prazo.split("-").reverse().join("/") : null;
   return (
     <div className="glow-card rounded-2xl border bg-white p-4 flex flex-col gap-2" style={{ borderColor: C.line }}>
-      <span className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: C.blueTint, color: C.blue }}>
-        <Briefcase size={16} />
-      </span>
+      <div className="flex items-center justify-between">
+        <span className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: C.blueTint, color: C.blue }}>
+          <Briefcase size={16} />
+        </span>
+        {v.tipo && (
+          <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: C.blueTint2, color: "#425A70" }}>{v.tipo}</span>
+        )}
+      </div>
       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
       <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{v.empresa} · {v.cidade}</p>
       <p className="font-body text-xs font-semibold" style={{ color: C.amberDark }}>{v.salario}</p>
-      <button className="mt-1 w-full rounded-lg py-2 text-xs font-bold font-body text-white" style={{ background: C.blue }}>
-        Candidatar-se
-      </button>
+      {v.beneficios && <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{v.beneficios}</p>}
+      {prazoFormatado && <p className="font-body text-[11px] font-semibold" style={{ color: "#B4462F" }}>Inscrições até {prazoFormatado}</p>}
+      {linkWhats ? (
+        <a href={linkWhats} target="_blank" rel="noopener noreferrer" className="mt-1 w-full text-center rounded-lg py-2 text-xs font-bold font-body text-white" style={{ background: C.blue }}>
+          Candidatar-se
+        </a>
+      ) : (
+        <span className="mt-1 w-full text-center rounded-lg py-2 text-xs font-bold font-body text-white opacity-50" style={{ background: C.blue }}>
+          Candidatar-se
+        </span>
+      )}
     </div>
   );
 }
 
 function CursoCard({ c }) {
+  // Aceita tanto os cursos de exemplo (data: "12 AGO", local: "...") quanto
+  // os cursos reais cadastrados pelo admin (data_inicio ISO, instituição,
+  // professor, carga horária, link de inscrição, certificado, banner).
+  const [diaData, mesData] = c.data ? c.data.split(" ") : (c.data_inicio ? c.data_inicio.split("-").reverse() : ["--", ""]);
+  const local = c.local || c.instituicao || "";
   return (
-    <div className="rounded-2xl border bg-white p-4 flex gap-3 items-start" style={{ borderColor: C.line }}>
-      <div className="rounded-lg px-2.5 py-1.5 text-center shrink-0" style={{ background: C.blueDeep }}>
-        <p className="font-display text-[10px] font-bold text-white leading-none">{c.data.split(" ")[0]}</p>
-        <p className="font-display text-[9px] text-white/70 leading-none mt-0.5">{c.data.split(" ")[1]}</p>
-      </div>
-      <div>
+    <div className="rounded-2xl border bg-white p-4 flex gap-3 items-start overflow-hidden" style={{ borderColor: C.line }}>
+      {c.banner_url ? (
+        <img loading="lazy" decoding="async" src={c.banner_url} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0" />
+      ) : (
+        <div className="rounded-lg px-2.5 py-1.5 text-center shrink-0" style={{ background: C.blueDeep }}>
+          <p className="font-display text-[10px] font-bold text-white leading-none">{diaData}</p>
+          <p className="font-display text-[9px] text-white/70 leading-none mt-0.5">{mesData}</p>
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.titulo}</p>
         <p className="font-body text-xs mt-1 flex items-center gap-1" style={{ color: "#7E93A7" }}>
-          <MapPin size={11} /> {c.local}
+          <MapPin size={11} /> {local}{c.professor ? ` · ${c.professor}` : ""}{c.carga_horaria ? ` · ${c.carga_horaria}` : ""}
         </p>
+        {c.certificado && (
+          <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 inline-block" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>Com certificado</span>
+        )}
+        {c.link_inscricao && (
+          <a href={c.link_inscricao} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold mt-1.5 flex items-center gap-1 w-fit" style={{ color: C.blue }}>
+            <ExternalLink size={11} /> Inscreva-se
+          </a>
+        )}
       </div>
     </div>
   );
@@ -584,6 +709,177 @@ const meusProdutos = [
 // ---------------------------------------------------------------------------
 function AdminPanel() {
   const [tab, setTab] = useState("dashboard");
+  const categoriasReaisAdmin = useCategoriasReais();
+
+  // -------------------------------------------------------------------------
+  // Categorias de empresas — CRUD completo (nome, ícone, cor, ordem, status).
+  // -------------------------------------------------------------------------
+  const [categoriasAdmin, setCategoriasAdmin] = useState(null); // null = carregando/indisponível
+  const [novaCategoria, setNovaCategoria] = useState({ nome: "", icone: "Tag", cor: "#0A5AA8" });
+  const [statusCategoria, setStatusCategoria] = useState("");
+  const [editandoCategoria, setEditandoCategoria] = useState(null);
+  const [formCategoria, setFormCategoria] = useState({ nome: "", icone: "Tag", cor: "#0A5AA8" });
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("categorias").select("*").order("ordem").then(({ data, error }) => {
+      if (!error) setCategoriasAdmin(data || []);
+    });
+  }, []);
+
+  const criarCategoria = async (e) => {
+    e.preventDefault();
+    setStatusCategoria("");
+    if (!novaCategoria.nome.trim()) { setStatusCategoria("Informe o nome da categoria."); return; }
+    if (!supabaseConfigurado) {
+      setCategoriasAdmin((atual) => [...(atual ?? []), { id: `demo-${Date.now()}`, ...novaCategoria, ordem: (atual ?? []).length, ativa: true }]);
+      setNovaCategoria({ nome: "", icone: "Tag", cor: "#0A5AA8" });
+      setStatusCategoria("ok");
+      return;
+    }
+    const ordem = (categoriasAdmin ?? []).length;
+    const { data, error } = await supabase.from("categorias").insert({ ...novaCategoria, ordem, ativa: true }).select().single();
+    if (error) { setStatusCategoria(error.message); return; }
+    setCategoriasAdmin((atual) => [...(atual ?? []), data]);
+    setNovaCategoria({ nome: "", icone: "Tag", cor: "#0A5AA8" });
+    setStatusCategoria("ok");
+  };
+
+  const alternarAtivaCategoria = async (id, ativa) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setCategoriasAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ativa } : c)));
+      return;
+    }
+    const { error } = await supabase.from("categorias").update({ ativa }).eq("id", id);
+    if (!error) setCategoriasAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ativa } : c)));
+  };
+
+  const removerCategoria = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setCategoriasAdmin((atual) => atual.filter((c) => c.id !== id));
+      return;
+    }
+    const { error } = await supabase.from("categorias").delete().eq("id", id);
+    if (!error) setCategoriasAdmin((atual) => atual.filter((c) => c.id !== id));
+  };
+
+  const iniciarEdicaoCategoria = (c) => { setEditandoCategoria(c.id); setFormCategoria({ nome: c.nome, icone: c.icone, cor: c.cor || "#0A5AA8" }); };
+
+  const salvarEdicaoCategoria = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setCategoriasAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ...formCategoria } : c)));
+      setEditandoCategoria(null);
+      return;
+    }
+    const { error } = await supabase.from("categorias").update(formCategoria).eq("id", id);
+    if (!error) setCategoriasAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ...formCategoria } : c)));
+    setEditandoCategoria(null);
+  };
+
+  // Reordenar trocando a "ordem" com o vizinho — mais simples e confiável
+  // pra quem não mexe com informática do que arrastar-e-soltar.
+  const moverCategoria = async (index, direcao) => {
+    const lista = [...(categoriasAdmin ?? [])];
+    const alvo = index + direcao;
+    if (alvo < 0 || alvo >= lista.length) return;
+    const a = lista[index];
+    const b = lista[alvo];
+    const ordemA = b.ordem;
+    const ordemB = a.ordem;
+    lista[index] = { ...a, ordem: ordemA };
+    lista[alvo] = { ...b, ordem: ordemB };
+    lista.sort((x, y) => x.ordem - y.ordem);
+    setCategoriasAdmin(lista);
+    if (supabaseConfigurado && !String(a.id).startsWith("demo-")) {
+      await supabase.from("categorias").update({ ordem: ordemA }).eq("id", a.id);
+      await supabase.from("categorias").update({ ordem: ordemB }).eq("id", b.id);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // FAQ — CRUD completo com categoria e ordenação (mesmo padrão de
+  // reordenar das categorias de empresas: trocar a "ordem" com o vizinho).
+  // -------------------------------------------------------------------------
+  const [faqAdmin, setFaqAdmin] = useState(null);
+  const [novaFaq, setNovaFaq] = useState({ pergunta: "", resposta: "", categoria: "Geral" });
+  const [statusFaq, setStatusFaq] = useState("");
+  const [editandoFaq, setEditandoFaq] = useState(null);
+  const [formFaq, setFormFaq] = useState({ pergunta: "", resposta: "", categoria: "Geral" });
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("faq").select("*").order("ordem").then(({ data, error }) => {
+      if (!error) setFaqAdmin(data || []);
+    });
+  }, []);
+
+  const criarFaq = async (e) => {
+    e.preventDefault();
+    setStatusFaq("");
+    if (!novaFaq.pergunta.trim() || !novaFaq.resposta.trim()) { setStatusFaq("Preencha a pergunta e a resposta."); return; }
+    if (!supabaseConfigurado) {
+      setFaqAdmin((atual) => [...(atual ?? []), { id: `demo-${Date.now()}`, ...novaFaq, ordem: (atual ?? []).length, ativa: true }]);
+      setNovaFaq({ pergunta: "", resposta: "", categoria: "Geral" });
+      setStatusFaq("ok");
+      return;
+    }
+    const ordem = (faqAdmin ?? []).length;
+    const { data, error } = await supabase.from("faq").insert({ ...novaFaq, ordem, ativa: true }).select().single();
+    if (error) { setStatusFaq(error.message); return; }
+    setFaqAdmin((atual) => [...(atual ?? []), data]);
+    setNovaFaq({ pergunta: "", resposta: "", categoria: "Geral" });
+    setStatusFaq("ok");
+  };
+
+  const alternarAtivaFaq = async (id, ativa) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setFaqAdmin((atual) => atual.map((f) => (f.id === id ? { ...f, ativa } : f)));
+      return;
+    }
+    const { error } = await supabase.from("faq").update({ ativa }).eq("id", id);
+    if (!error) setFaqAdmin((atual) => atual.map((f) => (f.id === id ? { ...f, ativa } : f)));
+  };
+
+  const removerFaq = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setFaqAdmin((atual) => atual.filter((f) => f.id !== id));
+      return;
+    }
+    const { error } = await supabase.from("faq").delete().eq("id", id);
+    if (!error) setFaqAdmin((atual) => atual.filter((f) => f.id !== id));
+  };
+
+  const iniciarEdicaoFaq = (f) => { setEditandoFaq(f.id); setFormFaq({ pergunta: f.pergunta, resposta: f.resposta, categoria: f.categoria || "Geral" }); };
+
+  const salvarEdicaoFaq = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setFaqAdmin((atual) => atual.map((f) => (f.id === id ? { ...f, ...formFaq } : f)));
+      setEditandoFaq(null);
+      return;
+    }
+    const { error } = await supabase.from("faq").update(formFaq).eq("id", id);
+    if (!error) setFaqAdmin((atual) => atual.map((f) => (f.id === id ? { ...f, ...formFaq } : f)));
+    setEditandoFaq(null);
+  };
+
+  const moverFaq = async (index, direcao) => {
+    const lista = [...(faqAdmin ?? [])];
+    const alvo = index + direcao;
+    if (alvo < 0 || alvo >= lista.length) return;
+    const a = lista[index];
+    const b = lista[alvo];
+    const ordemA = b.ordem;
+    const ordemB = a.ordem;
+    lista[index] = { ...a, ordem: ordemA };
+    lista[alvo] = { ...b, ordem: ordemB };
+    lista.sort((x, y) => x.ordem - y.ordem);
+    setFaqAdmin(lista);
+    if (supabaseConfigurado && !String(a.id).startsWith("demo-")) {
+      await supabase.from("faq").update({ ordem: ordemA }).eq("id", a.id);
+      await supabase.from("faq").update({ ordem: ordemB }).eq("id", b.id);
+    }
+  };
+
   const [servicos, setServicos] = useState(servicosEmpreendedor.map((s) => ({ ...s })));
   const [servicosCarregados, setServicosCarregados] = useState(false);
   const [salvandoServico, setSalvandoServico] = useState(null); // titulo do serviço sendo salvo
@@ -597,21 +893,117 @@ function AdminPanel() {
   }, []);
 
   // -------------------------------------------------------------------------
+  // Dashboard — números e gráficos reais (nada de valores fixos de exemplo).
+  // -------------------------------------------------------------------------
+  const [statsReais, setStatsReais] = useState(null); // null = carregando
+  const [empresasDestaqueReais, setEmpresasDestaqueReais] = useState(null);
+  const [ultimosCadastros, setUltimosCadastros] = useState(null);
+  const [crescimentoMensal, setCrescimentoMensal] = useState(null);
+  const [acessosSemanaReais, setAcessosSemanaReais] = useState(null);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+
+    const contar = (tabela, filtro) => {
+      let q = supabase.from(tabela).select("*", { count: "exact", head: true });
+      if (filtro) q = filtro(q);
+      return q.then(({ count }) => count ?? 0);
+    };
+
+    Promise.all([
+      contar("empresas", (q) => q.eq("status", "aprovada")),
+      contar("produtos", (q) => q.eq("ativo", true)),
+      contar("vagas", (q) => q.eq("status", "aberta")),
+      contar("noticias"),
+      contar("eventos_calendario"),
+      contar("prestadores", (q) => q.eq("status", "aprovado")),
+    ]).then(([empresas, produtos, vagas, noticiasN, eventos, prestadoresN]) => {
+      setStatsReais({ empresas, produtos, vagas, noticias: noticiasN, eventos, prestadores: prestadoresN });
+    });
+
+    supabase.from("empresas").select("nome, categoria, visualizacoes").eq("status", "aprovada")
+      .order("visualizacoes", { ascending: false }).limit(5)
+      .then(({ data, error }) => { if (!error) setEmpresasDestaqueReais(data || []); });
+
+    Promise.all([
+      supabase.from("empresas").select("nome, criado_em").order("criado_em", { ascending: false }).limit(6),
+      supabase.from("produtos").select("nome, criado_em").order("criado_em", { ascending: false }).limit(6),
+      supabase.from("prestadores").select("nome, criado_em").order("criado_em", { ascending: false }).limit(6),
+    ]).then(([emp, prod, pres]) => {
+      const juntos = [
+        ...(emp.data || []).map((x) => ({ nome: x.nome, tipo: "Empresa", criado_em: x.criado_em })),
+        ...(prod.data || []).map((x) => ({ nome: x.nome, tipo: "Produto", criado_em: x.criado_em })),
+        ...(pres.data || []).map((x) => ({ nome: x.nome, tipo: "Prestador", criado_em: x.criado_em })),
+      ]
+        .filter((x) => x.criado_em)
+        .sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em))
+        .slice(0, 8);
+      setUltimosCadastros(juntos);
+    });
+
+    // Crescimento mensal — empresas novas cadastradas nos últimos 6 meses.
+    supabase.from("empresas").select("criado_em").then(({ data, error }) => {
+      if (error || !data) return;
+      const hoje = new Date();
+      const meses = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        meses.push({ chave: `${d.getFullYear()}-${d.getMonth()}`, mes: d.toLocaleDateString("pt-BR", { month: "short" }), empresas: 0 });
+      }
+      data.forEach((row) => {
+        if (!row.criado_em) return;
+        const d = new Date(row.criado_em);
+        const chave = `${d.getFullYear()}-${d.getMonth()}`;
+        const alvo = meses.find((m) => m.chave === chave);
+        if (alvo) alvo.empresas += 1;
+      });
+      setCrescimentoMensal(meses);
+    });
+
+    // Acessos ao site — conta visitas reais registradas na tabela page_views.
+    supabase.from("page_views").select("criado_em").gte("criado_em", new Date(Date.now() - 7 * 86400000).toISOString())
+      .then(({ data, error }) => {
+        if (error || !data) { setAcessosSemanaReais([]); return; }
+        const dias = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(Date.now() - i * 86400000);
+          dias.push({ chave: d.toDateString(), dia: d.toLocaleDateString("pt-BR", { weekday: "short" }), views: 0 });
+        }
+        data.forEach((row) => {
+          const chave = new Date(row.criado_em).toDateString();
+          const alvo = dias.find((d) => d.chave === chave);
+          if (alvo) alvo.views += 1;
+        });
+        setAcessosSemanaReais(dias);
+      });
+  }, []);
+
+  // -------------------------------------------------------------------------
   // Moderação de empresas — aprovar, recusar e editar de verdade.
   // -------------------------------------------------------------------------
   const [empresasPend, setEmpresasPend] = useState(null); // null = carregando/indisponível
   const [statusEmpresa, setStatusEmpresa] = useState({});
   const [editandoEmpresa, setEditandoEmpresa] = useState(null);
-  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "" });
+  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, fotos_urls: [] });
   const [enviandoLogoEmpresa, setEnviandoLogoEmpresa] = useState(false);
+  const [enviandoBannerEmpresa, setEnviandoBannerEmpresa] = useState(false);
+  const [enviandoFotoGaleria, setEnviandoFotoGaleria] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("empresas").select("id, nome, categoria, status, logo_url, criado_em").order("criado_em", { ascending: false })
+    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em").order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setEmpresasPend(data || []); });
   }, []);
 
   const listaEmpresas = empresasPend ?? pendentes.map((p, i) => ({ id: `demo-${i}`, nome: p.nome, categoria: p.cat, status: "pendente", criado_em: p.data }));
+  const [buscaEmpresasAdmin, setBuscaEmpresasAdmin] = useState("");
+  const listaEmpresasFiltradaAdmin = useMemo(() => {
+    if (!buscaEmpresasAdmin.trim()) return listaEmpresas;
+    const q = buscaEmpresasAdmin.toLowerCase();
+    return listaEmpresas.filter((e) => (e.nome || "").toLowerCase().includes(q) || (e.categoria || "").toLowerCase().includes(q));
+  }, [listaEmpresas, buscaEmpresasAdmin]);
+  const [qtdEmpresasAdminVisiveis, setQtdEmpresasAdminVisiveis] = useState(15);
+  useEffect(() => { setQtdEmpresasAdminVisiveis(15); }, [buscaEmpresasAdmin]);
 
   const mudarStatusEmpresa = async (id, status) => {
     if (!supabaseConfigurado) {
@@ -623,7 +1015,14 @@ function AdminPanel() {
     else setStatusEmpresa((s) => ({ ...s, [id]: error.message }));
   };
 
-  const iniciarEdicaoEmpresa = (e) => { setEditandoEmpresa(e.id); setFormEmpresa({ nome: e.nome, categoria: e.categoria, logo_url: e.logo_url || "" }); };
+  const iniciarEdicaoEmpresa = (e) => {
+    setEditandoEmpresa(e.id);
+    setFormEmpresa({
+      nome: e.nome, categoria: e.categoria, logo_url: e.logo_url || "",
+      banner_url: e.banner_url || "", facebook: e.facebook || "", site: e.site || "",
+      destaque: !!e.destaque, fotos_urls: e.fotos_urls || [],
+    });
+  };
 
   const enviarLogoEmpresaAdmin = (e) => {
     const arquivo = e.target.files?.[0];
@@ -640,13 +1039,51 @@ function AdminPanel() {
     });
   };
 
+  const enviarBannerEmpresaAdmin = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setFormEmpresa((f) => ({ ...f, banner_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoBannerEmpresa(true);
+    const caminho = `banners-empresas/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("fotos-empresas").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoBannerEmpresa(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("fotos-empresas").getPublicUrl(caminho);
+        setFormEmpresa((f) => ({ ...f, banner_url: pub.publicUrl }));
+      }
+    });
+  };
+
+  const enviarFotoGaleriaEmpresa = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setFormEmpresa((f) => ({ ...f, fotos_urls: [...f.fotos_urls, URL.createObjectURL(arquivo)] })); return; }
+    setEnviandoFotoGaleria(true);
+    const caminho = `galeria/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("fotos-empresas").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoGaleria(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("fotos-empresas").getPublicUrl(caminho);
+        setFormEmpresa((f) => ({ ...f, fotos_urls: [...f.fotos_urls, pub.publicUrl] }));
+      }
+    });
+  };
+
+  const removerFotoGaleriaEmpresa = (indice) => {
+    setFormEmpresa((f) => ({ ...f, fotos_urls: f.fotos_urls.filter((_, i) => i !== indice) }));
+  };
+
   const salvarEdicaoEmpresa = async (id) => {
     if (!supabaseConfigurado) {
       setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, ...formEmpresa } : e)));
       setEditandoEmpresa(null);
       return;
     }
-    const { error } = await supabase.from("empresas").update({ nome: formEmpresa.nome, categoria: formEmpresa.categoria, logo_url: formEmpresa.logo_url }).eq("id", id);
+    const { error } = await supabase.from("empresas").update({
+      nome: formEmpresa.nome, categoria: formEmpresa.categoria, logo_url: formEmpresa.logo_url,
+      banner_url: formEmpresa.banner_url, facebook: formEmpresa.facebook, site: formEmpresa.site,
+      destaque: formEmpresa.destaque, fotos_urls: formEmpresa.fotos_urls,
+    }).eq("id", id);
     if (!error) setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, ...formEmpresa } : e)));
     setEditandoEmpresa(null);
   };
@@ -665,6 +1102,14 @@ function AdminPanel() {
   const listaProdutos = produtosAdmin ?? produtosModeracao.map((p, i) => ({
     id: `demo-${i}`, nome: p.nome, ativo: p.status !== "denunciado", empresas: { nome: p.empresa }, _denunciado: p.status === "denunciado",
   }));
+  const [buscaProdutosAdmin, setBuscaProdutosAdmin] = useState("");
+  const listaProdutosFiltradaAdmin = useMemo(() => {
+    if (!buscaProdutosAdmin.trim()) return listaProdutos;
+    const q = buscaProdutosAdmin.toLowerCase();
+    return listaProdutos.filter((p) => (p.nome || "").toLowerCase().includes(q) || (p.empresas?.nome || "").toLowerCase().includes(q));
+  }, [listaProdutos, buscaProdutosAdmin]);
+  const [qtdProdutosAdminVisiveis, setQtdProdutosAdminVisiveis] = useState(15);
+  useEffect(() => { setQtdProdutosAdminVisiveis(15); }, [buscaProdutosAdmin]);
 
   const alternarAtivoProduto = async (id, ativo) => {
     setProdutosAdmin((atual) => (atual || listaProdutos).map((p) => (p.id === id ? { ...p, ativo } : p)));
@@ -676,6 +1121,85 @@ function AdminPanel() {
     if (!supabaseConfigurado) { setProdutosAdmin((atual) => (atual || listaProdutos).filter((p) => p.id !== id)); return; }
     const { error } = await supabase.from("produtos").delete().eq("id", id);
     if (!error) setProdutosAdmin((atual) => atual.filter((p) => p.id !== id));
+  };
+
+  // -------------------------------------------------------------------------
+  // Promoções — cadastro real vinculado a um produto (nome, desconto,
+  // imagem, período de validade e status). Antes essa tabela existia no
+  // banco mas não tinha nenhuma tela nem política de acesso.
+  // -------------------------------------------------------------------------
+  const [promocoesAdmin, setPromocoesAdmin] = useState(null);
+  const [novaPromocao, setNovaPromocao] = useState({ produto_id: "", nome: "", descricao: "", desconto_percentual: "", data_inicio: "", valida_ate: "", imagem_url: "" });
+  const [publicandoPromocao, setPublicandoPromocao] = useState(false);
+  const [statusPromocao, setStatusPromocao] = useState("");
+  const [enviandoImagemPromocao, setEnviandoImagemPromocao] = useState(false);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("promocoes").select("*, produtos(nome, empresas(nome))").order("criado_em", { ascending: false })
+      .then(({ data, error }) => { if (!error) setPromocoesAdmin(data || []); });
+  }, []);
+
+  const enviarImagemPromocao = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setNovaPromocao((v) => ({ ...v, imagem_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoImagemPromocao(true);
+    const caminho = `promocoes/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("fotos-produtos").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoImagemPromocao(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("fotos-produtos").getPublicUrl(caminho);
+        setNovaPromocao((v) => ({ ...v, imagem_url: pub.publicUrl }));
+      }
+    });
+  };
+
+  const publicarPromocao = async (e) => {
+    e.preventDefault();
+    setStatusPromocao("");
+    if (!novaPromocao.produto_id || !novaPromocao.desconto_percentual || !novaPromocao.valida_ate) {
+      setStatusPromocao("Escolha o produto, o desconto e a validade.");
+      return;
+    }
+    if (!supabaseConfigurado) {
+      setPromocoesAdmin((atual) => [{ id: `demo-${Date.now()}`, ...novaPromocao, ativa: true }, ...(atual ?? [])]);
+      setNovaPromocao({ produto_id: "", nome: "", descricao: "", desconto_percentual: "", data_inicio: "", valida_ate: "", imagem_url: "" });
+      setStatusPromocao("ok");
+      return;
+    }
+    setPublicandoPromocao(true);
+    try {
+      const registro = {
+        produto_id: novaPromocao.produto_id, nome: novaPromocao.nome || null, descricao: novaPromocao.descricao || null,
+        desconto_percentual: Number(novaPromocao.desconto_percentual), data_inicio: novaPromocao.data_inicio || null,
+        valida_ate: novaPromocao.valida_ate, imagem_url: novaPromocao.imagem_url || null, ativa: true,
+      };
+      const { data, error } = await supabase.from("promocoes").insert(registro).select("*, produtos(nome, empresas(nome))").single();
+      if (error) throw error;
+      setPromocoesAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovaPromocao({ produto_id: "", nome: "", descricao: "", desconto_percentual: "", data_inicio: "", valida_ate: "", imagem_url: "" });
+      setStatusPromocao("ok");
+    } catch (err) {
+      setStatusPromocao(err.message || "Erro ao publicar promoção");
+    } finally {
+      setPublicandoPromocao(false);
+    }
+  };
+
+  const alternarAtivaPromocao = async (id, ativa) => {
+    setPromocoesAdmin((atual) => (atual ?? []).map((p) => (p.id === id ? { ...p, ativa } : p)));
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) return;
+    await supabase.from("promocoes").update({ ativa }).eq("id", id);
+  };
+
+  const removerPromocao = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setPromocoesAdmin((atual) => (atual ?? []).filter((p) => p.id !== id));
+      return;
+    }
+    const { error } = await supabase.from("promocoes").delete().eq("id", id);
+    if (!error) setPromocoesAdmin((atual) => atual.filter((p) => p.id !== id));
   };
 
   // -------------------------------------------------------------------------
@@ -778,9 +1302,26 @@ function AdminPanel() {
   // principal em modo somente leitura (componente CalendarioEventos).
   // -------------------------------------------------------------------------
   const [eventosAdmin, setEventosAdmin] = useState(null);
-  const [novoEvento, setNovoEvento] = useState({ titulo: "", descricao: "", data_inicio: "", data_fim: "", local: "", tipo: "outro" });
+  const eventoVazio = { titulo: "", descricao: "", data_inicio: "", data_fim: "", hora: "", local: "", tipo: "outro", banner_url: "", link_inscricao: "", google_maps_url: "", status: "confirmado" };
+  const [novoEvento, setNovoEvento] = useState(eventoVazio);
   const [salvandoEvento, setSalvandoEvento] = useState(false);
   const [erroEvento, setErroEvento] = useState("");
+  const [enviandoBannerEvento, setEnviandoBannerEvento] = useState(false);
+
+  const enviarBannerEvento = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setNovoEvento((f) => ({ ...f, banner_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoBannerEvento(true);
+    const caminho = `eventos/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoBannerEvento(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+        setNovoEvento((f) => ({ ...f, banner_url: pub.publicUrl }));
+      }
+    });
+  };
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
@@ -797,7 +1338,7 @@ function AdminPanel() {
     if (!novoEvento.titulo || !novoEvento.data_inicio) { setErroEvento("Preencha ao menos título e data."); return; }
     if (!supabaseConfigurado) {
       setEventosAdmin((atual) => [...(atual ?? []), { id: `demo-${Date.now()}`, ...novoEvento }]);
-      setNovoEvento({ titulo: "", descricao: "", data_inicio: "", data_fim: "", local: "", tipo: "outro" });
+      setNovoEvento(eventoVazio);
       return;
     }
     setSalvandoEvento(true);
@@ -806,7 +1347,7 @@ function AdminPanel() {
       const { data, error } = await supabase.from("eventos_calendario").insert(registro).select().single();
       if (error) throw error;
       setEventosAdmin((atual) => [...(atual ?? []), data]);
-      setNovoEvento({ titulo: "", descricao: "", data_inicio: "", data_fim: "", local: "", tipo: "outro" });
+      setNovoEvento(eventoVazio);
     } catch (err) {
       setErroEvento(err.message || "Erro ao salvar evento");
     } finally {
@@ -818,6 +1359,12 @@ function AdminPanel() {
     if (!supabaseConfigurado) { setEventosAdmin((atual) => (atual ?? []).filter((ev) => ev.id !== id)); return; }
     const { error } = await supabase.from("eventos_calendario").delete().eq("id", id);
     if (!error) setEventosAdmin((atual) => atual.filter((ev) => ev.id !== id));
+  };
+
+  const mudarStatusEvento = async (id, status) => {
+    if (!supabaseConfigurado) { setEventosAdmin((atual) => (atual ?? []).map((ev) => (ev.id === id ? { ...ev, status } : ev))); return; }
+    const { error } = await supabase.from("eventos_calendario").update({ status }).eq("id", id);
+    if (!error) setEventosAdmin((atual) => atual.map((ev) => (ev.id === id ? { ...ev, status } : ev)));
   };
 
   const atualizarServico = (indice, campo, valor) => {
@@ -892,12 +1439,30 @@ function AdminPanel() {
     });
   };
 
+  const enviarImagemBannerMobile = (id, e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { atualizarBanner(id, "imagem_mobile_url", URL.createObjectURL(arquivo)); return; }
+    setEnviandoBanner(id);
+    const caminho = `banners/mobile-${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoBanner(null);
+      if (error) { setStatusBanner((s) => ({ ...s, [id]: error.message })); return; }
+      const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+      atualizarBanner(id, "imagem_mobile_url", pub.publicUrl);
+    });
+  };
+
   const salvarBanner = async (banner) => {
     setStatusBanner((s) => ({ ...s, [banner.id]: "" }));
     if (!banner.imagem_url) { setStatusBanner((s) => ({ ...s, [banner.id]: "Envie uma imagem antes de salvar." })); return; }
     if (!supabaseConfigurado) { setStatusBanner((s) => ({ ...s, [banner.id]: "ok" })); return; }
     try {
-      const registro = { titulo: banner.titulo, imagem_url: banner.imagem_url, link_url: banner.link_url, ordem: banner.ordem ?? 0, ativo: banner.ativo !== false };
+      const registro = {
+        titulo: banner.titulo, imagem_url: banner.imagem_url, imagem_mobile_url: banner.imagem_mobile_url || null,
+        link_url: banner.link_url, ordem: banner.ordem ?? 0, ativo: banner.ativo !== false,
+        data_inicio: banner.data_inicio || null, data_fim: banner.data_fim || null,
+      };
       const ehNovo = String(banner.id).startsWith("demo-") || String(banner.id).startsWith("novo-");
       const { data, error } = ehNovo
         ? await supabase.from("banners").insert(registro).select().single()
@@ -925,7 +1490,7 @@ function AdminPanel() {
   // serviço, porque criar conta de outra pessoa exige privilégio de admin
   // que não pode ficar no navegador.
   // -------------------------------------------------------------------------
-  const [novoUsuarioAdmin, setNovoUsuarioAdmin] = useState({ nome: "", email: "", senha: "", tipo: "cliente", empresaNome: "", empresaCategoria: "" });
+  const [novoUsuarioAdmin, setNovoUsuarioAdmin] = useState({ nome: "", email: "", senha: "", tipo: "cliente", empresaNome: "", empresaCategoria: "", empresaWhatsapp: "", empresaInstagram: "", empresaEndereco: "", empresaGoogleMaps: "", prestadorServico: "", prestadorWhatsapp: "", prestadorInstagram: "", prestadorEndereco: "", prestadorGoogleMaps: "" });
   const [criandoUsuarioAdmin, setCriandoUsuarioAdmin] = useState(false);
   const [statusUsuarioAdmin, setStatusUsuarioAdmin] = useState("");
 
@@ -948,7 +1513,7 @@ function AdminPanel() {
       const dados = await resp.json();
       if (!resp.ok) throw new Error(dados.error || "Não foi possível criar o usuário agora.");
       setStatusUsuarioAdmin("ok");
-      setNovoUsuarioAdmin({ nome: "", email: "", senha: "", tipo: "cliente", empresaNome: "", empresaCategoria: "" });
+      setNovoUsuarioAdmin({ nome: "", email: "", senha: "", tipo: "cliente", empresaNome: "", empresaCategoria: "", empresaWhatsapp: "", empresaInstagram: "", empresaEndereco: "", empresaGoogleMaps: "", prestadorServico: "", prestadorWhatsapp: "", prestadorInstagram: "", prestadorEndereco: "", prestadorGoogleMaps: "" });
     } catch (err) {
       setStatusUsuarioAdmin(err.message || "Erro ao criar usuário.");
     } finally {
@@ -1011,10 +1576,13 @@ function AdminPanel() {
   // Notícias — cadastro real com foto e link.
   // -------------------------------------------------------------------------
   const [noticiasAdmin, setNoticiasAdmin] = useState(null);
-  const [novaNoticia, setNovaNoticia] = useState({ titulo: "", conteudo: "", imagem_url: "", link_url: "" });
+  const noticiaVazia = { titulo: "", resumo: "", conteudo: "", imagem_url: "", link_url: "", categoria: "", autor: "", tags: "", destaque: false, galeria_urls: [] };
+  const [novaNoticia, setNovaNoticia] = useState(noticiaVazia);
   const [enviandoFotoNoticia, setEnviandoFotoNoticia] = useState(false);
+  const [enviandoGaleriaNoticia, setEnviandoGaleriaNoticia] = useState(false);
   const [publicandoNoticia, setPublicandoNoticia] = useState(false);
   const [statusNoticia, setStatusNoticia] = useState("");
+  const conteudoNoticiaRef = useRef(null);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
@@ -1037,22 +1605,64 @@ function AdminPanel() {
     });
   };
 
+  const enviarGaleriaNoticia = (e) => {
+    const arquivos = Array.from(e.target.files || []);
+    if (!arquivos.length) return;
+    if (!supabaseConfigurado) {
+      setNovaNoticia((v) => ({ ...v, galeria_urls: [...v.galeria_urls, ...arquivos.map((a) => URL.createObjectURL(a))] }));
+      return;
+    }
+    setEnviandoGaleriaNoticia(true);
+    (async () => {
+      const urls = [];
+      for (const arquivo of arquivos) {
+        const caminho = `noticias/galeria/${Date.now()}-${arquivo.name}`;
+        const { error } = await supabase.storage.from("banners").upload(caminho, arquivo);
+        if (!error) {
+          const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+          urls.push(pub.publicUrl);
+        }
+      }
+      setNovaNoticia((v) => ({ ...v, galeria_urls: [...v.galeria_urls, ...urls] }));
+      setEnviandoGaleriaNoticia(false);
+    })();
+  };
+
+  const removerFotoGaleriaNoticia = (url) => setNovaNoticia((v) => ({ ...v, galeria_urls: v.galeria_urls.filter((u) => u !== url) }));
+
+  // Toolbar de "editor rico" simples: envolve o texto selecionado com marcação
+  // (negrito **, itálico *, título ##) sem depender de nenhuma biblioteca —
+  // o site interpreta essa marcação na hora de exibir a notícia.
+  const formatarConteudoNoticia = (marcador) => {
+    const campo = conteudoNoticiaRef.current;
+    if (!campo) return;
+    const inicio = campo.selectionStart;
+    const fim = campo.selectionEnd;
+    const texto = novaNoticia.conteudo;
+    const selecionado = texto.slice(inicio, fim) || "texto";
+    const novoTexto = marcador === "##"
+      ? `${texto.slice(0, inicio)}\n## ${selecionado}\n${texto.slice(fim)}`
+      : `${texto.slice(0, inicio)}${marcador}${selecionado}${marcador}${texto.slice(fim)}`;
+    setNovaNoticia((v) => ({ ...v, conteudo: novoTexto }));
+  };
+
   const publicarNoticia = async (e) => {
     e.preventDefault();
     setStatusNoticia("");
     if (!novaNoticia.titulo) { setStatusNoticia("Informe ao menos o título."); return; }
+    const registro = { ...novaNoticia, tags: novaNoticia.tags ? novaNoticia.tags.split(",").map((t) => t.trim()).filter(Boolean) : [] };
     if (!supabaseConfigurado) {
-      setNoticiasAdmin((atual) => [{ id: `demo-${Date.now()}`, ...novaNoticia, publicada_em: new Date().toISOString() }, ...(atual ?? [])]);
-      setNovaNoticia({ titulo: "", conteudo: "", imagem_url: "", link_url: "" });
+      setNoticiasAdmin((atual) => [{ id: `demo-${Date.now()}`, ...registro, publicada_em: new Date().toISOString() }, ...(atual ?? [])]);
+      setNovaNoticia(noticiaVazia);
       setStatusNoticia("ok");
       return;
     }
     setPublicandoNoticia(true);
     try {
-      const { data, error } = await supabase.from("noticias").insert(novaNoticia).select().single();
+      const { data, error } = await supabase.from("noticias").insert(registro).select().single();
       if (error) throw error;
       setNoticiasAdmin((atual) => [data, ...(atual ?? [])]);
-      setNovaNoticia({ titulo: "", conteudo: "", imagem_url: "", link_url: "" });
+      setNovaNoticia(noticiaVazia);
       setStatusNoticia("ok");
     } catch (err) {
       setStatusNoticia(err.message || "Erro ao publicar notícia");
@@ -1068,6 +1678,71 @@ function AdminPanel() {
     }
     const { error } = await supabase.from("noticias").delete().eq("id", id);
     if (!error) setNoticiasAdmin((atual) => atual.filter((n) => n.id !== id));
+  };
+
+  // -------------------------------------------------------------------------
+  // Cursos — CRUD completo, só o administrador cadastra. Aparece no site
+  // principal para todo mundo (seção "Cursos e Eventos").
+  // -------------------------------------------------------------------------
+  const [cursosAdmin, setCursosAdmin] = useState(null);
+  const cursoVazio = { titulo: "", instituicao: "", descricao: "", professor: "", carga_horaria: "", data_inicio: "", link_inscricao: "", certificado: false, banner_url: "" };
+  const [novoCurso, setNovoCurso] = useState(cursoVazio);
+  const [enviandoBannerCurso, setEnviandoBannerCurso] = useState(false);
+  const [publicandoCurso, setPublicandoCurso] = useState(false);
+  const [statusCurso, setStatusCurso] = useState("");
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("cursos").select("*").order("data_inicio").then(({ data, error }) => {
+      if (!error) setCursosAdmin(data || []);
+    });
+  }, []);
+
+  const enviarBannerCurso = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setNovoCurso((v) => ({ ...v, banner_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoBannerCurso(true);
+    const caminho = `cursos/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoBannerCurso(false);
+      if (error) { setStatusCurso(error.message); return; }
+      const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+      setNovoCurso((v) => ({ ...v, banner_url: pub.publicUrl }));
+    });
+  };
+
+  const publicarCurso = async (e) => {
+    e.preventDefault();
+    setStatusCurso("");
+    if (!novoCurso.titulo || !novoCurso.data_inicio) { setStatusCurso("Informe ao menos o título e a data."); return; }
+    if (!supabaseConfigurado) {
+      setCursosAdmin((atual) => [{ id: `demo-${Date.now()}`, ...novoCurso }, ...(atual ?? [])]);
+      setNovoCurso(cursoVazio);
+      setStatusCurso("ok");
+      return;
+    }
+    setPublicandoCurso(true);
+    try {
+      const { data, error } = await supabase.from("cursos").insert(novoCurso).select().single();
+      if (error) throw error;
+      setCursosAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovoCurso(cursoVazio);
+      setStatusCurso("ok");
+    } catch (err) {
+      setStatusCurso(err.message || "Erro ao publicar curso");
+    } finally {
+      setPublicandoCurso(false);
+    }
+  };
+
+  const removerCurso = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setCursosAdmin((atual) => (atual ?? []).filter((c) => c.id !== id));
+      return;
+    }
+    const { error } = await supabase.from("cursos").delete().eq("id", id);
+    if (!error) setCursosAdmin((atual) => atual.filter((c) => c.id !== id));
   };
 
   // -------------------------------------------------------------------------
@@ -1128,7 +1803,8 @@ function AdminPanel() {
   // Vagas — admin cadastra vagas publicadas vinculadas a uma empresa.
   // -------------------------------------------------------------------------
   const [vagasAdmin, setVagasAdmin] = useState(null);
-  const [novaVaga, setNovaVaga] = useState({ empresa_id: "", cargo: "", salario: "", requisitos: "", cidade: "Ivatuba - PR" });
+  const vagaVazia = { empresa_id: "", cargo: "", salario: "", requisitos: "", cidade: "Ivatuba - PR", tipo: "CLT", beneficios: "", prazo: "" };
+  const [novaVaga, setNovaVaga] = useState(vagaVazia);
   const [publicandoVaga, setPublicandoVaga] = useState(false);
   const [statusVaga, setStatusVaga] = useState("");
 
@@ -1145,17 +1821,18 @@ function AdminPanel() {
     if (!novaVaga.cargo) { setStatusVaga("Informe ao menos o cargo."); return; }
     if (!supabaseConfigurado) {
       setVagasAdmin((atual) => [{ id: `demo-${Date.now()}`, ...novaVaga, status: "aberta" }, ...(atual ?? [])]);
-      setNovaVaga({ empresa_id: "", cargo: "", salario: "", requisitos: "", cidade: "Ivatuba - PR" });
+      setNovaVaga(vagaVazia);
       setStatusVaga("ok");
       return;
     }
     if (!novaVaga.empresa_id) { setStatusVaga("Escolha a empresa da vaga."); return; }
     setPublicandoVaga(true);
     try {
-      const { data, error } = await supabase.from("vagas").insert(novaVaga).select("*, empresas(nome)").single();
+      const registro = { ...novaVaga, prazo: novaVaga.prazo || null };
+      const { data, error } = await supabase.from("vagas").insert(registro).select("*, empresas(nome)").single();
       if (error) throw error;
       setVagasAdmin((atual) => [data, ...(atual ?? [])]);
-      setNovaVaga({ empresa_id: "", cargo: "", salario: "", requisitos: "", cidade: "Ivatuba - PR" });
+      setNovaVaga(vagaVazia);
       setStatusVaga("ok");
     } catch (err) {
       setStatusVaga(err.message || "Erro ao publicar vaga");
@@ -1176,10 +1853,12 @@ function AdminPanel() {
   // -------------------------------------------------------------------------
   // Feirantes — admin cadastra direto (com foto), já aprovado, aparece no site.
   // -------------------------------------------------------------------------
-  const [novoFeiranteAdmin, setNovoFeiranteAdmin] = useState({ nome: "", produto: "", whatsapp: "", instagram: "" });
+  const feiranteVazio = { nome: "", produto: "", whatsapp: "", instagram: "", categoria: "", descricao: "", local: "", numero_estande: "", empresa_id: "" };
+  const [novoFeiranteAdmin, setNovoFeiranteAdmin] = useState(feiranteVazio);
   const [fotoFeiranteAdmin, setFotoFeiranteAdmin] = useState(null);
   const [enviandoFeiranteAdmin, setEnviandoFeiranteAdmin] = useState(false);
   const [statusFeiranteAdmin, setStatusFeiranteAdmin] = useState("");
+  const [editandoLocalFeirante, setEditandoLocalFeirante] = useState({}); // { [id]: { local, numero_estande } }
 
   const cadastrarFeiranteAdmin = async (e) => {
     e.preventDefault();
@@ -1188,9 +1867,10 @@ function AdminPanel() {
       setStatusFeiranteAdmin("Preencha nome, produto e WhatsApp.");
       return;
     }
+    const payload = { ...novoFeiranteAdmin, empresa_id: novoFeiranteAdmin.empresa_id || null };
     if (!supabaseConfigurado) {
-      setFeirantes((atual) => [{ id: `demo-${Date.now()}`, ...novoFeiranteAdmin, status: "aprovado", fotos_urls: [] }, ...(atual ?? [])]);
-      setNovoFeiranteAdmin({ nome: "", produto: "", whatsapp: "", instagram: "" });
+      setFeirantes((atual) => [{ id: `demo-${Date.now()}`, ...payload, status: "aprovado", fotos_urls: [] }, ...(atual ?? [])]);
+      setNovoFeiranteAdmin(feiranteVazio);
       setFotoFeiranteAdmin(null);
       setStatusFeiranteAdmin("ok");
       return;
@@ -1206,10 +1886,10 @@ function AdminPanel() {
           fotosUrls = [pub.publicUrl];
         }
       }
-      const { data, error } = await supabase.from("feirantes").insert({ ...novoFeiranteAdmin, status: "aprovado", fotos_urls: fotosUrls }).select().single();
+      const { data, error } = await supabase.from("feirantes").insert({ ...payload, status: "aprovado", fotos_urls: fotosUrls }).select().single();
       if (error) throw error;
       setFeirantes((atual) => [data, ...(atual ?? [])]);
-      setNovoFeiranteAdmin({ nome: "", produto: "", whatsapp: "", instagram: "" });
+      setNovoFeiranteAdmin(feiranteVazio);
       setFotoFeiranteAdmin(null);
       setStatusFeiranteAdmin("ok");
     } catch (err) {
@@ -1219,10 +1899,22 @@ function AdminPanel() {
     }
   };
 
+  const salvarLocalFeirante = async (id) => {
+    const valores = editandoLocalFeirante[id];
+    if (!valores) return;
+    if (!supabaseConfigurado) {
+      setFeirantes((atual) => atual.map((f) => (f.id === id ? { ...f, ...valores } : f)));
+      return;
+    }
+    const { error } = await supabase.from("feirantes").update(valores).eq("id", id);
+    if (!error) setFeirantes((atual) => atual.map((f) => (f.id === id ? { ...f, ...valores } : f)));
+  };
+
   // -------------------------------------------------------------------------
   // Produtos — admin cadastra direto para qualquer empresa (não só modera).
   // -------------------------------------------------------------------------
-  const [novoProdutoAdmin, setNovoProdutoAdmin] = useState({ empresa_id: "", nome: "", descricao: "", preco: "", categoria: "" });
+  const produtoAdminVazio = { empresa_id: "", nome: "", descricao: "", preco: "", preco_promocional: "", estoque: "", categoria: "" };
+  const [novoProdutoAdmin, setNovoProdutoAdmin] = useState(produtoAdminVazio);
   const [fotoProdutoAdmin, setFotoProdutoAdmin] = useState(null);
   const [cadastrandoProdutoAdmin, setCadastrandoProdutoAdmin] = useState(false);
   const [statusProdutoAdmin, setStatusProdutoAdmin] = useState("");
@@ -1233,7 +1925,7 @@ function AdminPanel() {
     if (!novoProdutoAdmin.nome) { setStatusProdutoAdmin("Informe ao menos o nome do produto."); return; }
     if (!supabaseConfigurado) {
       setProdutosAdmin((atual) => [{ id: `demo-${Date.now()}`, ...novoProdutoAdmin, ativo: true }, ...(atual ?? listaProdutos)]);
-      setNovoProdutoAdmin({ empresa_id: "", nome: "", descricao: "", preco: "", categoria: "" });
+      setNovoProdutoAdmin(produtoAdminVazio);
       setFotoProdutoAdmin(null);
       setStatusProdutoAdmin("ok");
       return;
@@ -1255,6 +1947,8 @@ function AdminPanel() {
         nome: novoProdutoAdmin.nome,
         descricao: novoProdutoAdmin.descricao,
         preco: novoProdutoAdmin.preco ? Number(novoProdutoAdmin.preco) : null,
+        preco_promocional: novoProdutoAdmin.preco_promocional ? Number(novoProdutoAdmin.preco_promocional) : null,
+        estoque: novoProdutoAdmin.estoque !== "" ? Number(novoProdutoAdmin.estoque) : null,
         categoria: novoProdutoAdmin.categoria,
         foto_url: fotoUrl,
         ativo: true,
@@ -1262,7 +1956,7 @@ function AdminPanel() {
       const { data, error } = await supabase.from("produtos").insert(registro).select("*, empresas(nome)").single();
       if (error) throw error;
       setProdutosAdmin((atual) => [data, ...(atual ?? [])]);
-      setNovoProdutoAdmin({ empresa_id: "", nome: "", descricao: "", preco: "", categoria: "" });
+      setNovoProdutoAdmin(produtoAdminVazio);
       setFotoProdutoAdmin(null);
       setStatusProdutoAdmin("ok");
     } catch (err) {
@@ -1270,6 +1964,79 @@ function AdminPanel() {
     } finally {
       setCadastrandoProdutoAdmin(false);
     }
+  };
+
+  // -------------------------------------------------------------------------
+  // Depoimentos — CRUD completo com avaliação em estrelas, só o admin cadastra.
+  // -------------------------------------------------------------------------
+  const [depoimentosAdmin, setDepoimentosAdmin] = useState(null);
+  const depoimentoVazio = { nome: "", empresa: "", cargo: "", foto_url: "", avaliacao: 5, texto: "", status: "aprovado" };
+  const [novoDepoimento, setNovoDepoimento] = useState(depoimentoVazio);
+  const [enviandoFotoDepoimento, setEnviandoFotoDepoimento] = useState(false);
+  const [publicandoDepoimento, setPublicandoDepoimento] = useState(false);
+  const [statusDepoimentoForm, setStatusDepoimentoForm] = useState("");
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("depoimentos").select("*").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setDepoimentosAdmin(data || []);
+    });
+  }, []);
+
+  const enviarFotoDepoimento = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setNovoDepoimento((v) => ({ ...v, foto_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoFotoDepoimento(true);
+    const caminho = `depoimentos/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoDepoimento(false);
+      if (error) { setStatusDepoimentoForm(error.message); return; }
+      const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+      setNovoDepoimento((v) => ({ ...v, foto_url: pub.publicUrl }));
+    });
+  };
+
+  const publicarDepoimento = async (e) => {
+    e.preventDefault();
+    setStatusDepoimentoForm("");
+    if (!novoDepoimento.nome || !novoDepoimento.texto) { setStatusDepoimentoForm("Informe ao menos o nome e o texto."); return; }
+    if (!supabaseConfigurado) {
+      setDepoimentosAdmin((atual) => [{ id: `demo-${Date.now()}`, ...novoDepoimento }, ...(atual ?? [])]);
+      setNovoDepoimento(depoimentoVazio);
+      setStatusDepoimentoForm("ok");
+      return;
+    }
+    setPublicandoDepoimento(true);
+    try {
+      const { data, error } = await supabase.from("depoimentos").insert(novoDepoimento).select().single();
+      if (error) throw error;
+      setDepoimentosAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovoDepoimento(depoimentoVazio);
+      setStatusDepoimentoForm("ok");
+    } catch (err) {
+      setStatusDepoimentoForm(err.message || "Erro ao publicar depoimento");
+    } finally {
+      setPublicandoDepoimento(false);
+    }
+  };
+
+  const mudarStatusDepoimento = async (id, status) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setDepoimentosAdmin((atual) => (atual ?? []).map((d) => (d.id === id ? { ...d, status } : d)));
+      return;
+    }
+    const { error } = await supabase.from("depoimentos").update({ status }).eq("id", id);
+    if (!error) setDepoimentosAdmin((atual) => atual.map((d) => (d.id === id ? { ...d, status } : d)));
+  };
+
+  const removerDepoimento = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setDepoimentosAdmin((atual) => (atual ?? []).filter((d) => d.id !== id));
+      return;
+    }
+    const { error } = await supabase.from("depoimentos").delete().eq("id", id);
+    if (!error) setDepoimentosAdmin((atual) => atual.filter((d) => d.id !== id));
   };
 
   // -------------------------------------------------------------------------
@@ -1380,13 +2147,18 @@ function AdminPanel() {
   const items = [
     { id: "dashboard", label: "Estatísticas", icon: LayoutDashboard },
     { id: "usuarios", label: "Cadastrar usuário", icon: UserCircle2 },
+    { id: "categorias", label: "Categorias", icon: Tag },
     { id: "empresas", label: "Comerciantes", icon: CheckCircle2 },
     { id: "prestadores", label: "Prestadores de serviço", icon: Wrench },
     { id: "produtos", label: "Produtos", icon: ShoppingBag },
+    { id: "promocoes", label: "Promoções", icon: Tag },
     { id: "feira", label: "Feira do Empreendedor", icon: PartyPopper },
     { id: "calendario", label: "Calendário de eventos", icon: CalendarDays },
+    { id: "cursos", label: "Cursos", icon: GraduationCap },
     { id: "servicos", label: "Serviços do Empreendedor", icon: Landmark },
     { id: "enquetes", label: "Enquetes", icon: Vote },
+    { id: "depoimentos", label: "Depoimentos", icon: Star },
+    { id: "faq", label: "FAQ", icon: FileText },
     { id: "noticias", label: "Notícias", icon: Newspaper },
     { id: "vagas", label: "Vagas", icon: Briefcase },
     { id: "banners", label: "Banners", icon: ImageIcon },
@@ -1415,31 +2187,94 @@ function AdminPanel() {
         {tab === "dashboard" && (
           <div>
             <SectionHeader eyebrow="Visão geral" title="Estatísticas da plataforma" />
+            {!supabaseConfigurado && (
+              <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
+                <BadgeCheck size={14} className="mt-0.5 shrink-0" />
+                Modo demonstração: conecte o Supabase para ver os números reais da plataforma.
+              </div>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               {[
-                ["206", "Empresas ativas", Building2],
-                ["540", "Produtos publicados", ShoppingBag],
-                ["18", "Vagas abertas", Briefcase],
-                ["12.4k", "Visualizações no mês", Eye],
+                [statsReais?.empresas, "Empresas aprovadas", Building2],
+                [statsReais?.produtos, "Produtos ativos", ShoppingBag],
+                [statsReais?.vagas, "Vagas abertas", Briefcase],
+                [statsReais?.prestadores, "Prestadores aprovados", Wrench],
+                [statsReais?.noticias, "Notícias publicadas", Newspaper],
+                [statsReais?.eventos, "Eventos no calendário", CalendarDays],
               ].map(([n, l, Icon]) => (
                 <div key={l} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                   <Icon size={16} color={C.blue} />
-                  <p className="font-display font-extrabold text-xl mt-2" style={{ color: C.ink }}>{n}</p>
+                  <p className="font-display font-extrabold text-xl mt-2" style={{ color: C.ink }}>{statsReais ? n : "…"}</p>
                   <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{l}</p>
                 </div>
               ))}
             </div>
-            <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
-              <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Acessos na última semana</p>
-              <div style={{ width: "100%", height: 220 }}>
-                <ResponsiveContainer>
-                  <LineChart data={visitasSemana}>
-                    <XAxis dataKey="dia" tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} width={30} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="views" stroke={C.blue} strokeWidth={2.5} dot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
+
+            <div className="grid md:grid-cols-2 gap-4 mb-6">
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Acessos no site (últimos 7 dias)</p>
+                <div style={{ width: "100%", height: 200 }}>
+                  <ResponsiveContainer>
+                    <LineChart data={acessosSemanaReais ?? []}>
+                      <XAxis dataKey="dia" tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="views" stroke={C.blue} strokeWidth={2.5} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {acessosSemanaReais && acessosSemanaReais.every((d) => d.views === 0) && (
+                  <p className="font-body text-[11px] mt-2" style={{ color: "#7E93A7" }}>Sem visitas registradas ainda nos últimos 7 dias.</p>
+                )}
+              </div>
+
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Crescimento mensal (novas empresas)</p>
+                <div style={{ width: "100%", height: 200 }}>
+                  <ResponsiveContainer>
+                    <LineChart data={crescimentoMensal ?? []}>
+                      <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="empresas" stroke={C.amberDark} strokeWidth={2.5} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Empresas em destaque (mais visualizadas)</p>
+                <div className="flex flex-col gap-2.5">
+                  {(empresasDestaqueReais ?? []).map((e, i) => (
+                    <div key={e.nome + i} className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-body text-sm font-semibold truncate" style={{ color: C.ink }}>{e.nome}</p>
+                        <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{e.categoria}</p>
+                      </div>
+                      <span className="font-body text-xs font-bold shrink-0" style={{ color: C.blue }}>{e.visualizacoes ?? 0} views</span>
+                    </div>
+                  ))}
+                  {empresasDestaqueReais && empresasDestaqueReais.length === 0 && (
+                    <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma empresa aprovada ainda.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Últimos cadastros</p>
+                <div className="flex flex-col gap-2.5">
+                  {(ultimosCadastros ?? []).map((u, i) => (
+                    <div key={u.nome + i} className="flex items-center justify-between gap-2">
+                      <p className="font-body text-sm font-semibold truncate" style={{ color: C.ink }}>{u.nome}</p>
+                      <span className="font-body text-[11px] font-bold shrink-0 px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{u.tipo}</span>
+                    </div>
+                  ))}
+                  {ultimosCadastros && ultimosCadastros.length === 0 && (
+                    <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum cadastro ainda.</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1484,11 +2319,12 @@ function AdminPanel() {
               >
                 <option value="cliente">Cliente</option>
                 <option value="empresario">Empresário</option>
+                <option value="prestador">Prestador de serviço</option>
                 <option value="admin">Administrador</option>
               </select>
               {novoUsuarioAdmin.tipo === "empresario" && (
                 <div className="rounded-xl border p-3 flex flex-col gap-2" style={{ borderColor: C.line, background: C.blueTint2 }}>
-                  <p className="font-body text-xs font-bold" style={{ color: C.ink }}>Cadastrar a empresa deste empresário junto (opcional)</p>
+                  <p className="font-body text-xs font-bold" style={{ color: C.ink }}>Cadastrar a empresa deste empresário junto (aparece aprovada direto)</p>
                   <input
                     value={novoUsuarioAdmin.empresaNome}
                     onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, empresaNome: e.target.value }))}
@@ -1496,10 +2332,84 @@ function AdminPanel() {
                     className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
                     style={{ borderColor: C.line }}
                   />
-                  <input
+                  <select
                     value={novoUsuarioAdmin.empresaCategoria}
                     onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, empresaCategoria: e.target.value }))}
-                    placeholder="Categoria da empresa"
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white"
+                    style={{ borderColor: C.line }}
+                  >
+                    <option value="">Categoria da empresa</option>
+                    {(categoriasReaisAdmin ?? categorias).map((cat) => <option key={cat.nome} value={cat.nome}>{cat.nome}</option>)}
+                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={novoUsuarioAdmin.empresaWhatsapp}
+                      onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, empresaWhatsapp: e.target.value }))}
+                      placeholder="WhatsApp"
+                      className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                      style={{ borderColor: C.line }}
+                    />
+                    <input
+                      value={novoUsuarioAdmin.empresaInstagram}
+                      onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, empresaInstagram: e.target.value }))}
+                      placeholder="Instagram"
+                      className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                      style={{ borderColor: C.line }}
+                    />
+                  </div>
+                  <input
+                    value={novoUsuarioAdmin.empresaEndereco}
+                    onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, empresaEndereco: e.target.value }))}
+                    placeholder="Endereço"
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                    style={{ borderColor: C.line }}
+                  />
+                  <input
+                    value={novoUsuarioAdmin.empresaGoogleMaps}
+                    onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, empresaGoogleMaps: e.target.value }))}
+                    placeholder="Link do Google Maps"
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                    style={{ borderColor: C.line }}
+                  />
+                </div>
+              )}
+              {novoUsuarioAdmin.tipo === "prestador" && (
+                <div className="rounded-xl border p-3 flex flex-col gap-2" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                  <p className="font-body text-xs font-bold" style={{ color: C.ink }}>Dados do prestador de serviço (aparece aprovado direto)</p>
+                  <input
+                    value={novoUsuarioAdmin.prestadorServico}
+                    onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, prestadorServico: e.target.value }))}
+                    placeholder="Serviço prestado (ex: Eletricista)"
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                    style={{ borderColor: C.line }}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={novoUsuarioAdmin.prestadorWhatsapp}
+                      onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, prestadorWhatsapp: e.target.value }))}
+                      placeholder="WhatsApp"
+                      className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                      style={{ borderColor: C.line }}
+                    />
+                    <input
+                      value={novoUsuarioAdmin.prestadorInstagram}
+                      onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, prestadorInstagram: e.target.value }))}
+                      placeholder="Instagram"
+                      className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                      style={{ borderColor: C.line }}
+                    />
+                  </div>
+                  <input
+                    value={novoUsuarioAdmin.prestadorEndereco}
+                    onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, prestadorEndereco: e.target.value }))}
+                    placeholder="Endereço"
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                    style={{ borderColor: C.line }}
+                  />
+                  <input
+                    value={novoUsuarioAdmin.prestadorGoogleMaps}
+                    onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, prestadorGoogleMaps: e.target.value }))}
+                    placeholder="Link do Google Maps"
                     className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
                     style={{ borderColor: C.line }}
                   />
@@ -1523,6 +2433,89 @@ function AdminPanel() {
           </div>
         )}
 
+        {tab === "categorias" && (
+          <div>
+            <SectionHeader eyebrow="Vitrine" title="Categorias de empresas" sub="Nome, ícone, cor, ordem e status — controla o que aparece na home e nos formulários de cadastro" />
+            {!supabaseConfigurado && (
+              <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
+                <BadgeCheck size={14} className="mt-0.5 shrink-0" />
+                Modo demonstração: conecte o Supabase para essas alterações serem salvas de verdade.
+              </div>
+            )}
+
+            <form onSubmit={criarCategoria} className="rounded-2xl border p-4 flex flex-col sm:flex-row gap-2.5 sm:items-end mb-6 max-w-3xl" style={{ borderColor: C.line }}>
+              <label className="font-body text-xs font-semibold flex-1" style={{ color: "#425A70" }}>
+                Nome
+                <input value={novaCategoria.nome} onChange={(e) => setNovaCategoria((v) => ({ ...v, nome: e.target.value }))}
+                  placeholder="Ex: Agricultura" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                Ícone
+                <select value={novaCategoria.icone} onChange={(e) => setNovaCategoria((v) => ({ ...v, icone: e.target.value }))}
+                  className="mt-1 font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                  {ICONES_CATEGORIA.map((i) => <option key={i.nome} value={i.nome}>{i.label}</option>)}
+                </select>
+              </label>
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                Cor
+                <input type="color" value={novaCategoria.cor} onChange={(e) => setNovaCategoria((v) => ({ ...v, cor: e.target.value }))}
+                  className="mt-1 w-14 h-[38px] border rounded-lg outline-none block" style={{ borderColor: C.line }} />
+              </label>
+              <button type="submit" className="font-body text-sm font-bold text-white rounded-lg px-4 py-2.5 flex items-center justify-center gap-2 shrink-0" style={{ background: C.blue }}>
+                <PlusCircle size={14} /> Adicionar
+              </button>
+            </form>
+            {statusCategoria && statusCategoria !== "ok" && <p className="font-body text-xs mb-3" style={{ color: "#D64545" }}>{statusCategoria}</p>}
+
+            <div className="flex flex-col gap-2.5 max-w-3xl">
+              {(categoriasAdmin ?? []).map((c, i) => {
+                const Icon = resolverIconeCategoria(c.icone);
+                const editando = editandoCategoria === c.id;
+                return (
+                  <div key={c.id} className="rounded-2xl border p-3.5 flex items-center gap-3 flex-wrap" style={{ borderColor: C.line }}>
+                    <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${c.cor || C.blue}1a`, color: c.cor || C.blue }}>
+                      <Icon size={18} />
+                    </span>
+                    {editando ? (
+                      <div className="flex-1 min-w-[220px] flex flex-wrap gap-2 items-center">
+                        <input value={formCategoria.nome} onChange={(e) => setFormCategoria((f) => ({ ...f, nome: e.target.value }))}
+                          className="flex-1 min-w-[140px] font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                        <select value={formCategoria.icone} onChange={(e) => setFormCategoria((f) => ({ ...f, icone: e.target.value }))}
+                          className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                          {ICONES_CATEGORIA.map((i) => <option key={i.nome} value={i.nome}>{i.label}</option>)}
+                        </select>
+                        <input type="color" value={formCategoria.cor} onChange={(e) => setFormCategoria((f) => ({ ...f, cor: e.target.value }))}
+                          className="w-10 h-8 border rounded-lg outline-none" style={{ borderColor: C.line }} />
+                      </div>
+                    ) : (
+                      <div className="flex-1 min-w-0">
+                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.nome}</p>
+                        <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{c.ativa ? "Ativa" : "Desativada"} · ordem {c.ordem}</p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button onClick={() => moverCategoria(i, -1)} disabled={i === 0} className="w-8 h-8 rounded-lg border flex items-center justify-center disabled:opacity-30" style={{ borderColor: C.line, color: "#425A70" }}><ArrowUp size={14} /></button>
+                      <button onClick={() => moverCategoria(i, 1)} disabled={i === (categoriasAdmin ?? []).length - 1} className="w-8 h-8 rounded-lg border flex items-center justify-center disabled:opacity-30" style={{ borderColor: C.line, color: "#425A70" }}><ArrowDown size={14} /></button>
+                      <button onClick={() => alternarAtivaCategoria(c.id, !c.ativa)} className="font-body text-xs font-bold px-2.5 py-1.5 rounded-lg border" style={{ borderColor: C.line, color: c.ativa ? "#B4462F" : "#1E8E5A" }}>
+                        {c.ativa ? "Desativar" : "Ativar"}
+                      </button>
+                      {editando ? (
+                        <button onClick={() => salvarEdicaoCategoria(c.id)} className="font-body text-xs font-bold px-2.5 py-1.5 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
+                      ) : (
+                        <button onClick={() => iniciarEdicaoCategoria(c)} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#425A70" }}><Pencil size={14} /></button>
+                      )}
+                      <button onClick={() => removerCategoria(c.id)} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#B4462F" }}><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+                );
+              })}
+              {categoriasAdmin && categoriasAdmin.length === 0 && (
+                <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma categoria cadastrada ainda — as categorias de exemplo estão sendo usadas nos formulários por enquanto.</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {tab === "empresas" && (
           <div>
             <SectionHeader eyebrow="Moderação" title="Empresas aguardando aprovação" sub="Aprovar, recusar e editar já grava direto no banco" />
@@ -1532,11 +2525,13 @@ function AdminPanel() {
                 Modo demonstração: as ações abaixo só são salvas de verdade com o Supabase conectado.
               </div>
             )}
+            <input value={buscaEmpresasAdmin} onChange={(e) => setBuscaEmpresasAdmin(e.target.value)} placeholder="Buscar por nome ou categoria..."
+              className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none w-full max-w-sm mb-4" style={{ borderColor: C.line }} />
             <div className="flex flex-col gap-3">
-              {listaEmpresas.map((p) => (
+              {listaEmpresasFiltradaAdmin.slice(0, qtdEmpresasAdminVisiveis).map((p) => (
                 <div key={p.id} className="rounded-2xl border p-4 flex items-center gap-4 flex-wrap" style={{ borderColor: C.line }}>
                   {p.logo_url ? (
-                    <img src={p.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                    <img loading="lazy" decoding="async" src={p.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
                   ) : (
                     <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
                       <Building2 size={17} />
@@ -1547,17 +2542,54 @@ function AdminPanel() {
                       <div className="flex gap-2">
                         <input value={formEmpresa.nome} onChange={(e) => setFormEmpresa((f) => ({ ...f, nome: e.target.value }))}
                           className="flex-1 font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
-                        <input value={formEmpresa.categoria} onChange={(e) => setFormEmpresa((f) => ({ ...f, categoria: e.target.value }))}
-                          className="w-36 font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                        <select value={formEmpresa.categoria} onChange={(e) => setFormEmpresa((f) => ({ ...f, categoria: e.target.value }))}
+                          className="w-36 font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                          <option value="">Categoria</option>
+                          {(categoriasReaisAdmin ?? categorias).map((cat) => <option key={cat.nome} value={cat.nome}>{cat.nome}</option>)}
+                        </select>
                       </div>
-                      <label className="font-body text-xs font-bold cursor-pointer w-fit flex items-center gap-1.5" style={{ color: C.blue }}>
-                        <Camera size={13} /> {enviandoLogoEmpresa ? "Enviando..." : "Trocar logo"}
-                        <input type="file" accept="image/*" className="hidden" onChange={enviarLogoEmpresaAdmin} />
+                      <div className="flex flex-wrap gap-3">
+                        <label className="font-body text-xs font-bold cursor-pointer w-fit flex items-center gap-1.5" style={{ color: C.blue }}>
+                          <Camera size={13} /> {enviandoLogoEmpresa ? "Enviando..." : "Trocar logo"}
+                          <input type="file" accept="image/*" className="hidden" onChange={enviarLogoEmpresaAdmin} />
+                        </label>
+                        <label className="font-body text-xs font-bold cursor-pointer w-fit flex items-center gap-1.5" style={{ color: C.blue }}>
+                          <ImageIcon size={13} /> {enviandoBannerEmpresa ? "Enviando..." : "Trocar banner"}
+                          <input type="file" accept="image/*" className="hidden" onChange={enviarBannerEmpresaAdmin} />
+                        </label>
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        <input value={formEmpresa.facebook} onChange={(e) => setFormEmpresa((f) => ({ ...f, facebook: e.target.value }))}
+                          placeholder="Link do Facebook" className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                        <input value={formEmpresa.site} onChange={(e) => setFormEmpresa((f) => ({ ...f, site: e.target.value }))}
+                          placeholder="Site (https://...)" className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      </div>
+                      <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                        <input type="checkbox" checked={formEmpresa.destaque} onChange={(e) => setFormEmpresa((f) => ({ ...f, destaque: e.target.checked }))} />
+                        Mostrar em destaque na Vitrine Local
                       </label>
+                      <div>
+                        <p className="font-body text-xs font-bold mb-1.5" style={{ color: "#425A70" }}>Galeria de fotos</p>
+                        <div className="flex flex-wrap gap-2">
+                          {formEmpresa.fotos_urls.map((url, i) => (
+                            <div key={url + i} className="relative w-14 h-14 rounded-lg overflow-hidden border" style={{ borderColor: C.line }}>
+                              <img loading="lazy" decoding="async" src={url} alt="" className="w-full h-full object-cover" />
+                              <button onClick={() => removerFotoGaleriaEmpresa(i)} type="button" className="absolute top-0 right-0 w-5 h-5 bg-black/60 text-white flex items-center justify-center"><X size={11} /></button>
+                            </div>
+                          ))}
+                          <label className="w-14 h-14 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, color: "#7E93A7" }}>
+                            {enviandoFotoGaleria ? "..." : <PlusCircle size={16} />}
+                            <input type="file" accept="image/*" className="hidden" onChange={enviarFotoGaleriaEmpresa} />
+                          </label>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex-1 min-w-0">
-                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
+                      <p className="font-display font-bold text-sm flex items-center gap-1.5" style={{ color: C.ink }}>
+                        {p.nome}
+                        {p.destaque && <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: C.amber, color: C.blueDeep }}>DESTAQUE</span>}
+                      </p>
                       <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{p.categoria} · status: {p.status}</p>
                       {statusEmpresa[p.id] && statusEmpresa[p.id] !== "ok" && <p className="font-body text-[11px] mt-1" style={{ color: "#B4462F" }}>{statusEmpresa[p.id]}</p>}
                     </div>
@@ -1578,7 +2610,13 @@ function AdminPanel() {
                 </div>
               ))}
               {listaEmpresas.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma empresa cadastrada ainda.</p>}
+              {listaEmpresas.length > 0 && listaEmpresasFiltradaAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma empresa encontrada.</p>}
             </div>
+            {listaEmpresasFiltradaAdmin.length > qtdEmpresasAdminVisiveis && (
+              <button onClick={() => setQtdEmpresasAdminVisiveis((n) => n + 15)} className="font-body text-xs font-bold px-4 py-2.5 rounded-lg border mt-3" style={{ borderColor: C.line, color: "#425A70" }}>
+                Carregar mais
+              </button>
+            )}
           </div>
         )}
 
@@ -1589,7 +2627,7 @@ function AdminPanel() {
               {listaPrestadores.map((p) => (
                 <div key={p.id} className="rounded-2xl border p-4 flex items-center gap-4 flex-wrap" style={{ borderColor: C.line }}>
                   {p.foto_url ? (
-                    <img src={p.foto_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                    <img loading="lazy" decoding="async" src={p.foto_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
                   ) : (
                     <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
                       <Wrench size={17} />
@@ -1646,6 +2684,8 @@ function AdminPanel() {
               </select>
               <input value={novoProdutoAdmin.nome} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, nome: e.target.value }))} placeholder="Nome do produto" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
               <input value={novoProdutoAdmin.preco} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, preco: e.target.value }))} type="number" step="0.01" placeholder="Preço" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novoProdutoAdmin.preco_promocional} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, preco_promocional: e.target.value }))} type="number" step="0.01" placeholder="Preço promocional (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novoProdutoAdmin.estoque} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, estoque: e.target.value }))} type="number" min="0" placeholder="Estoque (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               <input value={novoProdutoAdmin.categoria} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, categoria: e.target.value }))} placeholder="Categoria" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               <textarea value={novoProdutoAdmin.descricao} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
               <label className="font-body text-xs font-bold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: C.blue }}>
@@ -1660,8 +2700,10 @@ function AdminPanel() {
             </form>
 
             <SectionHeader eyebrow="Moderação" title="Produtos publicados" sub="Publicar/despublicar e remover já grava direto no banco" />
+            <input value={buscaProdutosAdmin} onChange={(e) => setBuscaProdutosAdmin(e.target.value)} placeholder="Buscar por nome ou empresa..."
+              className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none w-full max-w-sm mb-4" style={{ borderColor: C.line }} />
             <div className="flex flex-col gap-3">
-              {listaProdutos.map((p) => (
+              {listaProdutosFiltradaAdmin.slice(0, qtdProdutosAdminVisiveis).map((p) => (
                 <div key={p.id} className="rounded-2xl border p-4 flex items-center gap-4 flex-wrap" style={{ borderColor: C.line }}>
                   <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
                     <ShoppingBag size={17} />
@@ -1683,7 +2725,69 @@ function AdminPanel() {
                   <button onClick={() => removerProduto(p.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
                 </div>
               ))}
-              {listaProdutos.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum produto publicado ainda.</p>}
+              {listaProdutosFiltradaAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>{listaProdutos.length === 0 ? "Nenhum produto publicado ainda." : "Nenhum produto encontrado."}</p>}
+            </div>
+            {listaProdutosFiltradaAdmin.length > qtdProdutosAdminVisiveis && (
+              <button onClick={() => setQtdProdutosAdminVisiveis((n) => n + 15)} className="font-body text-xs font-bold px-4 py-2.5 rounded-lg border mt-3" style={{ borderColor: C.line, color: "#425A70" }}>
+                Carregar mais
+              </button>
+            )}
+          </div>
+        )}
+
+        {tab === "promocoes" && (
+          <div>
+            <SectionHeader eyebrow="Ofertas" title="Cadastrar promoção" sub="Escolha um produto já publicado e defina o desconto" />
+            <form onSubmit={publicarPromocao} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <select value={novaPromocao.produto_id} onChange={(e) => setNovaPromocao((v) => ({ ...v, produto_id: e.target.value }))}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2 bg-white" style={{ borderColor: C.line }}>
+                <option value="">Selecione o produto</option>
+                {listaProdutos.map((p) => <option key={p.id} value={p.id}>{p.nome} — {p.empresas?.nome || "—"}</option>)}
+              </select>
+              <input value={novaPromocao.nome} onChange={(e) => setNovaPromocao((v) => ({ ...v, nome: e.target.value }))}
+                placeholder="Nome da promoção (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <textarea value={novaPromocao.descricao} onChange={(e) => setNovaPromocao((v) => ({ ...v, descricao: e.target.value }))}
+                placeholder="Descrição (opcional)" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <input value={novaPromocao.desconto_percentual} onChange={(e) => setNovaPromocao((v) => ({ ...v, desconto_percentual: e.target.value }))}
+                type="number" min="1" max="90" placeholder="% de desconto" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaPromocao.data_inicio} onChange={(e) => setNovaPromocao((v) => ({ ...v, data_inicio: e.target.value }))}
+                type="date" placeholder="Início (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaPromocao.valida_ate} onChange={(e) => setNovaPromocao((v) => ({ ...v, valida_ate: e.target.value }))}
+                type="date" placeholder="Válida até" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <label className="font-body text-xs font-bold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: C.blue }}>
+                <Camera size={14} /> {enviandoImagemPromocao ? "Enviando..." : (novaPromocao.imagem_url ? "Imagem enviada" : "Anexar imagem (opcional)")}
+                <input type="file" accept="image/*" className="hidden" onChange={enviarImagemPromocao} />
+              </label>
+              {statusPromocao && statusPromocao !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusPromocao}</p>}
+              {statusPromocao === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Promoção publicada!</p>}
+              <button type="submit" disabled={publicandoPromocao} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                {publicandoPromocao ? "Publicando..." : "Publicar promoção"}
+              </button>
+            </form>
+
+            <SectionHeader eyebrow="Moderação" title="Promoções cadastradas" sub="Ativar/desativar e remover já grava direto no banco" />
+            <div className="flex flex-col gap-3">
+              {(promocoesAdmin ?? []).map((p) => (
+                <div key={p.id} className="rounded-2xl border p-4 flex items-center gap-4 flex-wrap" style={{ borderColor: C.line }}>
+                  <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
+                    <Tag size={17} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome || p.produtos?.nome || "Promoção"}</p>
+                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>
+                      {p.produtos?.empresas?.nome || "—"} · -{p.desconto_percentual}% · até {p.valida_ate ? new Date(p.valida_ate + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
+                    </p>
+                  </div>
+                  <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: p.ativa ? "#E7F6EE" : C.blueTint, color: p.ativa ? "#1E8E5A" : "#7E93A7" }}>
+                    {p.ativa ? "Ativa" : "Inativa"}
+                  </span>
+                  <button onClick={() => alternarAtivaPromocao(p.id, !p.ativa)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
+                    {p.ativa ? "Desativar" : "Ativar"}
+                  </button>
+                  <button onClick={() => removerPromocao(p.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
+                </div>
+              ))}
+              {promocoesAdmin && promocoesAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma promoção cadastrada ainda.</p>}
             </div>
           </div>
         )}
@@ -1735,7 +2839,7 @@ function AdminPanel() {
               <div className="flex flex-col gap-2 max-w-lg">
                 {listaFeirasEspeciais.map((f) => (
                   <div key={f.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ borderColor: C.line }}>
-                    {f.imagem_url && <img src={f.imagem_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
+                    {f.imagem_url && <img loading="lazy" decoding="async" src={f.imagem_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{f.titulo}</p>
                       <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{f.data_inicio} · {f.local}</p>
@@ -1758,6 +2862,22 @@ function AdminPanel() {
                   className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 <input value={novoFeiranteAdmin.instagram} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, instagram: e.target.value }))} placeholder="Instagram (opcional)"
                   className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                <select value={novoFeiranteAdmin.categoria} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, categoria: e.target.value }))}
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }}>
+                  <option value="">Categoria (opcional)</option>
+                  {(categoriasReaisAdmin ?? []).map((c) => <option key={c.id || c.nome} value={c.nome}>{c.nome}</option>)}
+                </select>
+                <select value={novoFeiranteAdmin.empresa_id} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, empresa_id: e.target.value }))}
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }}>
+                  <option value="">Vincular a uma empresa (opcional)</option>
+                  {(empresasPend ?? []).map((emp) => <option key={emp.id} value={emp.id}>{emp.nome}</option>)}
+                </select>
+                <input value={novoFeiranteAdmin.local} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, local: e.target.value }))} placeholder="Local na feira (ex: Praça Central)"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={novoFeiranteAdmin.numero_estande} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, numero_estande: e.target.value }))} placeholder="Nº da barraca/estande"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <textarea value={novoFeiranteAdmin.descricao} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descrição breve (opcional)" rows={2}
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2 resize-none" style={{ borderColor: C.line }} />
                 <label className="font-body text-xs font-bold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: C.blue }}>
                   <Camera size={14} /> {fotoFeiranteAdmin ? `Foto: ${fotoFeiranteAdmin.name}` : "Anexar foto (opcional)"}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => setFotoFeiranteAdmin(e.target.files?.[0] || null)} />
@@ -1769,27 +2889,41 @@ function AdminPanel() {
                 </button>
               </form>
               <div className="flex flex-col gap-3">
-                {(feirantes ?? []).map((f) => (
-                  <div key={f.id} className="rounded-2xl border p-4 flex items-center gap-4 flex-wrap" style={{ borderColor: C.line }}>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.nome}</p>
-                      <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{f.produto} · {f.whatsapp}{f.instagram ? ` · ${f.instagram}` : ""}</p>
+                {(feirantes ?? []).map((f) => {
+                  const editando = editandoLocalFeirante[f.id] ?? { local: f.local || "", numero_estande: f.numero_estande || "" };
+                  const empresaVinculada = (empresasPend ?? []).find((emp) => emp.id === f.empresa_id);
+                  return (
+                  <div key={f.id} className="rounded-2xl border p-4 flex flex-col gap-3" style={{ borderColor: C.line }}>
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.nome}{f.categoria ? ` · ${f.categoria}` : ""}</p>
+                        <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{f.produto} · {f.whatsapp}{f.instagram ? ` · ${f.instagram}` : ""}{empresaVinculada ? ` · Empresa: ${empresaVinculada.nome}` : ""}</p>
+                        {f.descricao && <p className="font-body text-xs mt-0.5" style={{ color: "#7E93A7" }}>{f.descricao}</p>}
+                      </div>
+                      <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
+                        style={{
+                          background: f.status === "aprovado" ? "#E7F6EE" : f.status === "recusado" ? "#FBEAE5" : C.blueTint,
+                          color: f.status === "aprovado" ? "#1E8E5A" : f.status === "recusado" ? "#B4462F" : "#7E93A7",
+                        }}>
+                        {f.status}
+                      </span>
+                      {f.status !== "aprovado" && (
+                        <button onClick={() => mudarStatusFeirante(f.id, "aprovado")} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: "#25A85B" }}>Aprovar</button>
+                      )}
+                      {f.status !== "recusado" && (
+                        <button onClick={() => mudarStatusFeirante(f.id, "recusado")} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Recusar</button>
+                      )}
                     </div>
-                    <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
-                      style={{
-                        background: f.status === "aprovado" ? "#E7F6EE" : f.status === "recusado" ? "#FBEAE5" : C.blueTint,
-                        color: f.status === "aprovado" ? "#1E8E5A" : f.status === "recusado" ? "#B4462F" : "#7E93A7",
-                      }}>
-                      {f.status}
-                    </span>
-                    {f.status !== "aprovado" && (
-                      <button onClick={() => mudarStatusFeirante(f.id, "aprovado")} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: "#25A85B" }}>Aprovar</button>
-                    )}
-                    {f.status !== "recusado" && (
-                      <button onClick={() => mudarStatusFeirante(f.id, "recusado")} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Recusar</button>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input value={editando.local} onChange={(e) => setEditandoLocalFeirante((s) => ({ ...s, [f.id]: { ...editando, local: e.target.value } }))}
+                        placeholder="Local na feira" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none w-44" style={{ borderColor: C.line }} />
+                      <input value={editando.numero_estande} onChange={(e) => setEditandoLocalFeirante((s) => ({ ...s, [f.id]: { ...editando, numero_estande: e.target.value } }))}
+                        placeholder="Nº da barraca" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none w-32" style={{ borderColor: C.line }} />
+                      <button onClick={() => salvarLocalFeirante(f.id)} className="font-body text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.blueTint, color: C.blue }}>Salvar local</button>
+                    </div>
                   </div>
-                ))}
+                  );
+                })}
                 {(feirantes ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum cadastro de feirante ainda.</p>}
               </div>
             </div>
@@ -1815,6 +2949,11 @@ function AdminPanel() {
                 <input type="date" value={novoEvento.data_fim} onChange={(e) => setNovoEvento((f) => ({ ...f, data_fim: e.target.value }))}
                   className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               </label>
+              <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                Horário (opcional)
+                <input type="time" value={novoEvento.hora} onChange={(e) => setNovoEvento((f) => ({ ...f, hora: e.target.value }))}
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
               <input value={novoEvento.local} onChange={(e) => setNovoEvento((f) => ({ ...f, local: e.target.value }))} placeholder="Local"
                 className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               <select value={novoEvento.tipo} onChange={(e) => setNovoEvento((f) => ({ ...f, tipo: e.target.value }))}
@@ -1824,6 +2963,20 @@ function AdminPanel() {
                 <option value="curso">Curso</option>
                 <option value="institucional">Institucional</option>
               </select>
+              <select value={novoEvento.status} onChange={(e) => setNovoEvento((f) => ({ ...f, status: e.target.value }))}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }}>
+                <option value="confirmado">Confirmado</option>
+                <option value="adiado">Adiado</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
+              <input value={novoEvento.link_inscricao} onChange={(e) => setNovoEvento((f) => ({ ...f, link_inscricao: e.target.value }))} placeholder="Link de inscrição (opcional)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novoEvento.google_maps_url} onChange={(e) => setNovoEvento((f) => ({ ...f, google_maps_url: e.target.value }))} placeholder="Link do Google Maps (opcional)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <label className="font-body text-xs font-bold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: C.blue }}>
+                <Camera size={14} /> {enviandoBannerEvento ? "Enviando..." : novoEvento.banner_url ? "Banner anexado ✓" : "Anexar banner do evento (opcional)"}
+                <input type="file" accept="image/*" className="hidden" onChange={enviarBannerEvento} />
+              </label>
               <button type="submit" disabled={salvandoEvento} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
                 {salvandoEvento ? "Salvando..." : "Adicionar ao calendário"}
               </button>
@@ -1831,16 +2984,30 @@ function AdminPanel() {
 
             <div className="flex flex-col gap-2 max-w-2xl">
               {listaEventos.map((ev) => (
-                <div key={ev.id} className="rounded-xl border p-3.5 flex items-center gap-3" style={{ borderColor: C.line }}>
-                  <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
-                    <CalendarDays size={16} />
-                  </span>
+                <div key={ev.id} className="rounded-xl border p-3.5 flex items-center gap-3 flex-wrap" style={{ borderColor: C.line }}>
+                  {ev.banner_url ? (
+                    <img loading="lazy" decoding="async" src={ev.banner_url} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
+                      <CalendarDays size={16} />
+                    </span>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{ev.titulo}</p>
                     <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>
-                      {ev.data_inicio}{ev.data_fim ? ` a ${ev.data_fim}` : ""}{ev.local ? ` · ${ev.local}` : ""} · {ev.tipo}
+                      {ev.data_inicio}{ev.data_fim ? ` a ${ev.data_fim}` : ""}{ev.hora ? ` · ${ev.hora}` : ""}{ev.local ? ` · ${ev.local}` : ""} · {ev.tipo}
                     </p>
                   </div>
+                  <select value={ev.status || "confirmado"} onChange={(e) => mudarStatusEvento(ev.id, e.target.value)}
+                    className="font-body text-[11px] font-bold border rounded-lg px-2 py-1.5 outline-none"
+                    style={{
+                      borderColor: C.line,
+                      color: ev.status === "cancelado" ? "#B4462F" : ev.status === "adiado" ? "#B4802F" : "#1E8E5A",
+                    }}>
+                    <option value="confirmado">Confirmado</option>
+                    <option value="adiado">Adiado</option>
+                    <option value="cancelado">Cancelado</option>
+                  </select>
                   <button onClick={() => removerEvento(ev.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
@@ -1864,7 +3031,7 @@ function AdminPanel() {
                   <div className="flex items-center gap-3 mb-3">
                     <label className="relative w-12 h-12 rounded-xl flex items-center justify-center shrink-0 cursor-pointer overflow-hidden border-2 border-dashed"
                       style={{ background: `${s.cor_hex || C.blue}1A`, borderColor: C.line }}>
-                      {s.logo_url ? <img src={s.logo_url} alt="" className="w-full h-full object-cover" /> : <Upload size={16} color={s.cor_hex || C.blue} />}
+                      {s.logo_url ? <img loading="lazy" decoding="async" src={s.logo_url} alt="" className="w-full h-full object-cover" /> : <Upload size={16} color={s.cor_hex || C.blue} />}
                       <input type="file" accept="image/*" className="hidden" onChange={(e) => enviarLogoServico(i, e)} />
                     </label>
                     <input value={s.titulo} onChange={(e) => atualizarServico(i, "titulo", e.target.value)}
@@ -1955,17 +3122,162 @@ function AdminPanel() {
           </div>
         )}
 
+        {tab === "depoimentos" && (
+          <div>
+            <SectionHeader eyebrow="Prova social" title="Depoimentos" sub="Cadastre — os aprovados aparecem no carrossel da home" />
+            <form onSubmit={publicarDepoimento} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <input value={novoDepoimento.nome} onChange={(e) => setNovoDepoimento((v) => ({ ...v, nome: e.target.value }))} placeholder="Nome" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={novoDepoimento.cargo} onChange={(e) => setNovoDepoimento((v) => ({ ...v, cargo: e.target.value }))} placeholder="Cargo (ex: Dona da Padaria X)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </div>
+              <input value={novoDepoimento.empresa} onChange={(e) => setNovoDepoimento((v) => ({ ...v, empresa: e.target.value }))} placeholder="Empresa (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novoDepoimento.texto} onChange={(e) => setNovoDepoimento((v) => ({ ...v, texto: e.target.value }))} placeholder="Texto do depoimento" rows={3} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <div className="flex items-center gap-1">
+                <span className="font-body text-xs font-semibold mr-1" style={{ color: "#425A70" }}>Avaliação:</span>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button key={n} type="button" onClick={() => setNovoDepoimento((v) => ({ ...v, avaliacao: n }))}>
+                    <Star size={18} fill={n <= novoDepoimento.avaliacao ? C.amberDark : "none"} color={C.amberDark} />
+                  </button>
+                ))}
+              </div>
+              <label className="font-body text-xs font-bold cursor-pointer flex items-center gap-2" style={{ color: C.blue }}>
+                <Camera size={14} /> {enviandoFotoDepoimento ? "Enviando..." : novoDepoimento.foto_url ? "Foto anexada — trocar" : "Anexar foto (opcional)"}
+                <input type="file" accept="image/*" className="hidden" onChange={enviarFotoDepoimento} />
+              </label>
+              {statusDepoimentoForm && statusDepoimentoForm !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusDepoimentoForm}</p>}
+              {statusDepoimentoForm === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Publicado!</p>}
+              <button type="submit" disabled={publicandoDepoimento} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+                {publicandoDepoimento ? "Publicando..." : "Publicar depoimento"}
+              </button>
+            </form>
+            <div className="flex flex-col gap-3 max-w-lg">
+              {(depoimentosAdmin ?? []).map((d) => (
+                <div key={d.id} className="rounded-2xl border p-4 flex items-center gap-3" style={{ borderColor: C.line }}>
+                  {d.foto_url ? (
+                    <img loading="lazy" decoding="async" src={d.foto_url} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <span className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 font-display font-bold text-white" style={{ background: C.blue }}>{(d.nome || "?").charAt(0)}</span>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{d.nome}</p>
+                    <p className="font-body text-xs truncate" style={{ color: "#7E93A7" }}>{d.cargo}{d.empresa ? ` · ${d.empresa}` : ""} · {"★".repeat(d.avaliacao || 0)}</p>
+                  </div>
+                  <select value={d.status} onChange={(e) => mudarStatusDepoimento(d.id, e.target.value)}
+                    className="font-body text-[11px] font-bold border rounded-lg px-2 py-1.5 outline-none shrink-0"
+                    style={{ borderColor: C.line, color: d.status === "aprovado" ? "#1E8E5A" : "#7E93A7" }}>
+                    <option value="aprovado">Aprovado</option>
+                    <option value="pendente">Pendente</option>
+                  </select>
+                  <button onClick={() => removerDepoimento(d.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                </div>
+              ))}
+              {(depoimentosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhum depoimento cadastrado ainda.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "faq" && (
+          <div>
+            <SectionHeader eyebrow="Dúvidas" title="Perguntas frequentes" sub="Agrupe por categoria e use as setas pra definir a ordem de exibição" />
+            <form onSubmit={criarFaq} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <input value={novaFaq.pergunta} onChange={(e) => setNovaFaq((v) => ({ ...v, pergunta: e.target.value }))} placeholder="Pergunta" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novaFaq.resposta} onChange={(e) => setNovaFaq((v) => ({ ...v, resposta: e.target.value }))} placeholder="Resposta" rows={3} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaFaq.categoria} onChange={(e) => setNovaFaq((v) => ({ ...v, categoria: e.target.value }))} placeholder="Categoria (ex: Cadastro, Pagamento, Geral)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              {statusFaq && statusFaq !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusFaq}</p>}
+              {statusFaq === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Adicionada!</p>}
+              <button type="submit" className="font-body text-sm font-bold text-white rounded-lg py-2.5" style={{ background: C.blue }}>
+                Adicionar pergunta
+              </button>
+            </form>
+            <div className="flex flex-col gap-3 max-w-lg">
+              {(faqAdmin ?? []).map((f, i) => (
+                <div key={f.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  {editandoFaq === f.id ? (
+                    <div className="flex flex-col gap-2">
+                      <input value={formFaq.pergunta} onChange={(e) => setFormFaq((v) => ({ ...v, pergunta: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <textarea value={formFaq.resposta} onChange={(e) => setFormFaq((v) => ({ ...v, resposta: e.target.value }))} rows={2} className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formFaq.categoria} onChange={(e) => setFormFaq((v) => ({ ...v, categoria: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <div className="flex gap-2">
+                        <button onClick={() => salvarEdicaoFaq(f.id)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-2" style={{ background: C.blue }}>Salvar</button>
+                        <button onClick={() => setEditandoFaq(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#425A70" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.pergunta}</p>
+                        <p className="font-body text-xs mt-1" style={{ color: "#7E93A7" }}>{f.resposta}</p>
+                        <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 inline-block" style={{ background: C.blueTint, color: C.blue }}>{f.categoria || "Geral"}</span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => moverFaq(i, -1)} disabled={i === 0} className="w-8 h-8 rounded-lg border flex items-center justify-center disabled:opacity-30" style={{ borderColor: C.line, color: "#425A70" }}><ArrowUp size={14} /></button>
+                        <button onClick={() => moverFaq(i, 1)} disabled={i === (faqAdmin ?? []).length - 1} className="w-8 h-8 rounded-lg border flex items-center justify-center disabled:opacity-30" style={{ borderColor: C.line, color: "#425A70" }}><ArrowDown size={14} /></button>
+                        <button onClick={() => alternarAtivaFaq(f.id, !f.ativa)} className="font-body text-[10px] font-bold px-2 py-2 rounded-lg border" style={{ borderColor: C.line, color: f.ativa ? "#1E8E5A" : "#7E93A7" }}>{f.ativa ? "Ativa" : "Oculta"}</button>
+                        <button onClick={() => iniciarEdicaoFaq(f)} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#425A70" }}><Pencil size={14} /></button>
+                        <button onClick={() => removerFaq(f.id)} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#B4462F" }}><Trash2 size={14} /></button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(faqAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhuma pergunta cadastrada ainda.</p>}
+            </div>
+          </div>
+        )}
+
         {tab === "noticias" && (
           <div>
             <SectionHeader eyebrow="Comunicação" title="Cadastrar notícia" sub="Foto e link são opcionais — aparece com data mais recente primeiro" />
             <form onSubmit={publicarNoticia} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
               <input value={novaNoticia.titulo} onChange={(e) => setNovaNoticia((v) => ({ ...v, titulo: e.target.value }))} placeholder="Título da notícia" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <textarea value={novaNoticia.conteudo} onChange={(e) => setNovaNoticia((v) => ({ ...v, conteudo: e.target.value }))} placeholder="Conteúdo" rows={4} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <input value={novaNoticia.link_url} onChange={(e) => setNovaNoticia((v) => ({ ...v, link_url: e.target.value }))} placeholder="Link (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novaNoticia.resumo} onChange={(e) => setNovaNoticia((v) => ({ ...v, resumo: e.target.value }))} placeholder="Resumo curto (aparece na lista)" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+
+              <div>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <button type="button" onClick={() => formatarConteudoNoticia("**")} className="font-display font-bold text-xs w-7 h-7 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>N</button>
+                  <button type="button" onClick={() => formatarConteudoNoticia("*")} className="font-display italic text-xs w-7 h-7 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>I</button>
+                  <button type="button" onClick={() => formatarConteudoNoticia("##")} className="font-display font-bold text-[10px] w-7 h-7 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>T</button>
+                  <span className="font-body text-[10px]" style={{ color: "#B7C6D6" }}>Selecione o texto e clique pra formatar</span>
+                </div>
+                <textarea ref={conteudoNoticiaRef} value={novaNoticia.conteudo} onChange={(e) => setNovaNoticia((v) => ({ ...v, conteudo: e.target.value }))} placeholder="Conteúdo completo da notícia" rows={6} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none w-full" style={{ borderColor: C.line }} />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <input value={novaNoticia.categoria} onChange={(e) => setNovaNoticia((v) => ({ ...v, categoria: e.target.value }))} placeholder="Categoria (ex: Comércio local)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={novaNoticia.autor} onChange={(e) => setNovaNoticia((v) => ({ ...v, autor: e.target.value }))} placeholder="Autor (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </div>
+              <input value={novaNoticia.tags} onChange={(e) => setNovaNoticia((v) => ({ ...v, tags: e.target.value }))} placeholder="Tags separadas por vírgula (ex: feira, mei, eventos)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaNoticia.link_url} onChange={(e) => setNovaNoticia((v) => ({ ...v, link_url: e.target.value }))} placeholder="Link externo (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+
+              <label className="font-body text-xs font-semibold flex items-center gap-2" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={novaNoticia.destaque} onChange={(e) => setNovaNoticia((v) => ({ ...v, destaque: e.target.checked }))} />
+                Notícia em destaque
+              </label>
+
               <label className="font-body text-xs font-bold cursor-pointer flex items-center gap-2" style={{ color: C.blue }}>
-                <Camera size={14} /> {enviandoFotoNoticia ? "Enviando..." : novaNoticia.imagem_url ? "Foto anexada — trocar" : "Anexar foto (opcional)"}
+                <Camera size={14} /> {enviandoFotoNoticia ? "Enviando..." : novaNoticia.imagem_url ? "Foto de capa anexada — trocar" : "Anexar foto de capa (opcional)"}
                 <input type="file" accept="image/*" className="hidden" onChange={enviarFotoNoticia} />
               </label>
+
+              <div>
+                <label className="font-body text-xs font-bold cursor-pointer flex items-center gap-2" style={{ color: C.blue }}>
+                  <ImageIcon size={14} /> {enviandoGaleriaNoticia ? "Enviando..." : "Adicionar fotos à galeria (opcional)"}
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={enviarGaleriaNoticia} />
+                </label>
+                {novaNoticia.galeria_urls.length > 0 && (
+                  <div className="flex gap-2 flex-wrap mt-2">
+                    {novaNoticia.galeria_urls.map((url) => (
+                      <div key={url} className="relative w-14 h-14 rounded-lg overflow-hidden border" style={{ borderColor: C.line }}>
+                        <img loading="lazy" decoding="async" src={url} alt="" className="w-full h-full object-cover" />
+                        <button type="button" onClick={() => removerFotoGaleriaNoticia(url)} className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center">
+                          <X size={9} color="#fff" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {statusNoticia && statusNoticia !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusNoticia}</p>}
               {statusNoticia === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Publicada!</p>}
               <button type="submit" disabled={publicandoNoticia} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
@@ -1975,15 +3287,63 @@ function AdminPanel() {
             <div className="flex flex-col gap-3 max-w-lg">
               {(noticiasAdmin ?? []).map((n) => (
                 <div key={n.id} className="rounded-2xl border p-4 flex items-center gap-3" style={{ borderColor: C.line }}>
-                  {n.imagem_url && <img src={n.imagem_url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />}
+                  {n.imagem_url && <img loading="lazy" decoding="async" src={n.imagem_url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
-                    <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{n.titulo}</p>
-                    <p className="font-body text-xs truncate" style={{ color: "#7E93A7" }}>{n.conteudo}</p>
+                    <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{n.titulo}{n.destaque ? " ⭐" : ""}</p>
+                    <p className="font-body text-xs truncate" style={{ color: "#7E93A7" }}>{n.resumo || n.conteudo}{n.categoria ? ` · ${n.categoria}` : ""}</p>
                   </div>
                   <button onClick={() => removerNoticia(n.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
               {(noticiasAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhuma notícia publicada ainda.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "cursos" && (
+          <div>
+            <SectionHeader eyebrow="Formação" title="Cursos e capacitações" sub="Cadastre — aparece direto na home, em Cursos e Eventos" />
+            <form onSubmit={publicarCurso} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <input value={novoCurso.titulo} onChange={(e) => setNovoCurso((v) => ({ ...v, titulo: e.target.value }))} placeholder="Nome do curso" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <div className="grid sm:grid-cols-2 gap-3">
+                <input value={novoCurso.instituicao} onChange={(e) => setNovoCurso((v) => ({ ...v, instituicao: e.target.value }))} placeholder="Instituição" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={novoCurso.professor} onChange={(e) => setNovoCurso((v) => ({ ...v, professor: e.target.value }))} placeholder="Professor/instrutor" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                  Data
+                  <input type="date" value={novoCurso.data_inicio} onChange={(e) => setNovoCurso((v) => ({ ...v, data_inicio: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+                <input value={novoCurso.carga_horaria} onChange={(e) => setNovoCurso((v) => ({ ...v, carga_horaria: e.target.value }))} placeholder="Carga horária (ex: 8h)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none self-end" style={{ borderColor: C.line }} />
+              </div>
+              <textarea value={novoCurso.descricao} onChange={(e) => setNovoCurso((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novoCurso.link_inscricao} onChange={(e) => setNovoCurso((v) => ({ ...v, link_inscricao: e.target.value }))} placeholder="Link de inscrição (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <label className="font-body text-xs font-semibold flex items-center gap-2" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={novoCurso.certificado} onChange={(e) => setNovoCurso((v) => ({ ...v, certificado: e.target.checked }))} />
+                Emite certificado
+              </label>
+              <label className="font-body text-xs font-bold cursor-pointer flex items-center gap-2" style={{ color: C.blue }}>
+                <Camera size={14} /> {enviandoBannerCurso ? "Enviando..." : novoCurso.banner_url ? "Banner anexado — trocar" : "Anexar banner (opcional)"}
+                <input type="file" accept="image/*" className="hidden" onChange={enviarBannerCurso} />
+              </label>
+              {statusCurso && statusCurso !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusCurso}</p>}
+              {statusCurso === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Publicado!</p>}
+              <button type="submit" disabled={publicandoCurso} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+                {publicandoCurso ? "Publicando..." : "Publicar curso"}
+              </button>
+            </form>
+            <div className="flex flex-col gap-3 max-w-lg">
+              {(cursosAdmin ?? []).map((c) => (
+                <div key={c.id} className="rounded-2xl border p-4 flex items-center gap-3" style={{ borderColor: C.line }}>
+                  {c.banner_url && <img loading="lazy" decoding="async" src={c.banner_url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{c.titulo}</p>
+                    <p className="font-body text-xs truncate" style={{ color: "#7E93A7" }}>{c.instituicao}{c.data_inicio ? ` · ${c.data_inicio}` : ""}{c.certificado ? " · Com certificado" : ""}</p>
+                  </div>
+                  <button onClick={() => removerCurso(c.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                </div>
+              ))}
+              {(cursosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhum curso cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -1999,7 +3359,19 @@ function AdminPanel() {
               <input value={novaVaga.cargo} onChange={(e) => setNovaVaga((v) => ({ ...v, cargo: e.target.value }))} placeholder="Cargo" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
               <input value={novaVaga.salario} onChange={(e) => setNovaVaga((v) => ({ ...v, salario: e.target.value }))} placeholder="Salário" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               <input value={novaVaga.cidade} onChange={(e) => setNovaVaga((v) => ({ ...v, cidade: e.target.value }))} placeholder="Cidade" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <select value={novaVaga.tipo} onChange={(e) => setNovaVaga((v) => ({ ...v, tipo: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }}>
+                <option value="CLT">CLT</option>
+                <option value="PJ">PJ</option>
+                <option value="Estágio">Estágio</option>
+                <option value="Temporário">Temporário</option>
+                <option value="Freelance">Freelance</option>
+              </select>
+              <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                Prazo para se candidatar (opcional)
+                <input type="date" value={novaVaga.prazo} onChange={(e) => setNovaVaga((v) => ({ ...v, prazo: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
               <textarea value={novaVaga.requisitos} onChange={(e) => setNovaVaga((v) => ({ ...v, requisitos: e.target.value }))} placeholder="Requisitos" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <textarea value={novaVaga.beneficios} onChange={(e) => setNovaVaga((v) => ({ ...v, beneficios: e.target.value }))} placeholder="Benefícios (ex: vale-transporte, vale-refeição)" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
               {statusVaga && statusVaga !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusVaga}</p>}
               {statusVaga === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Vaga publicada!</p>}
               <button type="submit" disabled={publicandoVaga} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
@@ -2011,7 +3383,9 @@ function AdminPanel() {
                 <div key={v.id} className="rounded-2xl border p-4 flex items-center gap-4" style={{ borderColor: C.line }}>
                   <div className="flex-1">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
-                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{v.empresas?.nome} · {v.salario}</p>
+                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>
+                      {v.empresas?.nome} · {v.salario}{v.tipo ? ` · ${v.tipo}` : ""}{v.prazo ? ` · até ${v.prazo}` : ""}
+                    </p>
                   </div>
                   <button onClick={() => removerVaga(v.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
                 </div>
@@ -2028,7 +3402,7 @@ function AdminPanel() {
                 <div key={b.id} className="rounded-2xl border p-4 flex flex-col gap-2" style={{ borderColor: C.line }}>
                   <div className="h-28 rounded-xl flex items-center justify-center mb-1 overflow-hidden" style={{ background: C.blueTint }}>
                     {b.imagem_url ? (
-                      <img src={b.imagem_url} alt={b.titulo || "Banner"} className="w-full h-full object-cover" />
+                      <img loading="lazy" decoding="async" src={b.imagem_url} alt={b.titulo || "Banner"} className="w-full h-full object-cover" />
                     ) : (
                       <ImageIcon size={22} color={C.blue} />
                     )}
@@ -2061,10 +3435,28 @@ function AdminPanel() {
                       Ativo
                     </label>
                   </div>
-                  <label className="font-body text-xs font-bold cursor-pointer" style={{ color: C.blue }}>
-                    {enviandoBanner === b.id ? "Enviando..." : "Substituir imagem"}
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => enviarImagemBanner(b.id, e)} />
-                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="font-body text-[11px] font-semibold" style={{ color: "#425A70" }}>
+                      Válido de
+                      <input type="date" value={b.data_inicio || ""} onChange={(e) => atualizarBanner(b.id, "data_inicio", e.target.value)}
+                        className="mt-1 w-full font-body text-xs border rounded-lg px-2 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                    </label>
+                    <label className="font-body text-[11px] font-semibold" style={{ color: "#425A70" }}>
+                      Até
+                      <input type="date" value={b.data_fim || ""} onChange={(e) => atualizarBanner(b.id, "data_fim", e.target.value)}
+                        className="mt-1 w-full font-body text-xs border rounded-lg px-2 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                    </label>
+                  </div>
+                  <div className="flex gap-3">
+                    <label className="font-body text-xs font-bold cursor-pointer" style={{ color: C.blue }}>
+                      {enviandoBanner === b.id ? "Enviando..." : "Imagem desktop"}
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => enviarImagemBanner(b.id, e)} />
+                    </label>
+                    <label className="font-body text-xs font-bold cursor-pointer" style={{ color: C.blue }}>
+                      {b.imagem_mobile_url ? "Trocar imagem mobile" : "Imagem mobile (opcional)"}
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => enviarImagemBannerMobile(b.id, e)} />
+                    </label>
+                  </div>
                   {statusBanner[b.id] && statusBanner[b.id] !== "ok" && (
                     <p className="font-body text-xs" style={{ color: "#D64545" }}>{statusBanner[b.id]}</p>
                   )}
@@ -2082,7 +3474,7 @@ function AdminPanel() {
                 </div>
               ))}
               <button
-                onClick={() => setBannersAdmin((atual) => [...(atual ?? listaBanners), { id: `novo-${Date.now()}`, titulo: "", imagem_url: null, link_url: "", ordem: (atual ?? listaBanners).length + 1, ativo: true }])}
+                onClick={() => setBannersAdmin((atual) => [...(atual ?? listaBanners), { id: `novo-${Date.now()}`, titulo: "", imagem_url: null, imagem_mobile_url: null, link_url: "", ordem: (atual ?? listaBanners).length + 1, ativo: true, data_inicio: "", data_fim: "" }])}
                 className="rounded-2xl border-2 border-dashed p-4 flex flex-col items-center justify-center gap-2 min-h-[180px]"
                 style={{ borderColor: C.line, color: C.blue }}
               >
@@ -2113,7 +3505,7 @@ function AdminPanel() {
             <div className="flex flex-col gap-2 max-w-lg">
               {(notificacoesAdmin ?? []).map((n) => (
                 <div key={n.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ borderColor: C.line }}>
-                  {n.imagem_url && <img src={n.imagem_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />}
+                  {n.imagem_url && <img loading="lazy" decoding="async" src={n.imagem_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{n.titulo}</p>
                     <p className="font-body text-[11px] truncate" style={{ color: "#7E93A7" }}>{n.mensagem}</p>
@@ -2137,7 +3529,7 @@ function AdminPanel() {
               <label className="font-body text-xs font-bold mt-2" style={{ color: C.ink }}>Logo</label>
               <div className="flex items-center gap-3">
                 {siteConfigAdmin?.logo_url ? (
-                  <img src={siteConfigAdmin.logo_url} alt="Logo" className="w-12 h-12 rounded-full object-cover border" style={{ borderColor: C.line }} />
+                  <img loading="lazy" decoding="async" src={siteConfigAdmin.logo_url} alt="Logo" className="w-12 h-12 rounded-full object-cover border" style={{ borderColor: C.line }} />
                 ) : (
                   <LogoMark size={48} />
                 )}
@@ -2174,6 +3566,8 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
   const [nome, setNome] = useState("");
   const [categoria, setCategoria] = useState("");
   const [preco, setPreco] = useState("");
+  const [precoPromocional, setPrecoPromocional] = useState("");
+  const [estoque, setEstoque] = useState("");
   const [palavrasChave, setPalavrasChave] = useState("");
   const [descricao, setDescricao] = useState("");
   const [gerandoDescricao, setGerandoDescricao] = useState(false);
@@ -2303,6 +3697,8 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
       const { error } = await supabase.from("produtos").insert({
         empresa_id: empresa?.id,
         nome, categoria, preco: preco ? Number(preco) : null,
+        preco_promocional: precoPromocional ? Number(precoPromocional) : null,
+        estoque: estoque !== "" ? Number(estoque) : null,
         descricao, foto_url: fotoUrl, imagem_ilustrativa: usandoImagemIlustrativa, ativo: true,
       });
       if (error) throw error;
@@ -2367,6 +3763,16 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
                   <input value={preco} onChange={(e) => setPreco(e.target.value)} type="number" step="0.01" placeholder="24,90"
                     className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 </label>
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  Preço promocional (opcional)
+                  <input value={precoPromocional} onChange={(e) => setPrecoPromocional(e.target.value)} type="number" step="0.01" placeholder="19,90"
+                    className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  Estoque disponível (opcional)
+                  <input value={estoque} onChange={(e) => setEstoque(e.target.value)} type="number" min="0" placeholder="Ex: 10"
+                    className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
               </div>
 
               {/* Descrição com IA */}
@@ -2393,7 +3799,7 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
                 </p>
                 {foto ? (
                   <div className="flex gap-3 items-start">
-                    <img src={foto.previewUrl} alt="Prévia do produto" className="w-20 h-20 rounded-lg object-cover border" style={{ borderColor: C.line }} />
+                    <img loading="lazy" decoding="async" src={foto.previewUrl} alt="Prévia do produto" className="w-20 h-20 rounded-lg object-cover border" style={{ borderColor: C.line }} />
                     <div className="flex-1">
                       <button type="button" onClick={analisarFoto} disabled={analisandoFoto}
                         className="glow-btn font-body text-xs font-bold rounded-lg px-3 py-2 flex items-center gap-1.5 disabled:opacity-60"
@@ -2429,7 +3835,7 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
                   {imagemIA ? (
                     <div className="flex gap-3 items-start">
                       <div className="relative w-20 h-20 shrink-0">
-                        <img src={`data:image/png;base64,${imagemIA}`} alt="Imagem ilustrativa gerada por IA" className="w-20 h-20 rounded-lg object-cover border" style={{ borderColor: C.line }} />
+                        <img loading="lazy" decoding="async" src={`data:image/png;base64,${imagemIA}`} alt="Imagem ilustrativa gerada por IA" className="w-20 h-20 rounded-lg object-cover border" style={{ borderColor: C.line }} />
                         <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap font-body text-[8px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: C.amberDark, color: "#fff" }}>
                           IA
                         </span>
@@ -2491,6 +3897,37 @@ function EmpresarioPanel() {
     });
   };
 
+  // Promoção real vinculada a um dos meus produtos.
+  const [novaPromocaoEmpresario, setNovaPromocaoEmpresario] = useState({ produto_id: "", desconto_percentual: "", valida_ate: "" });
+  const [publicandoPromocaoEmpresario, setPublicandoPromocaoEmpresario] = useState(false);
+  const [statusPromocaoEmpresario, setStatusPromocaoEmpresario] = useState("");
+
+  const publicarPromocaoEmpresario = async (e) => {
+    e.preventDefault();
+    setStatusPromocaoEmpresario("");
+    if (!novaPromocaoEmpresario.produto_id || !novaPromocaoEmpresario.desconto_percentual || !novaPromocaoEmpresario.valida_ate) {
+      setStatusPromocaoEmpresario("Escolha o produto, o desconto e a validade.");
+      return;
+    }
+    if (!supabaseConfigurado) { setStatusPromocaoEmpresario("ok"); return; }
+    setPublicandoPromocaoEmpresario(true);
+    try {
+      const { error } = await supabase.from("promocoes").insert({
+        produto_id: novaPromocaoEmpresario.produto_id,
+        desconto_percentual: Number(novaPromocaoEmpresario.desconto_percentual),
+        valida_ate: novaPromocaoEmpresario.valida_ate,
+        ativa: true,
+      });
+      if (error) throw error;
+      setNovaPromocaoEmpresario({ produto_id: "", desconto_percentual: "", valida_ate: "" });
+      setStatusPromocaoEmpresario("ok");
+    } catch (err) {
+      setStatusPromocaoEmpresario(err.message || "Erro ao publicar promoção.");
+    } finally {
+      setPublicandoPromocaoEmpresario(false);
+    }
+  };
+
   const alternarAtivoMeuProduto = async (id, ativo) => {
     if (!supabaseConfigurado) { setMeusProdutosReais((atual) => (atual ?? []).map((p) => (p.id === id ? { ...p, ativo } : p))); return; }
     const { error } = await supabase.from("produtos").update({ ativo }).eq("id", id);
@@ -2502,6 +3939,63 @@ function EmpresarioPanel() {
     const { error } = await supabase.from("produtos").delete().eq("id", id);
     if (!error) setMeusProdutosReais((atual) => atual.filter((p) => p.id !== id));
   };
+
+  const [editandoValoresProduto, setEditandoValoresProduto] = useState({}); // { [id]: { preco_promocional, estoque } }
+  const salvarValoresProduto = async (id) => {
+    const v = editandoValoresProduto[id];
+    if (!v) return;
+    const registro = { preco_promocional: v.preco_promocional !== "" ? Number(v.preco_promocional) : null, estoque: v.estoque !== "" ? Number(v.estoque) : null };
+    if (!supabaseConfigurado) { setMeusProdutosReais((atual) => atual.map((p) => (p.id === id ? { ...p, ...registro } : p))); return; }
+    const { error } = await supabase.from("produtos").update(registro).eq("id", id);
+    if (!error) setMeusProdutosReais((atual) => atual.map((p) => (p.id === id ? { ...p, ...registro } : p)));
+  };
+
+  // -------------------------------------------------------------------------
+  // Vagas do próprio empresário — o formulário existia na tela mas nunca
+  // salvava nada (nenhum input tinha state, o botão não fazia nada). Agora
+  // publica de verdade, vinculado à empresa do empresário logado.
+  // -------------------------------------------------------------------------
+  const [minhasVagasReais, setMinhasVagasReais] = useState(null);
+  const vagaEmpresarioVazia = { cargo: "", salario: "", cidade: "Ivatuba - PR", tipo: "CLT", requisitos: "", beneficios: "" };
+  const [novaVagaEmpresario, setNovaVagaEmpresario] = useState(vagaEmpresarioVazia);
+  const [publicandoVagaEmpresario, setPublicandoVagaEmpresario] = useState(false);
+  const [statusVagaEmpresario, setStatusVagaEmpresario] = useState("");
+
+  const carregarMinhasVagas = (idEmpresa) => {
+    if (!supabaseConfigurado || !idEmpresa) return;
+    supabase.from("vagas").select("*").eq("empresa_id", idEmpresa).order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMinhasVagasReais(data || []);
+    });
+  };
+
+  const publicarVagaEmpresario = async (e) => {
+    e.preventDefault();
+    setStatusVagaEmpresario("");
+    if (!novaVagaEmpresario.cargo) { setStatusVagaEmpresario("Informe ao menos o cargo."); return; }
+    if (!supabaseConfigurado || !empresaId) { setStatusVagaEmpresario("ok"); return; }
+    setPublicandoVagaEmpresario(true);
+    try {
+      const { data, error } = await supabase.from("vagas").insert({ ...novaVagaEmpresario, empresa_id: empresaId, status: "aberta" }).select().single();
+      if (error) throw error;
+      setMinhasVagasReais((atual) => [data, ...(atual ?? [])]);
+      setNovaVagaEmpresario(vagaEmpresarioVazia);
+      setStatusVagaEmpresario("ok");
+    } catch (err) {
+      setStatusVagaEmpresario(err.message || "Erro ao publicar vaga");
+    } finally {
+      setPublicandoVagaEmpresario(false);
+    }
+  };
+
+  const encerrarVagaEmpresario = async (id) => {
+    if (!supabaseConfigurado) { setMinhasVagasReais((atual) => atual.map((v) => (v.id === id ? { ...v, status: "encerrada" } : v))); return; }
+    const { error } = await supabase.from("vagas").update({ status: "encerrada" }).eq("id", id);
+    if (!error) setMinhasVagasReais((atual) => atual.map((v) => (v.id === id ? { ...v, status: "encerrada" } : v)));
+  };
+
+  // Visualizações do perfil — a coluna já existia na empresa (usada até pra
+  // ordenar "empresas em destaque"), só faltava mostrar aqui de verdade.
+  const [visualizacoesEmpresa, setVisualizacoesEmpresa] = useState(null);
 
   useEffect(() => {
     if (!supabaseConfigurado) {
@@ -2522,7 +4016,9 @@ function EmpresarioPanel() {
           nome: data.nome || "", whatsapp: data.whatsapp || "", instagram: data.instagram || "",
           endereco: data.endereco || "", horario_atendimento: data.horario_atendimento || "",
         });
+        setVisualizacoesEmpresa(data.visualizacoes ?? 0);
         carregarMeusProdutos(data.id);
+        carregarMinhasVagas(data.id);
       }
     })();
   }, []);
@@ -2621,25 +4117,43 @@ function EmpresarioPanel() {
               </button>
             </div>
             <div className="flex flex-col gap-3 -mt-4">
-              {(meusProdutosReais ?? meusProdutos.map((p, i) => ({ id: `demo-${i}`, ...p, preco_exibicao: p.preco }))).map((p) => (
-                <div key={p.id} className="rounded-2xl border p-4 flex items-center gap-4" style={{ borderColor: C.line }}>
-                  {p.foto_url ? (
-                    <img src={p.foto_url} alt={p.nome} className="w-10 h-10 rounded-lg object-cover shrink-0" />
-                  ) : (
-                    <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
-                      <ShoppingBag size={16} />
-                    </span>
-                  )}
-                  <div className="flex-1">
-                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
-                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{p.preco_exibicao ?? (p.preco != null ? `R$ ${Number(p.preco).toFixed(2)}` : "Sem preço")} · {p.ativo ? "Ativo" : "Inativo"}</p>
+              {(meusProdutosReais ?? meusProdutos.map((p, i) => ({ id: `demo-${i}`, ...p, preco_exibicao: p.preco }))).map((p) => {
+                const editando = editandoValoresProduto[p.id] ?? { preco_promocional: p.preco_promocional ?? "", estoque: p.estoque ?? "" };
+                return (
+                <div key={p.id} className="rounded-2xl border p-4 flex flex-col gap-3" style={{ borderColor: C.line }}>
+                  <div className="flex items-center gap-4">
+                    {p.foto_url ? (
+                      <img loading="lazy" decoding="async" src={p.foto_url} alt={p.nome} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                    ) : (
+                      <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
+                        <ShoppingBag size={16} />
+                      </span>
+                    )}
+                    <div className="flex-1">
+                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
+                      <p className="font-body text-xs" style={{ color: "#7E93A7" }}>
+                        {p.preco_exibicao ?? (p.preco != null ? `R$ ${Number(p.preco).toFixed(2)}` : "Sem preço")}
+                        {p.preco_promocional != null ? ` · Promo: R$ ${Number(p.preco_promocional).toFixed(2)}` : ""}
+                        {p.estoque != null ? ` · Estoque: ${p.estoque}` : ""} · {p.ativo ? "Ativo" : "Inativo"}
+                      </p>
+                    </div>
+                    <button onClick={() => alternarAtivoMeuProduto(p.id, !p.ativo)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border shrink-0" style={{ borderColor: C.line, color: "#425A70" }}>
+                      {p.ativo ? "Despublicar" : "Publicar"}
+                    </button>
+                    <button onClick={() => removerMeuProduto(p.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                   </div>
-                  <button onClick={() => alternarAtivoMeuProduto(p.id, !p.ativo)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
-                    {p.ativo ? "Despublicar" : "Publicar"}
-                  </button>
-                  <button onClick={() => removerMeuProduto(p.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                  {!String(p.id).startsWith("demo-") && (
+                    <div className="flex items-center gap-2 flex-wrap pl-14">
+                      <input value={editando.preco_promocional} onChange={(e) => setEditandoValoresProduto((s) => ({ ...s, [p.id]: { ...editando, preco_promocional: e.target.value } }))}
+                        type="number" step="0.01" placeholder="Preço promocional" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none w-36" style={{ borderColor: C.line }} />
+                      <input value={editando.estoque} onChange={(e) => setEditandoValoresProduto((s) => ({ ...s, [p.id]: { ...editando, estoque: e.target.value } }))}
+                        type="number" min="0" placeholder="Estoque" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none w-24" style={{ borderColor: C.line }} />
+                      <button onClick={() => salvarValoresProduto(p.id)} className="font-body text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.blueTint, color: C.blue }}>Salvar</button>
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
               {(meusProdutosReais ?? []).length === 0 && meusProdutosReais !== null && (
                 <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Você ainda não cadastrou nenhum produto.</p>
               )}
@@ -2650,52 +4164,73 @@ function EmpresarioPanel() {
         {tab === "promocoes" && (
           <div>
             <SectionHeader eyebrow="Vendas" title="Criar promoção" />
-            <div className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl" style={{ borderColor: C.line }}>
-              <select className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }}>
-                {meusProdutos.map((p) => <option key={p.nome}>{p.nome}</option>)}
+            <form onSubmit={publicarPromocaoEmpresario} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl" style={{ borderColor: C.line }}>
+              <select value={novaPromocaoEmpresario.produto_id} onChange={(e) => setNovaPromocaoEmpresario((v) => ({ ...v, produto_id: e.target.value }))}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2 bg-white" style={{ borderColor: C.line }}>
+                <option value="">Escolha o produto</option>
+                {(meusProdutosReais ?? []).map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
-              <input placeholder="% de desconto" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <input placeholder="Válida até" type="date" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <button className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2" style={{ background: C.blue }}>Publicar promoção</button>
-            </div>
+              <input value={novaPromocaoEmpresario.desconto_percentual} onChange={(e) => setNovaPromocaoEmpresario((v) => ({ ...v, desconto_percentual: e.target.value }))}
+                type="number" min="1" max="90" placeholder="% de desconto" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaPromocaoEmpresario.valida_ate} onChange={(e) => setNovaPromocaoEmpresario((v) => ({ ...v, valida_ate: e.target.value }))}
+                placeholder="Válida até" type="date" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <button type="submit" disabled={publicandoPromocaoEmpresario} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                {publicandoPromocaoEmpresario ? "Publicando..." : "Publicar promoção"}
+              </button>
+              {statusPromocaoEmpresario === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Promoção publicada!</p>}
+              {statusPromocaoEmpresario && statusPromocaoEmpresario !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusPromocaoEmpresario}</p>}
+              {(meusProdutosReais ?? []).length === 0 && (
+                <p className="sm:col-span-2 font-body text-xs" style={{ color: "#7E93A7" }}>Cadastre um produto primeiro na aba "Produtos" pra poder criar uma promoção.</p>
+              )}
+            </form>
           </div>
         )}
 
         {tab === "vagas" && (
           <div>
-            <SectionHeader eyebrow="Contratação" title="Publicar vaga" />
-            <div className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl" style={{ borderColor: C.line }}>
-              <input placeholder="Cargo" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
-              <input placeholder="Salário" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <input placeholder="Cidade" defaultValue="Ivatuba - PR" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <textarea placeholder="Requisitos" rows={3} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
-              <button className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2" style={{ background: C.blue }}>Publicar vaga</button>
+            <SectionHeader eyebrow="Contratação" title="Publicar vaga" sub="Aparece direto na home, na seção Vagas de emprego" />
+            <form onSubmit={publicarVagaEmpresario} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl mb-6" style={{ borderColor: C.line }}>
+              <input value={novaVagaEmpresario.cargo} onChange={(e) => setNovaVagaEmpresario((v) => ({ ...v, cargo: e.target.value }))} placeholder="Cargo" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <input value={novaVagaEmpresario.salario} onChange={(e) => setNovaVagaEmpresario((v) => ({ ...v, salario: e.target.value }))} placeholder="Salário" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaVagaEmpresario.cidade} onChange={(e) => setNovaVagaEmpresario((v) => ({ ...v, cidade: e.target.value }))} placeholder="Cidade" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <select value={novaVagaEmpresario.tipo} onChange={(e) => setNovaVagaEmpresario((v) => ({ ...v, tipo: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }}>
+                <option value="CLT">CLT</option>
+                <option value="PJ">PJ</option>
+                <option value="Estágio">Estágio</option>
+                <option value="Temporário">Temporário</option>
+                <option value="Freelance">Freelance</option>
+              </select>
+              <textarea value={novaVagaEmpresario.requisitos} onChange={(e) => setNovaVagaEmpresario((v) => ({ ...v, requisitos: e.target.value }))} placeholder="Requisitos" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <textarea value={novaVagaEmpresario.beneficios} onChange={(e) => setNovaVagaEmpresario((v) => ({ ...v, beneficios: e.target.value }))} placeholder="Benefícios (opcional)" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              {statusVagaEmpresario && statusVagaEmpresario !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusVagaEmpresario}</p>}
+              {statusVagaEmpresario === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Vaga publicada!</p>}
+              <button type="submit" disabled={publicandoVagaEmpresario} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                {publicandoVagaEmpresario ? "Publicando..." : "Publicar vaga"}
+              </button>
+            </form>
+            <div className="flex flex-col gap-3 max-w-2xl">
+              {(minhasVagasReais ?? []).map((v) => (
+                <div key={v.id} className="rounded-2xl border p-4 flex items-center gap-4" style={{ borderColor: C.line }}>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
+                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{v.salario} · {v.tipo}{v.status === "encerrada" ? " · Encerrada" : ""}</p>
+                  </div>
+                  {v.status !== "encerrada" && (
+                    <button onClick={() => encerrarVagaEmpresario(v.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Encerrar</button>
+                  )}
+                </div>
+              ))}
+              {(minhasVagasReais ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Você ainda não publicou nenhuma vaga.</p>}
             </div>
           </div>
         )}
 
         {tab === "visualizacoes" && (
           <div>
-            <SectionHeader eyebrow="Desempenho" title="Visualizações do meu perfil" />
-            <div className="grid grid-cols-3 gap-4 mb-6 max-w-lg">
-              {[["1.2k", "Este mês"], ["312", "Esta semana"], ["48", "Hoje"]].map(([n, l]) => (
-                <div key={l} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
-                  <p className="font-display font-extrabold text-xl" style={{ color: C.blue }}>{n}</p>
-                  <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{l}</p>
-                </div>
-              ))}
-            </div>
-            <div className="rounded-2xl border p-4 max-w-2xl" style={{ borderColor: C.line }}>
-              <div style={{ width: "100%", height: 200 }}>
-                <ResponsiveContainer>
-                  <LineChart data={visitasSemana}>
-                    <XAxis dataKey="dia" tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} width={30} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="views" stroke={C.amber} strokeWidth={2.5} dot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+            <SectionHeader eyebrow="Desempenho" title="Visualizações do meu perfil" sub="Contagem real de acessos à ficha da sua empresa" />
+            <div className="rounded-2xl border p-5 max-w-xs" style={{ borderColor: C.line }}>
+              <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{visualizacoesEmpresa ?? "—"}</p>
+              <p className="font-body text-xs mt-1" style={{ color: "#7E93A7" }}>Total de visualizações desde o cadastro</p>
             </div>
           </div>
         )}
@@ -2711,6 +4246,7 @@ function EmpresarioPanel() {
 // dos produtos oferecidos.
 // ---------------------------------------------------------------------------
 function ModalCadastroFeirante({ onFechar }) {
+  const categoriasReaisModal = useCategoriasReais();
   const [fotos, setFotos] = useState([]); // [{ nome, previewUrl, arquivo }]
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
@@ -2754,6 +4290,8 @@ function ModalCadastroFeirante({ onFechar }) {
         produto: form.get("produto"),
         instagram: form.get("instagram"),
         whatsapp: form.get("whatsapp"),
+        categoria: form.get("categoria"),
+        descricao: form.get("descricao"),
         fotos_urls: urls,
         status: "pendente",
       });
@@ -2828,6 +4366,19 @@ function ModalCadastroFeirante({ onFechar }) {
                 </label>
               </div>
 
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                Categoria (opcional)
+                <select name="categoria" defaultValue="" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }}>
+                  <option value="">Selecione</option>
+                  {(categoriasReaisModal ?? []).map((c) => <option key={c.id || c.nome} value={c.nome}>{c.nome}</option>)}
+                </select>
+              </label>
+
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                Descrição breve (opcional)
+                <textarea name="descricao" rows={2} placeholder="Conte um pouco sobre o que você vende" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none resize-none" style={{ borderColor: C.line }} />
+              </label>
+
               <div>
                 <p className="font-body text-xs font-semibold mb-1.5" style={{ color: "#425A70" }}>
                   Fotos do que você oferece <span style={{ color: "#B7C6D6" }}>(até 5)</span>
@@ -2835,7 +4386,7 @@ function ModalCadastroFeirante({ onFechar }) {
                 <div className="grid grid-cols-5 gap-2">
                   {fotos.map((f, i) => (
                     <div key={i} className="relative aspect-square rounded-lg overflow-hidden border" style={{ borderColor: C.line }}>
-                      <img src={f.previewUrl} alt={f.nome} className="w-full h-full object-cover" />
+                      <img loading="lazy" decoding="async" src={f.previewUrl} alt={f.nome} className="w-full h-full object-cover" />
                       <button type="button" onClick={() => removerFoto(i)}
                         className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
                         <X size={10} color="#fff" />
@@ -2866,6 +4417,50 @@ function ModalCadastroFeirante({ onFechar }) {
 // Banner de promoções em destaque — carrossel com autoplay das ofertas
 // publicadas pelos comerciantes.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Banners de publicidade — imagem real cadastrada pelo admin (desktop e
+// mobile, com período de validade). Antes essa tabela existia mas nunca
+// era mostrada em lugar nenhum do site; agora aparece logo abaixo do Hero.
+// ---------------------------------------------------------------------------
+function PublicidadeBanners() {
+  const [banners, setBanners] = useState(null);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    const hoje = new Date().toISOString().slice(0, 10);
+    supabase.from("banners").select("*").eq("ativo", true).order("ordem")
+      .then(({ data, error }) => {
+        if (error) return;
+        const validos = (data || []).filter((b) => {
+          if (b.data_inicio && b.data_inicio > hoje) return false;
+          if (b.data_fim && b.data_fim < hoje) return false;
+          return !!b.imagem_url;
+        });
+        setBanners(validos);
+      });
+  }, []);
+
+  if (!banners || banners.length === 0) return null;
+
+  return (
+    <section className="max-w-6xl mx-auto px-4 md:px-6 py-4 flex flex-col gap-3">
+      {banners.map((b) => {
+        const conteudo = (
+          <picture>
+            {b.imagem_mobile_url && <source media="(max-width: 640px)" srcSet={b.imagem_mobile_url} />}
+            <img loading="lazy" decoding="async" src={b.imagem_url} alt={b.titulo || "Publicidade"} className="w-full rounded-2xl object-cover" style={{ maxHeight: 180 }} />
+          </picture>
+        );
+        return b.link_url ? (
+          <a key={b.id} href={b.link_url} target="_blank" rel="noreferrer" className="block">{conteudo}</a>
+        ) : (
+          <div key={b.id}>{conteudo}</div>
+        );
+      })}
+    </section>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Capa de comerciante em destaque — espaço de publicidade paga, com rótulo
 // "Publicidade" visível (transparência com quem visita o site).
@@ -2940,14 +4535,39 @@ function CapaComercianteDestaque() {
 
 function BannerPromocoes() {
   const [indice, setIndice] = useState(0);
+  const [promocoesReais, setPromocoesReais] = useState(null); // null = carregando
 
   useEffect(() => {
-    const t = setInterval(() => setIndice((i) => (i + 1) % promocoesDestaque.length), 4500);
-    return () => clearInterval(t);
+    if (!supabaseConfigurado) { setPromocoesReais([]); return; }
+    const hoje = new Date().toISOString().slice(0, 10);
+    supabase.from("promocoes").select("*, produtos(nome, preco, empresas(nome, whatsapp))").eq("ativa", true)
+      .then(({ data, error }) => {
+        if (error) { setPromocoesReais([]); return; }
+        const validas = (data || [])
+          .filter((p) => (!p.data_inicio || p.data_inicio <= hoje) && (!p.valida_ate || p.valida_ate >= hoje))
+          .map((p) => ({
+            empresa: p.produtos?.empresas?.nome || p.nome || "Comércio local",
+            produto: p.nome || p.produtos?.nome || "Promoção",
+            precoOriginal: Number(p.produtos?.preco ?? 0),
+            precoPromo: Number(p.produtos?.preco ?? 0) * (1 - Number(p.desconto_percentual) / 100),
+            validoAte: p.valida_ate ? new Date(p.valida_ate + "T00:00:00").toLocaleDateString("pt-BR") : "",
+            whatsapp: p.produtos?.empresas?.whatsapp || null,
+          }));
+        setPromocoesReais(validas);
+      });
   }, []);
 
-  const promo = promocoesDestaque[indice];
-  const desconto = Math.round((1 - promo.precoPromo / promo.precoOriginal) * 100);
+  useEffect(() => {
+    if (!promocoesReais || promocoesReais.length === 0) return;
+    const t = setInterval(() => setIndice((i) => (i + 1) % promocoesReais.length), 4500);
+    return () => clearInterval(t);
+  }, [promocoesReais]);
+
+  if (!promocoesReais || promocoesReais.length === 0) return null;
+
+  const promo = promocoesReais[indice];
+  const linkWhats = promo.whatsapp ? `https://wa.me/55${String(promo.whatsapp).replace(/\D/g, "")}` : null;
+  const desconto = promo.precoOriginal > 0 ? Math.round((1 - promo.precoPromo / promo.precoOriginal) * 100) : 0;
 
   return (
     <section className="max-w-6xl mx-auto px-4 md:px-6 -mt-7 relative z-20">
@@ -2975,11 +4595,11 @@ function BannerPromocoes() {
               <p className="font-body text-[11px] text-white/60 mt-1">Válida até {promo.validoAte}</p>
 
               <div className="flex items-center gap-3 mt-5">
-                <button className="glow-btn font-body font-bold text-sm rounded-xl px-5 py-2.5 flex items-center gap-2" style={{ background: "#25A85B", color: "#fff" }}>
+                <a href={linkWhats || "#"} target={linkWhats ? "_blank" : undefined} rel="noreferrer" className="glow-btn font-body font-bold text-sm rounded-xl px-5 py-2.5 flex items-center gap-2" style={{ background: "#25A85B", color: "#fff" }}>
                   <MessageCircle size={15} /> Chamar no WhatsApp
-                </button>
+                </a>
                 <div className="flex gap-1.5">
-                  {promocoesDestaque.map((_, i) => (
+                  {promocoesReais.map((_, i) => (
                     <button key={i} onClick={() => setIndice(i)} aria-label={`Promoção ${i + 1}`}
                       className="rounded-full transition-all"
                       style={{ width: i === indice ? 18 : 6, height: 6, background: i === indice ? C.amber : "rgba(255,255,255,0.35)" }} />
@@ -3110,12 +4730,39 @@ function CalendarioEventos() {
           )}
           {(eventosDoDia ?? proximosEventos).map((ev) => (
             <div key={ev.id} className="flex items-start gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: corTipo[ev.tipo] || "#7E93A7" }} />
+              {ev.banner_url ? (
+                <img loading="lazy" decoding="async" src={ev.banner_url} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: corTipo[ev.tipo] || "#7E93A7" }} />
+              )}
               <div className="min-w-0 flex-1">
-                <p className="font-body text-xs font-semibold truncate" style={{ color: C.ink }}>{ev.titulo}</p>
-                <p className="font-body text-[10px]" style={{ color: "#7E93A7" }}>
-                  {formatarData(ev.data_inicio)}{ev.local ? ` · ${ev.local}` : ""} · {rotuloTipo[ev.tipo] || "Evento"}
+                <p className="font-body text-xs font-semibold truncate flex items-center gap-1.5" style={{ color: C.ink }}>
+                  {ev.titulo}
+                  {ev.status === "cancelado" && <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FBEAE5", color: "#B4462F" }}>Cancelado</span>}
+                  {ev.status === "adiado" && <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FFF6E9", color: "#8A5A12" }}>Adiado</span>}
                 </p>
+                <p className="font-body text-[10px]" style={{ color: "#7E93A7" }}>
+                  {formatarData(ev.data_inicio)}{ev.hora ? ` · ${ev.hora}` : ""}{ev.local ? ` · ${ev.local}` : ""} · {rotuloTipo[ev.tipo] || "Evento"}
+                </p>
+                {(ev.link_inscricao || ev.google_maps_url) && (
+                  <div className="flex items-center gap-3 mt-1">
+                    {ev.link_inscricao && (
+                      <a href={ev.link_inscricao} target="_blank" rel="noopener noreferrer" className="font-body text-[10px] font-bold flex items-center gap-1" style={{ color: C.blue }}>
+                        <ExternalLink size={10} /> Inscreva-se
+                      </a>
+                    )}
+                    {ev.google_maps_url && (
+                      <a href={ev.google_maps_url} target="_blank" rel="noopener noreferrer" className="font-body text-[10px] font-bold flex items-center gap-1" style={{ color: C.blue }}>
+                        <MapPin size={10} /> Ver no mapa
+                      </a>
+                    )}
+                  </div>
+                )}
+                {ev.link_inscricao && (
+                  <img loading="lazy" decoding="async"
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=64x64&data=${encodeURIComponent(ev.link_inscricao)}`}
+                    alt="QR Code de inscrição" className="w-12 h-12 mt-1.5 rounded" />
+                )}
               </div>
             </div>
           ))}
@@ -3127,17 +4774,89 @@ function CalendarioEventos() {
 
 function SiteHome({ onAuth, logoUrl, frase }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const categoriasReaisHome = useCategoriasReais();
+
+  // Registra uma visita real (sem dado pessoal nenhum, só a hora) pra
+  // alimentar o gráfico de "Acessos ao site" no dashboard do admin.
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("page_views").insert({}).then(() => {});
+  }, []);
+
+  // Instalação como app (PWA) — captura o prompt nativo do navegador (Android/
+  // desktop Chrome) e mostra um passo a passo manual pra quem usa iPhone
+  // (Safari não tem esse prompt automático).
+  const [promptInstalacao, setPromptInstalacao] = useState(null);
+  const [mostrarComoInstalarIOS, setMostrarComoInstalarIOS] = useState(false);
+  const ehIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  useEffect(() => {
+    const aoTerBeforeInstall = (e) => {
+      e.preventDefault();
+      setPromptInstalacao(e);
+    };
+    window.addEventListener("beforeinstallprompt", aoTerBeforeInstall);
+    return () => window.removeEventListener("beforeinstallprompt", aoTerBeforeInstall);
+  }, []);
+
+  const instalarApp = async () => {
+    if (promptInstalacao) {
+      promptInstalacao.prompt();
+      await promptInstalacao.userChoice;
+      setPromptInstalacao(null);
+      return;
+    }
+    if (ehIOS) {
+      setMostrarComoInstalarIOS(true);
+      return;
+    }
+    setMostrarComoInstalarIOS(true); // navegador sem suporte automático — mostra instrução genérica
+  };
   const [modalFeiranteAberto, setModalFeiranteAberto] = useState(false);
   const [query, setQuery] = useState("");
   const [favs, setFavs] = useState({});
   const [empresasReais, setEmpresasReais] = useState(null); // null = ainda carregando / indisponível
+  const [produtosReais, setProdutosReais] = useState(null);
+  const [vagasReais, setVagasReais] = useState(null);
+  const [cursosReais, setCursosReais] = useState(null);
+  const [noticiasReais, setNoticiasReais] = useState(null);
+  const [noticiaAberta, setNoticiaAberta] = useState(null);
   const [servicosReais, setServicosReais] = useState(null);
   const [feiraConfigReal, setFeiraConfigReal] = useState(null);
   const [feirasEspeciaisReais, setFeirasEspeciaisReais] = useState(null);
+  const [feirantesReais, setFeirantesReais] = useState(null);
   const [prestadoresReais, setPrestadoresReais] = useState(null);
   const [faqAberta, setFaqAberta] = useState(null);
+  const [faqReais, setFaqReais] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("faq").select("*").eq("ativa", true).order("ordem").then(({ data, error }) => {
+      if (!error && data && data.length > 0) setFaqReais(data);
+    });
+  }, []);
+  const listaFaq = faqReais ?? faqItens;
+  const faqPorCategoria = useMemo(() => {
+    const mapa = {};
+    listaFaq.forEach((item) => {
+      const cat = item.categoria || "Geral";
+      if (!mapa[cat]) mapa[cat] = [];
+      mapa[cat].push(item);
+    });
+    return mapa;
+  }, [listaFaq]);
+  const categoriasFaq = Object.keys(faqPorCategoria);
   const empresasSecaoRef = useRef(null);
   const vagasSecaoRef = useRef(null);
+  const produtosSecaoRef = useRef(null);
+  const cursosNoticiasSecaoRef = useRef(null);
+  const promocoesSecaoRef = useRef(null);
+  const servicosSecaoRef = useRef(null);
+  const feiraSecaoRef = useRef(null);
+  const calendarioSecaoRef = useRef(null);
+  const depoimentosSecaoRef = useRef(null);
+  const faqSecaoRef = useRef(null);
+  const contatoSecaoRef = useRef(null);
+  const heroSecaoRef = useRef(null);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
@@ -3146,11 +4865,20 @@ function SiteHome({ onAuth, logoUrl, frase }) {
     });
   }, []);
 
+  const [depoimentosReais, setDepoimentosReais] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("depoimentos").select("*").eq("status", "aprovado").order("criado_em", { ascending: false }).limit(20).then(({ data, error }) => {
+      if (!error && data && data.length > 0) setDepoimentosReais(data);
+    });
+  }, []);
+  const listaDepoimentos = depoimentosReais ?? depoimentos;
+
   const [indiceDepoimento, setIndiceDepoimento] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setIndiceDepoimento((i) => (i + 1) % depoimentos.length), 5500);
+    const t = setInterval(() => setIndiceDepoimento((i) => (i + 1) % listaDepoimentos.length), 5500);
     return () => clearInterval(t);
-  }, []);
+  }, [listaDepoimentos.length]);
 
   // Navbar ganha sombra/blur mais forte assim que a página é rolada.
   const [rolou, setRolou] = useState(false);
@@ -3183,6 +4911,9 @@ function SiteHome({ onAuth, logoUrl, frase }) {
     supabase.from("eventos_calendario").select("*").eq("tipo", "feira").order("data_inicio").then(({ data, error }) => {
       if (!error && data) setFeirasEspeciaisReais(data);
     });
+    supabase.from("feirantes").select("*").eq("status", "aprovado").order("criado_em", { ascending: false }).limit(24).then(({ data, error }) => {
+      if (!error) setFeirantesReais(data || []);
+    });
   }, []);
 
   const feiraAtual = feiraConfigReal ?? feiraRegular;
@@ -3197,30 +4928,170 @@ function SiteHome({ onAuth, logoUrl, frase }) {
     setTimeout(() => empresasSecaoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
+  // Cliques no menu do topo (Empresas, Produtos, Vagas, Cursos, Notícias)
+  // rolam a página até a seção certa, em vez de ficar sem fazer nada.
+  const irParaSecaoNav = (item) => {
+    setMenuOpen(false);
+    if (item === "Home") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    const refs = {
+      Empresas: empresasSecaoRef,
+      Serviços: servicosSecaoRef,
+      Promoções: promocoesSecaoRef,
+      "Feira do Empreendedor": feiraSecaoRef,
+      Calendário: calendarioSecaoRef,
+      Produtos: produtosSecaoRef,
+      Vagas: vagasSecaoRef,
+      Cursos: cursosNoticiasSecaoRef,
+      Notícias: cursosNoticiasSecaoRef,
+      Depoimentos: depoimentosSecaoRef,
+      FAQ: faqSecaoRef,
+      Contato: contatoSecaoRef,
+    };
+    refs[item]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   useEffect(() => {
     if (!supabaseConfigurado) return;
     supabase
       .from("empresas")
-      .select("nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes")
+      .select("nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, facebook, site, destaque, whatsapp")
       .eq("status", "aprovada")
+      .order("destaque", { ascending: false })
+      .order("visualizacoes", { ascending: false })
+      .limit(60)
       .then(({ data, error }) => {
         if (!error && data && data.length > 0) {
           setEmpresasReais(data.map((d) => ({
             nome: d.nome, cat: d.categoria, bairro: d.bairro, cidade: d.cidade,
             rating: d.rating ?? "—", cartaoServidor: !!d.cartao_servidor, itens: d.itens ?? 0,
+            banner_url: d.banner_url, facebook: d.facebook, site: d.site, destaque: d.destaque, whatsapp: d.whatsapp,
           })));
         }
       });
   }, []);
 
-  const listaBase = empresasReais ?? empresas; // usa dados reais assim que existirem
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase
+      .from("produtos")
+      .select("nome, preco, preco_promocional, estoque, foto_url, categoria, empresas(nome, whatsapp)")
+      .eq("ativo", true)
+      .order("criado_em", { ascending: false })
+      .limit(40)
+      .then(({ data, error }) => {
+        if (!error) {
+          setProdutosReais((data || []).map((d) => ({
+            nome: d.nome,
+            cat: d.categoria,
+            empresa: d.empresas?.nome || "",
+            whatsapp: d.empresas?.whatsapp || "",
+            foto_url: d.foto_url,
+            estoque: d.estoque,
+            preco: d.preco != null ? `R$ ${Number(d.preco).toFixed(2).replace(".", ",")}` : "Consulte",
+            precoPromocional: d.preco_promocional != null ? `R$ ${Number(d.preco_promocional).toFixed(2).replace(".", ",")}` : null,
+          })));
+        }
+      });
+  }, []);
 
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase
+      .from("vagas")
+      .select("cargo, salario, cidade, tipo, beneficios, prazo, empresas(nome, whatsapp)")
+      .eq("status", "aberta")
+      .order("criado_em", { ascending: false })
+      .limit(30)
+      .then(({ data, error }) => {
+        if (!error) {
+          setVagasReais((data || []).map((d) => ({
+            cargo: d.cargo,
+            salario: d.salario || "A combinar",
+            cidade: d.cidade || "Ivatuba - PR",
+            empresa: d.empresas?.nome || "",
+            whatsapp: d.empresas?.whatsapp || "",
+            tipo: d.tipo,
+            beneficios: d.beneficios,
+            prazo: d.prazo,
+          })));
+        }
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("cursos").select("*").order("data_inicio").limit(20).then(({ data, error }) => {
+      if (!error && data && data.length > 0) setCursosReais(data);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("noticias").select("*").order("publicada_em", { ascending: false }).limit(10).then(({ data, error }) => {
+      if (!error && data && data.length > 0) setNoticiasReais(data);
+    });
+  }, []);
+
+  // Assim que existir cadastro real (empresa aprovada, produto ativo, vaga
+  // aberta), a home passa a mostrar só dados reais — nada de exemplo fica
+  // exibido para sempre.
+  const listaBase = empresasReais ?? []; // usa dados reais assim que existirem
+
+  const [ordenacaoEmpresas, setOrdenacaoEmpresas] = useState("recentes");
   const empresasFiltradas = useMemo(() => {
-    if (!query.trim()) return listaBase;
-    return listaBase.filter((e) => e.nome.toLowerCase().includes(query.toLowerCase()) || e.cat.toLowerCase().includes(query.toLowerCase()));
-  }, [query, listaBase]);
+    let lista = !query.trim() ? listaBase : listaBase.filter((e) => e.nome.toLowerCase().includes(query.toLowerCase()) || e.cat.toLowerCase().includes(query.toLowerCase()));
+    lista = [...lista];
+    if (ordenacaoEmpresas === "az") lista.sort((a, b) => a.nome.localeCompare(b.nome));
+    if (ordenacaoEmpresas === "avaliacao") lista.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
+    return lista;
+  }, [query, listaBase, ordenacaoEmpresas]);
 
-  const nav = ["Empresas", "Produtos", "Vagas", "Cursos", "Notícias"];
+  const [queryProdutos, setQueryProdutos] = useState("");
+  const [ordenacaoProdutos, setOrdenacaoProdutos] = useState("recentes");
+  const produtosFiltrados = useMemo(() => {
+    let lista = (produtosReais ?? []);
+    if (queryProdutos.trim()) {
+      const q = queryProdutos.toLowerCase();
+      lista = lista.filter((p) => p.nome.toLowerCase().includes(q) || (p.empresa || "").toLowerCase().includes(q));
+    }
+    lista = [...lista];
+    const precoNum = (p) => Number((p.precoPromocional || p.preco || "0").replace(/[^\d,]/g, "").replace(",", "."));
+    if (ordenacaoProdutos === "menor-preco") lista.sort((a, b) => precoNum(a) - precoNum(b));
+    if (ordenacaoProdutos === "maior-preco") lista.sort((a, b) => precoNum(b) - precoNum(a));
+    if (ordenacaoProdutos === "az") lista.sort((a, b) => a.nome.localeCompare(b.nome));
+    return lista;
+  }, [produtosReais, queryProdutos, ordenacaoProdutos]);
+
+  const [queryVagas, setQueryVagas] = useState("");
+  const [filtroTipoVaga, setFiltroTipoVaga] = useState("");
+  const vagasFiltradas = useMemo(() => {
+    let lista = (vagasReais ?? []);
+    if (queryVagas.trim()) {
+      const q = queryVagas.toLowerCase();
+      lista = lista.filter((v) => v.cargo.toLowerCase().includes(q) || (v.cidade || "").toLowerCase().includes(q));
+    }
+    if (filtroTipoVaga) lista = lista.filter((v) => v.tipo === filtroTipoVaga);
+    return lista;
+  }, [vagasReais, queryVagas, filtroTipoVaga]);
+
+  // Paginação "carregar mais" — evita jogar centenas de cards na tela de
+  // uma vez só; mostra um tanto por vez e o resto sob demanda.
+  const PAGINA_EMPRESAS = 9, PAGINA_PRODUTOS = 8, PAGINA_VAGAS = 6;
+  const [qtdEmpresasVisiveis, setQtdEmpresasVisiveis] = useState(PAGINA_EMPRESAS);
+  const [qtdProdutosVisiveis, setQtdProdutosVisiveis] = useState(PAGINA_PRODUTOS);
+  const [qtdVagasVisiveis, setQtdVagasVisiveis] = useState(PAGINA_VAGAS);
+  useEffect(() => { setQtdEmpresasVisiveis(PAGINA_EMPRESAS); }, [query, ordenacaoEmpresas]);
+  useEffect(() => { setQtdProdutosVisiveis(PAGINA_PRODUTOS); }, [queryProdutos, ordenacaoProdutos]);
+  useEffect(() => { setQtdVagasVisiveis(PAGINA_VAGAS); }, [queryVagas, filtroTipoVaga]);
+
+  const nav = [
+    "Home", "Empresas", "Serviços", "Promoções", "Feira do Empreendedor",
+    "Calendário", "Produtos", "Vagas", "Cursos", "Notícias",
+    "Depoimentos", "FAQ", "Contato",
+  ];
 
   return (
     <div className="font-body min-h-screen" style={{ background: "#fff", color: C.ink }}>
@@ -3251,7 +5122,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
 
           <nav className="hidden md:flex items-center gap-6 ml-4">
             {nav.map((n) => (
-              <a key={n} href="#" className="font-body text-sm font-semibold" style={{ color: "#425A70" }}>{n}</a>
+              <a key={n} href="#" onClick={(e) => { e.preventDefault(); irParaSecaoNav(n); }} className="font-body text-sm font-semibold cursor-pointer" style={{ color: "#425A70" }}>{n}</a>
             ))}
           </nav>
 
@@ -3272,7 +5143,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
         {menuOpen && (
           <div className="md:hidden border-t px-4 py-3 flex flex-col gap-3" style={{ borderColor: C.line }}>
             {nav.map((n) => (
-              <a key={n} href="#" className="font-body text-sm font-semibold" style={{ color: "#425A70" }}>{n}</a>
+              <a key={n} href="#" onClick={(e) => { e.preventDefault(); irParaSecaoNav(n); }} className="font-body text-sm font-semibold cursor-pointer" style={{ color: "#425A70" }}>{n}</a>
             ))}
             <button onClick={() => onAuth?.("cadastro")} className="font-body text-sm font-bold px-4 py-2 rounded-lg text-white text-center" style={{ background: C.blue }}>
               Cadastrar empresa
@@ -3314,7 +5185,8 @@ function SiteHome({ onAuth, logoUrl, frase }) {
                 placeholder="Buscar empresas, produtos ou serviços..."
                 className="font-body flex-1 min-w-0 text-sm outline-none py-2"
               />
-              <button className="glow-btn font-body font-bold text-sm px-4 md:px-5 py-2.5 rounded-xl shrink-0" style={{ background: C.amber, color: C.blueDeep }}>
+              <button type="button" onClick={() => empresasSecaoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="glow-btn font-body font-bold text-sm px-4 md:px-5 py-2.5 rounded-xl shrink-0" style={{ background: C.amber, color: C.blueDeep }}>
                 Buscar
               </button>
             </div>
@@ -3382,7 +5254,40 @@ function SiteHome({ onAuth, logoUrl, frase }) {
         </div>
       </section>
 
-      <BannerPromocoes />
+      {/* Como funciona — timeline */}
+      <section className="max-w-6xl mx-auto px-4 md:px-6 py-14">
+        <Reveal>
+          <SectionHeader eyebrow="Passo a passo" title="Como funciona o Conecta Comércio" sub="Do cadastro até aparecer pra cidade toda, em poucos minutos" />
+        </Reveal>
+        <div className="relative grid sm:grid-cols-4 gap-8 sm:gap-4 mt-4">
+          <div aria-hidden="true" className="hidden sm:block absolute top-6 left-0 right-0 h-[2px]" style={{ background: C.line }} />
+          {[
+            { n: "1", titulo: "Cadastre-se grátis", desc: "Como cliente, empresário ou prestador de serviço — leva menos de 2 minutos.", icon: UserCircle2 },
+            { n: "2", titulo: "Publique seu conteúdo", desc: "Empresa, produtos, vagas ou seu serviço, com fotos de verdade.", icon: Upload },
+            { n: "3", titulo: "Admin aprova rapidinho", desc: "Uma checagem simples pra manter a plataforma confiável pra todo mundo.", icon: BadgeCheck },
+            { n: "4", titulo: "Apareça pra cidade toda", desc: "Clientes te encontram, favoritam e chamam direto no WhatsApp.", icon: TrendingUp },
+          ].map((etapa, i) => {
+            const Icon = etapa.icon;
+            return (
+              <Reveal key={etapa.n} delay={i * 110} className="relative">
+                <div className="flex sm:flex-col items-center sm:items-start gap-4 sm:gap-3">
+                  <span className="relative z-10 shrink-0 w-12 h-12 rounded-full flex items-center justify-center font-display font-extrabold text-white shadow-lg"
+                    style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
+                    <Icon size={20} />
+                  </span>
+                  <div>
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{etapa.titulo}</p>
+                    <p className="font-body text-xs mt-1" style={{ color: "#7E93A7" }}>{etapa.desc}</p>
+                  </div>
+                </div>
+              </Reveal>
+            );
+          })}
+        </div>
+      </section>
+
+      <PublicidadeBanners />
+      <div ref={promocoesSecaoRef}><BannerPromocoes /></div>
       <CapaComercianteDestaque />
 
       {/* Categorias */}
@@ -3391,14 +5296,14 @@ function SiteHome({ onAuth, logoUrl, frase }) {
           <SectionHeader eyebrow="Explorar" title="Categorias de empresas" sub="Tudo que Ivatuba tem para oferecer, organizado por perto de você" />
         </Reveal>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {categorias.map((c, i) => (
+          {(categoriasReaisHome ?? categorias).map((c, i) => (
             <Reveal key={c.nome} delay={i * 60}><CategoryCard cat={c} /></Reveal>
           ))}
         </div>
       </section>
 
       {/* Serviços do Empreendedor — em destaque */}
-      <section className="relative overflow-hidden py-14" style={{ background: `linear-gradient(155deg, ${C.blueDeep} 0%, ${C.blue} 100%)` }}>
+      <section ref={servicosSecaoRef} className="relative overflow-hidden py-14" style={{ background: `linear-gradient(155deg, ${C.blueDeep} 0%, ${C.blue} 100%)` }}>
         <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="blob absolute -top-16 right-[-4rem] w-72 h-72 rounded-full" style={{ background: C.amber, opacity: 0.25 }} />
         </div>
@@ -3427,7 +5332,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
                     style={{ background: "rgba(255,255,255,0.97)" }}>
                     <div className="flex items-start justify-between">
                       <span className="flex items-center justify-center w-11 h-11 rounded-xl overflow-hidden" style={{ background: `${cor}1A`, color: cor }}>
-                        {s.logo_url ? <img src={s.logo_url} alt="" className="w-full h-full object-cover" /> : <Icon size={20} />}
+                        {s.logo_url ? <img loading="lazy" decoding="async" src={s.logo_url} alt="" className="w-full h-full object-cover" /> : <Icon size={20} />}
                       </span>
                       <ExternalLink size={14} color="#B7C6D6" />
                     </div>
@@ -3447,7 +5352,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
       </section>
 
       {/* Feira do Empreendedor — em destaque */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section ref={feiraSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
         <Reveal>
           <div className="rounded-3xl overflow-hidden relative" style={{ background: `linear-gradient(120deg, ${C.amber}, ${C.amberDark})` }}>
             <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -3499,6 +5404,45 @@ function SiteHome({ onAuth, logoUrl, frase }) {
             </div>
           </div>
         </Reveal>
+
+        {(feirantesReais ?? []).length > 0 && (
+          <div className="mt-6">
+            <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Quem confirmou presença</p>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {(feirantesReais ?? []).map((f, i) => (
+                <Reveal key={f.id} delay={i * 60}>
+                  <div className="rounded-2xl border overflow-hidden h-full flex flex-col" style={{ borderColor: C.line }}>
+                    <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                      {f.fotos_urls && f.fotos_urls[0] ? (
+                        <img loading="lazy" decoding="async" src={f.fotos_urls[0]} alt={f.nome} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center" style={{ background: C.blueTint, color: C.blue }}><PartyPopper size={22} /></div>
+                      )}
+                    </div>
+                    <div className="p-3.5 flex-1 flex flex-col">
+                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.nome}</p>
+                      <p className="font-body text-xs mt-0.5" style={{ color: "#7E93A7" }}>{f.produto}</p>
+                      {f.categoria && (
+                        <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 w-fit" style={{ background: C.blueTint, color: C.blue }}>{f.categoria}</span>
+                      )}
+                      {(f.local || f.numero_estande) && (
+                        <p className="font-body text-[11px] mt-1.5 flex items-center gap-1" style={{ color: "#7E93A7" }}>
+                          <MapPin size={11} /> {[f.local, f.numero_estande ? `Barraca ${f.numero_estande}` : null].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
+                      {f.whatsapp && (
+                        <a href={`https://wa.me/55${(f.whatsapp || "").replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer"
+                          className="mt-auto pt-3 font-body text-xs font-bold flex items-center gap-1.5" style={{ color: "#1E8E5A" }}>
+                          <MessageCircle size={13} /> Chamar no WhatsApp
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {modalFeiranteAberto && <ModalCadastroFeirante onFechar={() => setModalFeiranteAberto(false)} />}
@@ -3506,7 +5450,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
       {/* Calendário de eventos — só o administrador edita, todo mundo vê */}
       <section className="max-w-6xl mx-auto px-4 md:px-6 pb-12">
         <Reveal><SectionHeader eyebrow="Agenda da cidade" title="Calendário de eventos" sub="Feiras, cursos e eventos do comércio local — atualizado pelo administrador" /></Reveal>
-        <div className="max-w-md">
+        <div ref={calendarioSecaoRef} className="max-w-md">
           <CalendarioEventos />
         </div>
       </section>
@@ -3514,64 +5458,194 @@ function SiteHome({ onAuth, logoUrl, frase }) {
       {/* Empresas em destaque */}
       <section ref={empresasSecaoRef} className="py-12" style={{ background: C.blueTint2 }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6">
-          <Reveal><SectionHeader eyebrow="Vitrine local" title="Empresas em destaque" linkLabel="Ver mapa de empresas" /></Reveal>
+          <div className="flex items-end justify-between gap-3 flex-wrap">
+            <Reveal><SectionHeader eyebrow="Vitrine local" title="Empresas em destaque" linkLabel="Ver mapa de empresas" /></Reveal>
+            <select value={ordenacaoEmpresas} onChange={(e) => setOrdenacaoEmpresas(e.target.value)}
+              className="font-body text-xs border rounded-lg px-3 py-2 outline-none bg-white mb-1" style={{ borderColor: C.line, color: "#425A70" }}>
+              <option value="recentes">Mais recentes</option>
+              <option value="az">Ordem alfabética</option>
+              <option value="avaliacao">Melhor avaliação</option>
+            </select>
+          </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {empresasFiltradas.map((e, i) => (
+            {empresasFiltradas.slice(0, qtdEmpresasVisiveis).map((e, i) => (
               <Reveal key={e.nome} delay={i * 70}>
                 <EmpresaCard e={e} fav={!!favs[e.nome]} onFav={() => setFavs((f) => ({ ...f, [e.nome]: !f[e.nome] }))} />
               </Reveal>
             ))}
             {empresasFiltradas.length === 0 && (
-              <p className="font-body text-sm col-span-full" style={{ color: "#7E93A7" }}>Nenhuma empresa encontrada para "{query}".</p>
+              <p className="font-body text-sm col-span-full" style={{ color: "#7E93A7" }}>
+                {query.trim() ? `Nenhuma empresa encontrada para "${query}".` : "Nenhuma empresa cadastrada ainda. Assim que a primeira for aprovada, aparece aqui."}
+              </p>
             )}
           </div>
+          {empresasFiltradas.length > qtdEmpresasVisiveis && (
+            <div className="flex justify-center mt-6">
+              <button onClick={() => setQtdEmpresasVisiveis((n) => n + PAGINA_EMPRESAS)}
+                className="font-body text-sm font-bold px-5 py-2.5 rounded-xl border bg-white" style={{ borderColor: C.line, color: C.blue }}>
+                Carregar mais empresas
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Produtos em destaque */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
-        <Reveal><SectionHeader eyebrow="Ofertas" title="Produtos em destaque" linkLabel="Ver todos" /></Reveal>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {produtos.map((p, i) => <Reveal key={p.nome} delay={i * 70}><ProdutoCard p={p} /></Reveal>)}
+      <section ref={produtosSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <Reveal><SectionHeader eyebrow="Ofertas" title="Produtos em destaque" linkLabel="Ver todos" /></Reveal>
+          {(produtosReais ?? []).length > 0 && (
+            <div className="flex items-center gap-2 mb-1">
+              <input value={queryProdutos} onChange={(e) => setQueryProdutos(e.target.value)} placeholder="Buscar produto..."
+                className="font-body text-xs border rounded-lg px-3 py-2 outline-none w-36" style={{ borderColor: C.line }} />
+              <select value={ordenacaoProdutos} onChange={(e) => setOrdenacaoProdutos(e.target.value)}
+                className="font-body text-xs border rounded-lg px-3 py-2 outline-none bg-white" style={{ borderColor: C.line, color: "#425A70" }}>
+                <option value="recentes">Mais recentes</option>
+                <option value="menor-preco">Menor preço</option>
+                <option value="maior-preco">Maior preço</option>
+                <option value="az">Ordem alfabética</option>
+              </select>
+            </div>
+          )}
         </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {produtosFiltrados.slice(0, qtdProdutosVisiveis).map((p, i) => <Reveal key={`${p.nome}-${i}`} delay={i * 70}><ProdutoCard p={p} /></Reveal>)}
+          {(produtosReais ?? []).length === 0 && (
+            <p className="font-body text-sm col-span-full" style={{ color: "#7E93A7" }}>Nenhum produto cadastrado ainda. Assim que um empresário publicar, aparece aqui.</p>
+          )}
+          {(produtosReais ?? []).length > 0 && produtosFiltrados.length === 0 && (
+            <p className="font-body text-sm col-span-full" style={{ color: "#7E93A7" }}>Nenhum produto encontrado para "{queryProdutos}".</p>
+          )}
+        </div>
+        {produtosFiltrados.length > qtdProdutosVisiveis && (
+          <div className="flex justify-center mt-6">
+            <button onClick={() => setQtdProdutosVisiveis((n) => n + PAGINA_PRODUTOS)}
+              className="font-body text-sm font-bold px-5 py-2.5 rounded-xl border bg-white" style={{ borderColor: C.line, color: C.blue }}>
+              Carregar mais produtos
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Vagas */}
       <section ref={vagasSecaoRef} className="py-12" style={{ background: C.blueTint2 }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6">
-          <Reveal><SectionHeader eyebrow="Trabalhe em Ivatuba" title="Vagas de emprego" linkLabel="Ver todas as vagas" /></Reveal>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {vagas.map((v, i) => <Reveal key={v.cargo} delay={i * 70}><VagaCard v={v} /></Reveal>)}
+          <div className="flex items-end justify-between gap-3 flex-wrap">
+            <Reveal><SectionHeader eyebrow="Trabalhe em Ivatuba" title="Vagas de emprego" linkLabel="Ver todas as vagas" /></Reveal>
+            {(vagasReais ?? []).length > 0 && (
+              <div className="flex items-center gap-2 mb-1">
+                <input value={queryVagas} onChange={(e) => setQueryVagas(e.target.value)} placeholder="Buscar cargo ou cidade..."
+                  className="font-body text-xs border rounded-lg px-3 py-2 outline-none w-40" style={{ borderColor: C.line }} />
+                <select value={filtroTipoVaga} onChange={(e) => setFiltroTipoVaga(e.target.value)}
+                  className="font-body text-xs border rounded-lg px-3 py-2 outline-none bg-white" style={{ borderColor: C.line, color: "#425A70" }}>
+                  <option value="">Todos os tipos</option>
+                  <option value="CLT">CLT</option>
+                  <option value="PJ">PJ</option>
+                  <option value="Estágio">Estágio</option>
+                  <option value="Temporário">Temporário</option>
+                  <option value="Freelance">Freelance</option>
+                </select>
+              </div>
+            )}
           </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {vagasFiltradas.slice(0, qtdVagasVisiveis).map((v, i) => <Reveal key={`${v.cargo}-${i}`} delay={i * 70}><VagaCard v={v} /></Reveal>)}
+            {(vagasReais ?? []).length === 0 && (
+              <p className="font-body text-sm col-span-full" style={{ color: "#7E93A7" }}>Nenhuma vaga publicada ainda.</p>
+            )}
+            {(vagasReais ?? []).length > 0 && vagasFiltradas.length === 0 && (
+              <p className="font-body text-sm col-span-full" style={{ color: "#7E93A7" }}>Nenhuma vaga encontrada com esse filtro.</p>
+            )}
+          </div>
+          {vagasFiltradas.length > qtdVagasVisiveis && (
+            <div className="flex justify-center mt-6">
+              <button onClick={() => setQtdVagasVisiveis((n) => n + PAGINA_VAGAS)}
+                className="font-body text-sm font-bold px-5 py-2.5 rounded-xl border bg-white" style={{ borderColor: C.line, color: C.blue }}>
+                Carregar mais vagas
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Cursos e Notícias */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 py-12 grid md:grid-cols-2 gap-10">
+      <section ref={cursosNoticiasSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12 grid md:grid-cols-2 gap-10">
         <div>
           <SectionHeader eyebrow="Sala do Empreendedor" title="Cursos e eventos" />
           <div className="flex flex-col gap-3">
-            {cursos.map((c) => <CursoCard key={c.titulo} c={c} />)}
+            {(cursosReais ?? cursos).map((c) => <CursoCard key={c.id || c.titulo} c={c} />)}
           </div>
         </div>
         <div>
           <SectionHeader eyebrow="Fique por dentro" title="Notícias" />
           <div className="flex flex-col">
-            {noticias.map((n, i) => (
-              <a key={n.titulo} href="#" className="flex items-center gap-3 py-3.5 border-b" style={{ borderColor: C.line }}>
-                <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
-                  <Newspaper size={15} />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-body text-sm font-semibold truncate" style={{ color: C.ink }}>{n.titulo}</p>
-                  <p className="font-body text-xs flex items-center gap-1 mt-0.5" style={{ color: "#7E93A7" }}><Clock size={10} /> {n.data}</p>
-                </div>
-                <ChevronRight size={16} color="#B7C6D6" />
-              </a>
-            ))}
+            {(noticiasReais ?? noticias).map((n, i) => {
+              const ehReal = !!noticiasReais;
+              const dataExibida = n.data || (n.publicada_em ? new Date(n.publicada_em).toLocaleDateString("pt-BR") : "");
+              return (
+                <button key={n.id || n.titulo} type="button" onClick={() => (ehReal ? setNoticiaAberta(n) : n.link_url && window.open(n.link_url, "_blank"))}
+                  className="flex items-center gap-3 py-3.5 border-b text-left w-full" style={{ borderColor: C.line }}>
+                  {n.imagem_url ? (
+                    <img loading="lazy" decoding="async" src={n.imagem_url} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
+                      <Newspaper size={15} />
+                    </span>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-body text-sm font-semibold truncate flex items-center gap-1.5" style={{ color: C.ink }}>
+                      {n.titulo}
+                      {n.destaque && <Sparkles size={12} color={C.amberDark} />}
+                    </p>
+                    <p className="font-body text-xs flex items-center gap-1 mt-0.5" style={{ color: "#7E93A7" }}><Clock size={10} /> {dataExibida}{n.categoria ? ` · ${n.categoria}` : ""}</p>
+                  </div>
+                  <ChevronRight size={16} color="#B7C6D6" />
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
+
+      {noticiaAberta && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.55)" }} onClick={() => setNoticiaAberta(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl max-h-[92vh] overflow-y-auto">
+            {noticiaAberta.imagem_url && <img loading="lazy" decoding="async" src={noticiaAberta.imagem_url} alt="" className="w-full h-40 object-cover sm:rounded-t-3xl" />}
+            <div className="p-5">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <p className="font-display font-bold text-lg" style={{ color: C.ink }}>{noticiaAberta.titulo}</p>
+                <button onClick={() => setNoticiaAberta(null)} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: C.blueTint2 }}>
+                  <X size={16} color="#425A70" />
+                </button>
+              </div>
+              <p className="font-body text-xs mb-3" style={{ color: "#7E93A7" }}>
+                {noticiaAberta.publicada_em ? new Date(noticiaAberta.publicada_em).toLocaleDateString("pt-BR") : ""}
+                {noticiaAberta.autor ? ` · ${noticiaAberta.autor}` : ""}{noticiaAberta.categoria ? ` · ${noticiaAberta.categoria}` : ""}
+              </p>
+              {renderizarConteudoNoticia(noticiaAberta.conteudo)}
+              {noticiaAberta.galeria_urls && noticiaAberta.galeria_urls.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  {noticiaAberta.galeria_urls.map((url) => (
+                    <img loading="lazy" decoding="async" key={url} src={url} alt="" className="w-full aspect-square object-cover rounded-lg" />
+                  ))}
+                </div>
+              )}
+              {noticiaAberta.tags && noticiaAberta.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {noticiaAberta.tags.map((t) => (
+                    <span key={t} className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: C.blueTint, color: C.blue }}>#{t}</span>
+                  ))}
+                </div>
+              )}
+              {noticiaAberta.link_url && (
+                <a href={noticiaAberta.link_url} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold mt-4 flex items-center gap-1 w-fit" style={{ color: C.blue }}>
+                  <ExternalLink size={12} /> Ver link relacionado
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Prestadores de serviço */}
       {(prestadoresReais ?? []).length > 0 && (
@@ -3590,29 +5664,45 @@ function SiteHome({ onAuth, logoUrl, frase }) {
       )}
 
       {/* Depoimentos */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section ref={depoimentosSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
         <Reveal>
           <SectionHeader eyebrow="Quem já usa" title="O que dizem sobre o Conecta Comércio" />
         </Reveal>
         <Reveal>
           <div className="rounded-3xl border p-8 md:p-10 relative overflow-hidden" style={{ borderColor: C.line, background: "rgba(255,255,255,0.6)", backdropFilter: "blur(10px)" }}>
             <div aria-hidden="true" className="blob absolute -top-16 right-[-4rem] w-64 h-64 rounded-full" style={{ background: C.blueTint, opacity: 0.6 }} />
-            <div key={indiceDepoimento} className="promo-slide relative">
-              <p className="font-display font-bold text-lg md:text-xl leading-snug max-w-2xl" style={{ color: C.ink }}>
-                "{depoimentos[indiceDepoimento].texto}"
-              </p>
-              <div className="mt-5 flex items-center gap-3">
-                <span className="w-10 h-10 rounded-full flex items-center justify-center font-display font-bold text-sm text-white" style={{ background: C.blue }}>
-                  {depoimentos[indiceDepoimento].nome.charAt(0)}
-                </span>
-                <div>
-                  <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{depoimentos[indiceDepoimento].nome}</p>
-                  <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{depoimentos[indiceDepoimento].papel}</p>
+            {(() => {
+              const atual = listaDepoimentos[indiceDepoimento % listaDepoimentos.length];
+              const nomeExibido = atual.nome;
+              const papelExibido = atual.papel || [atual.cargo, atual.empresa].filter(Boolean).join(" · ");
+              return (
+                <div key={indiceDepoimento} className="promo-slide relative">
+                  {atual.avaliacao && (
+                    <div className="flex gap-0.5 mb-2">
+                      {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={14} fill={n <= atual.avaliacao ? C.amberDark : "none"} color={C.amberDark} />)}
+                    </div>
+                  )}
+                  <p className="font-display font-bold text-lg md:text-xl leading-snug max-w-2xl" style={{ color: C.ink }}>
+                    "{atual.texto}"
+                  </p>
+                  <div className="mt-5 flex items-center gap-3">
+                    {atual.foto_url ? (
+                      <img loading="lazy" decoding="async" src={atual.foto_url} alt={nomeExibido} className="w-10 h-10 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <span className="w-10 h-10 rounded-full flex items-center justify-center font-display font-bold text-sm text-white shrink-0" style={{ background: C.blue }}>
+                        {nomeExibido.charAt(0)}
+                      </span>
+                    )}
+                    <div>
+                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{nomeExibido}</p>
+                      <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{papelExibido}</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
             <div className="flex gap-1.5 mt-6 relative">
-              {depoimentos.map((_, i) => (
+              {listaDepoimentos.map((_, i) => (
                 <button key={i} onClick={() => setIndiceDepoimento(i)} aria-label={`Depoimento ${i + 1}`}
                   className="rounded-full transition-all"
                   style={{ width: i === indiceDepoimento ? 18 : 6, height: 6, background: i === indiceDepoimento ? C.blue : C.blueTint }} />
@@ -3623,27 +5713,37 @@ function SiteHome({ onAuth, logoUrl, frase }) {
       </section>
 
       {/* FAQ */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section ref={faqSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
         <Reveal>
           <SectionHeader eyebrow="Dúvidas" title="Perguntas frequentes" />
         </Reveal>
-        <div className="max-w-2xl flex flex-col gap-3">
-          {faqItens.map((item, i) => {
-            const aberta = faqAberta === i;
-            return (
-              <Reveal key={item.pergunta} delay={i * 60}>
-                <div className="rounded-2xl border overflow-hidden" style={{ borderColor: C.line, background: "rgba(255,255,255,0.7)", backdropFilter: "blur(8px)" }}>
-                  <button onClick={() => setFaqAberta(aberta ? null : i)} className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left">
-                    <span className="font-display font-bold text-sm" style={{ color: C.ink }}>{item.pergunta}</span>
-                    <ChevronRight size={18} color={C.blue} style={{ transform: aberta ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .3s ease", flexShrink: 0 }} />
-                  </button>
-                  <div style={{ maxHeight: aberta ? 200 : 0, overflow: "hidden", transition: "max-height .35s ease" }}>
-                    <p className="font-body text-sm px-5 pb-4" style={{ color: "#7E93A7" }}>{item.resposta}</p>
-                  </div>
-                </div>
-              </Reveal>
-            );
-          })}
+        <div className="max-w-2xl flex flex-col gap-6">
+          {categoriasFaq.map((cat) => (
+            <div key={cat}>
+              {categoriasFaq.length > 1 && (
+                <p className="font-display font-bold text-xs uppercase tracking-wide mb-2" style={{ color: "#7E93A7" }}>{cat}</p>
+              )}
+              <div className="flex flex-col gap-3">
+                {faqPorCategoria[cat].map((item, i) => {
+                  const chave = `${cat}-${i}`;
+                  const aberta = faqAberta === chave;
+                  return (
+                    <Reveal key={item.id || item.pergunta} delay={i * 60}>
+                      <div className="rounded-2xl border overflow-hidden" style={{ borderColor: C.line, background: "rgba(255,255,255,0.7)", backdropFilter: "blur(8px)" }}>
+                        <button onClick={() => setFaqAberta(aberta ? null : chave)} className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left">
+                          <span className="font-display font-bold text-sm" style={{ color: C.ink }}>{item.pergunta}</span>
+                          <ChevronRight size={18} color={C.blue} style={{ transform: aberta ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .3s ease", flexShrink: 0 }} />
+                        </button>
+                        <div style={{ maxHeight: aberta ? 300 : 0, overflow: "hidden", transition: "max-height .35s ease" }}>
+                          <p className="font-body text-sm px-5 pb-4" style={{ color: "#7E93A7" }}>{item.resposta}</p>
+                        </div>
+                      </div>
+                    </Reveal>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -3659,14 +5759,38 @@ function SiteHome({ onAuth, logoUrl, frase }) {
             <h3 className="font-display font-extrabold text-white text-xl md:text-2xl">Instale o Conecta Comércio no seu celular</h3>
             <p className="font-body text-white/75 text-sm mt-1">Aceita o Cartão do Servidor Municipal e funciona até offline, como um app de verdade.</p>
           </div>
-          <button className="font-body font-bold text-sm px-6 py-3 rounded-xl whitespace-nowrap" style={{ background: C.amber, color: C.blueDeep }}>
+          <button onClick={instalarApp} className="glow-btn font-body font-bold text-sm px-6 py-3 rounded-xl whitespace-nowrap" style={{ background: C.amber, color: C.blueDeep }}>
             Instalar aplicativo
           </button>
         </div>
       </section>
 
+      {mostrarComoInstalarIOS && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.55)" }} onClick={() => setMostrarComoInstalarIOS(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl p-6">
+            <p className="font-display font-bold text-base" style={{ color: C.ink }}>Como instalar no seu celular</p>
+            {ehIOS ? (
+              <ol className="font-body text-sm mt-3 flex flex-col gap-2 list-decimal list-inside" style={{ color: "#425A70" }}>
+                <li>Toque no ícone de <strong>compartilhar</strong> (quadrado com seta) na barra do Safari.</li>
+                <li>Role e toque em <strong>"Adicionar à Tela de Início"</strong>.</li>
+                <li>Toque em <strong>"Adicionar"</strong> no canto superior direito.</li>
+              </ol>
+            ) : (
+              <ol className="font-body text-sm mt-3 flex flex-col gap-2 list-decimal list-inside" style={{ color: "#425A70" }}>
+                <li>Abra o menu do seu navegador (geralmente os três pontinhos, no canto superior).</li>
+                <li>Procure a opção <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</li>
+                <li>Confirme — o ícone aparece na sua tela como um app normal.</li>
+              </ol>
+            )}
+            <button onClick={() => setMostrarComoInstalarIOS(false)} className="glow-btn font-body font-bold text-sm text-white rounded-xl py-2.5 mt-5 w-full" style={{ background: C.blue }}>
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
-      <footer className="mt-10 pt-12 pb-6 text-white" style={{ background: C.blueDeep }}>
+      <footer ref={contatoSecaoRef} className="mt-10 pt-12 pb-6 text-white" style={{ background: C.blueDeep }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6 grid sm:grid-cols-2 md:grid-cols-5 gap-8">
           <div>
             <span className="font-display font-extrabold text-lg">Conecta Comércio</span>
@@ -3724,6 +5848,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
 // plataforma.
 // ---------------------------------------------------------------------------
 function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
+  const categoriasReaisConta = useCategoriasReais();
   // tela: "entrar" | "escolha" | "cadastro-cliente" | "cadastro-empresario"
   const [tela, setTela] = useState(abaInicial === "entrar" ? "entrar" : "escolha");
   const [enviado, setEnviado] = useState(false);
@@ -3770,8 +5895,13 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
             nome: form.get("nomeEmpresa"),
             categoria: form.get("categoria") || "A definir",
             whatsapp: form.get("whatsapp"),
+            instagram: form.get("instagram") || null,
+            endereco: form.get("endereco") || null,
+            google_maps_url: form.get("googleMaps") || null,
             logo_url: logoUrl,
-            status: "pendente",
+            // Cadastro de empresa aprovado automaticamente — já aparece no
+            // site assim que o empresário termina o cadastro.
+            status: "aprovada",
           });
         }
 
@@ -3792,6 +5922,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
             endereco: form.get("endereco"),
             whatsapp: form.get("whatsapp"),
             instagram: form.get("instagram"),
+            google_maps_url: form.get("googleMaps") || null,
             foto_url: fotoUrl,
             status: "pendente",
           });
@@ -4016,7 +6147,14 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               </label>
               <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                 Categoria
-                <input name="categoria" placeholder="Ex: Alimentação, Beleza, Serviços..." className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <select name="categoria" required defaultValue="" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                  <option value="" disabled>Selecione uma categoria</option>
+                  {(categoriasReaisConta ?? categorias).map((c) => <option key={c.nome} value={c.nome}>{c.nome}</option>)}
+                </select>
+              </label>
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                Endereço
+                <input name="endereco" placeholder="Rua, número, bairro" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               </label>
               <label className="font-body text-xs font-semibold flex items-center gap-2 cursor-pointer" style={{ color: C.blue }}>
                 <Camera size={14} /> {logoEmpresa ? `Logo: ${logoEmpresa.name}` : "Enviar logo da empresa (opcional)"}
@@ -4030,6 +6168,16 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                   WhatsApp
                   <input name="whatsapp" required placeholder="(44) 90000-0000" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  Instagram (opcional)
+                  <input name="instagram" placeholder="@suaempresa" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  Link do Google Maps (opcional)
+                  <input name="googleMaps" type="url" placeholder="https://maps.google.com/..." className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 </label>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -4052,7 +6200,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 {carregando ? "Enviando..." : "Cadastrar minha empresa"}
               </button>
               <p className="font-body text-[11px] text-center" style={{ color: "#B7C6D6" }}>
-                Sua empresa fica em análise até ser aprovada pelo administrador da plataforma.
+                Seu cadastro já aparece no site assim que você concluir.
               </p>
             </form>
           ) : tela === "cadastro-prestador" ? (
@@ -4083,10 +6231,16 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                   <input name="whatsapp" required placeholder="(44) 90000-0000" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 </label>
               </div>
-              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
-                Instagram (opcional)
-                <input name="instagram" placeholder="@seuservico" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              </label>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  Instagram (opcional)
+                  <input name="instagram" placeholder="@seuservico" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  Link do Google Maps (opcional)
+                  <input name="googleMaps" type="url" placeholder="https://maps.google.com/..." className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+              </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                   Senha
@@ -4251,6 +6405,18 @@ function ChatWidget() {
 // que não dá permissão para aquele painel (ex: cliente tentando abrir o
 // painel admin).
 // ---------------------------------------------------------------------------
+function LoadingBrand({ texto = "Carregando..." }) {
+  return (
+    <div className="max-w-md mx-auto px-4 py-24 flex flex-col items-center gap-4 text-center">
+      <span className="relative flex items-center justify-center w-16 h-16">
+        <span className="absolute inset-0 rounded-full border-4 animate-spin" style={{ borderColor: C.blueTint, borderTopColor: C.blue }} />
+        <LogoMark size={34} />
+      </span>
+      <p className="font-body text-sm font-semibold" style={{ color: "#7E93A7" }}>{texto}</p>
+    </div>
+  );
+}
+
 function AcessoRestrito({ tipo, onEntrar }) {
   const trocarConta = async () => {
     if (supabaseConfigurado) await supabase.auth.signOut();
@@ -4412,6 +6578,7 @@ export default function ConectaComercio() {
     if (!supabaseConfigurado) return true;
     if (!sessao) return false;
     if (!perfil) return true; // ainda carregando o perfil — libera provisoriamente
+    if (perfil.tipo === "admin") return true; // admin tem acesso a todos os painéis do site
     return perfil.tipo === restrito;
   };
 
@@ -4440,7 +6607,9 @@ export default function ConectaComercio() {
       {modo === "conta" && <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />}
 
       {modo === "admin" && (
-        podeVer("admin") ? (
+        sessao === undefined ? (
+          <LoadingBrand texto="Verificando seu acesso..." />
+        ) : podeVer("admin") ? (
           <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
             <SectionHeader eyebrow="Área restrita" title="Painel administrativo" sub={perfil?.nome ? `Olá, ${perfil.nome}` : "Visível só para administradores da plataforma"} />
             <AdminPanel />
@@ -4451,7 +6620,9 @@ export default function ConectaComercio() {
       )}
 
       {modo === "empresario" && (
-        podeVer("empresario") ? (
+        sessao === undefined ? (
+          <LoadingBrand texto="Verificando seu acesso..." />
+        ) : podeVer("empresario") ? (
           <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
             <SectionHeader eyebrow="Área restrita" title="Painel do empresário" sub={perfil?.nome ? `Olá, ${perfil.nome}` : "Visível só para o dono da empresa, após login"} />
             <EmpresarioPanel />
