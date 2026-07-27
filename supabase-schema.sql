@@ -111,8 +111,21 @@ create table public.noticias (
   id uuid primary key default gen_random_uuid(),
   titulo text not null,
   conteudo text,
+  imagem_url text,
+  link_url text,
   autor_id uuid references public.perfis(id),
   publicada_em timestamptz not null default now()
+);
+
+-- -----------------------------------------------------------------------------
+-- ENQUETES (cadastradas e encerradas só pelo admin)
+-- -----------------------------------------------------------------------------
+create table public.enquetes (
+  id uuid primary key default gen_random_uuid(),
+  pergunta text not null,
+  opcoes jsonb not null default '[]', -- [{ "texto": "...", "votos": 0 }, ...]
+  ativa boolean not null default true,
+  criada_em timestamptz not null default now()
 );
 
 -- -----------------------------------------------------------------------------
@@ -137,6 +150,7 @@ create table public.favoritos (
   primary key (usuario_id, empresa_id)
 );
 
+-- -----------------------------------------------------------------------------
 -- -----------------------------------------------------------------------------
 -- SERVIÇOS DO EMPREENDEDOR (botões editáveis pelo admin: cor, logo, link)
 -- -----------------------------------------------------------------------------
@@ -181,6 +195,8 @@ create table public.notificacoes (
   id uuid primary key default gen_random_uuid(),
   titulo text not null,
   mensagem text not null,
+  imagem_url text,
+  link_url text,
   enviada_em timestamptz not null default now()
 );
 
@@ -209,6 +225,8 @@ create table public.eventos_calendario (
   data_fim date,
   local text,
   tipo text not null check (tipo in ('feira','curso','institucional','outro')) default 'outro',
+  imagem_url text,
+  link_url text,
   criado_em timestamptz not null default now()
 );
 
@@ -223,6 +241,7 @@ alter table public.vagas enable row level security;
 alter table public.candidaturas enable row level security;
 alter table public.cursos enable row level security;
 alter table public.noticias enable row level security;
+alter table public.enquetes enable row level security;
 alter table public.banners enable row level security;
 alter table public.favoritos enable row level security;
 alter table public.notificacoes enable row level security;
@@ -238,7 +257,16 @@ create policy "leitura publica produtos" on public.produtos for select using (tr
 create policy "leitura publica vagas" on public.vagas for select using (status = 'aberta');
 create policy "leitura publica cursos" on public.cursos for select using (true);
 create policy "leitura publica noticias" on public.noticias for select using (true);
+create policy "leitura publica enquetes" on public.enquetes for select using (true);
+create policy "admin gerencia enquetes" on public.enquetes
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
 create policy "leitura publica banners" on public.banners for select using (ativo = true);
+create policy "admin gerencia banners" on public.banners
+  for all using (
+    exists (select 1 from public.perfis where id = auth.uid() and tipo = 'admin')
+  );
 create policy "leitura publica feirantes aprovados" on public.feirantes for select using (status = 'aprovado');
 create policy "leitura publica servicos do empreendedor" on public.servicos_empreendedor for select using (ativo = true);
 create policy "admin gerencia servicos do empreendedor" on public.servicos_empreendedor
@@ -253,6 +281,27 @@ create policy "admin gerencia feira_config" on public.feira_config
   );
 create policy "leitura publica eventos_calendario" on public.eventos_calendario for select using (true);
 create policy "admin gerencia eventos_calendario" on public.eventos_calendario
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
+create policy "leitura publica site_config" on public.site_config for select using (true);
+create policy "admin gerencia site_config" on public.site_config
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
+create policy "admin gerencia noticias" on public.noticias
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
+create policy "admin gerencia notificacoes" on public.notificacoes
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
+create policy "admin gerencia feirantes" on public.feirantes
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
+create policy "admin gerencia vagas" on public.vagas
   for all using (
     exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
   );

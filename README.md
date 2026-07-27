@@ -71,7 +71,24 @@ responder de verdade:
 Sem essa chave configurada, o botão continua visível, mas avisa educadamente
 que a IA ainda não foi conectada — nada quebra.
 
-### 6. Imagem ilustrativa de produto por IA (opcional)
+### 6. Cadastrar usuários direto pelo painel admin (necessário para essa função)
+O admin agora pode criar contas (cliente, empresário ou admin) direto pelo painel,
+sem precisar que a pessoa se cadastre sozinha. Isso usa um endpoint de servidor que
+precisa da **chave secreta** do Supabase:
+1. No Supabase, vá em **Project Settings → API Keys** e copie a **Secret key**
+   (formato `sb_secret_...`) — é diferente da chave pública usada no passo 1.
+2. Na Vercel/Netlify, adicione a variável de ambiente:
+   ```
+   SUPABASE_SERVICE_ROLE_KEY=sb_secret_sua-chave-aqui
+   ```
+   **Importante**: essa variável NUNCA deve ter o prefixo `VITE_` — se tiver, ela fica
+   exposta no navegador para qualquer visitante ver, o que é um risco de segurança grave.
+3. Publique de novo (redeploy).
+
+Sem essa chave, o cadastro de usuário pelo admin mostra uma mensagem avisando que o
+Supabase ainda não foi configurado no servidor — o resto do site continua normal.
+
+### 7. Imagem ilustrativa de produto por IA (opcional)
 No cadastro de produto, se o comerciante ainda não tiver uma foto, ele pode gerar
 uma **imagem ilustrativa** — sempre marcada com um selo "IA", nunca apresentada
 como foto real. Isso usa a API de imagens da OpenAI (a Anthropic não gera imagens):
@@ -109,22 +126,42 @@ por IA continuam funcionando normalmente, pois usam só a Anthropic).
   cadastrar e divulgar feiras especiais, e aprovar/recusar cadastros de feirante
 - **Painel Admin — Calendário de eventos**: cadastro completo (criar/remover) de eventos;
   só o administrador edita, e o calendário aparece no site principal para todo mundo ver
+- **Painel Admin — Banners**: upload real de foto (Supabase Storage), título, link,
+  ordem e ativo/inativo — tudo grava na tabela `banners`
+- **Painel Admin — Cadastrar usuário**: cria conta de cliente, empresário ou admin
+  direto pelo painel (usa o endpoint `api/admin-criar-usuario`, precisa da
+  `SUPABASE_SERVICE_ROLE_KEY` — veja o passo 6); se for empresário, pode cadastrar a
+  empresa junto na hora
+- **Painel Admin — Notícias**: cadastro com foto e link, aparece por ordem de publicação
+- **Painel Admin — Vagas**: cadastro de vaga vinculada a uma empresa existente
+- **Painel Admin — Notificações**: envio com foto e link, fica salvo no histórico
+- **Painel Admin — Feiras especiais**: cadastro agora aceita foto e link de divulgação
+- **Painel Admin — Feirantes**: além de aprovar/recusar quem se cadastrou pelo site, o
+  admin pode cadastrar um feirante direto (com foto) já aprovado, aparecendo na hora
+- **Painel Admin — Produtos**: além de moderar, o admin pode cadastrar um produto novo
+  direto para qualquer empresa (com foto)
+- **Painel Admin — Identidade do site**: cor principal, logo e frase de destaque da home
+  são editáveis pelo admin e aplicados no site inteiro
+- **Painel Admin — Enquetes**: cadastro real (pergunta + até 3 opções), encerrar/reabrir e remover
+- **Cadastro de empresa (público)**: agora tem upload real de logo; o admin também pode
+  trocar a logo de qualquer empresa na moderação
+- **Painel do Empresário — Meus produtos**: lista os produtos reais (com foto), permite
+  publicar/despublicar e remover; "Novo produto" já atualiza a lista na hora
 
 ### O que ainda é só interface (próximo passo)
-- Painel do empresário: produtos (editar/excluir existentes), promoções, vagas, visualizações
-- Notícias, banners e enquetes no Painel Admin
-- Upload de imagens (logo, fotos de empresa)
+- Painel do empresário: promoções, visualizações, editar detalhes de um produto já existente
+  (hoje dá para publicar/despublicar/remover, mas não para trocar nome/preço/foto depois de criado)
 
 Esses pontos já têm todo o design pronto — falta ligar cada ação aos comandos
 do Supabase (a mesma lógica usada nos painéis já ativados serve de modelo). Me
 chame quando quiser seguir com isso.
 
 ### Depois de atualizar o banco
-Se você já tinha rodado o `supabase-schema.sql` antes, rode de novo só a parte nova
-(tabelas `feira_config` e `eventos_calendario`, mais as políticas de RLS que vêm logo
-depois) — pode colar o arquivo inteiro de novo no SQL Editor, o Supabase ignora o que
-já existe e cria só o que é novo (as duas tabelas novas usam `create table`, então se
-já existirem vai dar erro "already exists" nelas especificamente — nesse caso é só
-rodar cada bloco novo separado, copiando a partir do comentário
-`-- FEIRA REGULAR (Feira do Empreendedor)` até o fim do arquivo).
-
+Se você já tinha rodado o `supabase-schema.sql` antes, ele vai reclamar de tabelas que
+já existem (`create table` dá erro "already exists" se a tabela já estiver lá). Isso é
+normal — o jeito mais simples é rodar o arquivo inteiro de novo e, se aparecer erro em
+alguma tabela específica, pular só aquele bloco e continuar colando o resto. As
+novidades desta rodada são: colunas `imagem_url`/`link_url` em `noticias`,
+`notificacoes` e `eventos_calendario`; a tabela nova `site_config` (identidade visual);
+e novas políticas de RLS para admin gerenciar banners, notícias, notificações,
+feirantes e vagas diretamente.
