@@ -89,6 +89,16 @@ const fontImport = `
 @keyframes ring-pulse { 0% { box-shadow: 0 0 0 0 rgba(232,162,61,0.55); } 100% { box-shadow: 0 0 0 14px rgba(232,162,61,0); } }
 .ring-pulse { animation: ring-pulse 2.2s ease-out infinite; }
 
+@keyframes skeleton-shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+.skeleton-pulse {
+  background-image: linear-gradient(90deg, #EAF0F7 0px, #F6F9FC 40px, #EAF0F7 80px);
+  background-size: 400px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.toast-in { animation: toast-in .25s cubic-bezier(.2,.8,.2,1) both; }
+
 .glow-card { transition: transform .4s cubic-bezier(.2,.8,.2,1), box-shadow .4s ease, border-color .4s ease; }
 .glow-card:hover { transform: translateY(-6px); box-shadow: 0 26px 50px -18px rgba(10,90,168,0.38); border-color: rgba(10,90,168,0.35); }
 
@@ -445,6 +455,35 @@ function SectionHeader({ eyebrow, title, sub, linkLabel }) {
   );
 }
 
+// Bloco cinza com "brilho" passando por cima — usado nos lugares que
+// carregam dados do banco, no lugar de deixar a tela em branco/vazia.
+function Skeleton({ className = "", style = {} }) {
+  return (
+    <div className={`skeleton-pulse rounded-lg ${className}`} style={{ background: "#EAF0F7", ...style }} />
+  );
+}
+
+// Pilha de avisos rápidos (toasts) no canto da tela — some sozinha depois
+// de alguns segundos. Usada pra confirmar ações que antes eram silenciosas
+// (aprovar, recusar, ativar/inativar, excluir, check-in).
+function ToastStack({ toasts }) {
+  if (!toasts.length) return null;
+  return (
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 sm:left-auto sm:right-5 sm:translate-x-0 z-[80] flex flex-col gap-2 items-center sm:items-end px-3 sm:px-0 w-full sm:w-auto">
+      {toasts.map((t) => (
+        <div key={t.id} className="toast-in flex items-center gap-2 rounded-xl px-4 py-3 shadow-xl font-body text-sm font-semibold max-w-sm"
+          style={{
+            background: t.tipo === "erro" ? "#B4462F" : t.tipo === "aviso" ? "#C6811F" : C.blueDeep,
+            color: "#fff",
+          }}>
+          {t.tipo === "erro" ? <X size={15} className="shrink-0" /> : <CheckCircle2 size={15} className="shrink-0" />}
+          {t.mensagem}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CategoryCard({ cat }) {
   const Icon = cat.icon || resolverIconeCategoria(cat.icone);
   const cor = cat.cor || C.blue;
@@ -715,6 +754,15 @@ const meusProdutos = [
 function AdminPanel() {
   const [tab, setTab] = useState("dashboard");
   const categoriasReaisAdmin = useCategoriasReais();
+
+  // Toasts (avisos rápidos) e confirmação antes de excluir — FASE 21.
+  const [toastsAdmin, setToastsAdmin] = useState([]);
+  const notificar = (mensagem, tipo = "sucesso") => {
+    const id = Date.now() + Math.random();
+    setToastsAdmin((t) => [...t, { id, mensagem, tipo }]);
+    setTimeout(() => setToastsAdmin((t) => t.filter((x) => x.id !== id)), 3500);
+  };
+  const confirmarExclusao = (mensagem = "Tem certeza que quer excluir? Essa ação não pode ser desfeita.") => window.confirm(mensagem);
 
   // -------------------------------------------------------------------------
   // Categorias de empresas — CRUD completo (nome, ícone, cor, ordem, status).
@@ -1016,7 +1064,7 @@ function AdminPanel() {
       return;
     }
     const { error } = await supabase.from("empresas").update({ status }).eq("id", id);
-    if (!error) setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, status } : e)));
+    if (!error) { setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, status } : e))); notificar(status === "aprovada" ? "Empresa aprovada." : "Empresa recusada.", status === "aprovada" ? "sucesso" : "aviso"); }
     else setStatusEmpresa((s) => ({ ...s, [id]: error.message }));
   };
 
@@ -2129,7 +2177,7 @@ function AdminPanel() {
       return;
     }
     const { error } = await supabase.from("prestadores").update({ status }).eq("id", id);
-    if (!error) setPrestadoresAdmin((atual) => atual.map((p) => (p.id === id ? { ...p, status } : p)));
+    if (!error) { setPrestadoresAdmin((atual) => atual.map((p) => (p.id === id ? { ...p, status } : p))); notificar(status === "aprovado" ? "Prestador aprovado." : "Prestador recusado.", status === "aprovado" ? "sucesso" : "aviso"); }
     else setStatusPrestador((s) => ({ ...s, [id]: error.message }));
   };
 
@@ -2169,6 +2217,7 @@ function AdminPanel() {
 
   useEffect(() => {
     if (!supabaseConfigurado || !eventoCredenciaisSelecionado) { setCredenciaisAdmin(null); return; }
+    setCredenciaisAdmin(null); // volta pro estado de carregando ao trocar de evento
     supabase.from("credenciais").select("*").eq("evento_id", eventoCredenciaisSelecionado).order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setCredenciaisAdmin(data || []); });
   }, [eventoCredenciaisSelecionado]);
@@ -2220,7 +2269,7 @@ function AdminPanel() {
       return;
     }
     const { error } = await supabase.from("credenciais").update({ status: novoStatus }).eq("id", id);
-    if (!error) setCredenciaisAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, status: novoStatus } : c)));
+    if (!error) { setCredenciaisAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, status: novoStatus } : c))); notificar(novoStatus === "ativa" ? "Credencial ativada." : "Credencial inativada.", novoStatus === "ativa" ? "sucesso" : "aviso"); }
   };
 
   const alternarCheckinCredencial = async (id, feitoAtual) => {
@@ -2230,7 +2279,7 @@ function AdminPanel() {
       return;
     }
     const { error } = await supabase.from("credenciais").update(payload).eq("id", id);
-    if (!error) setCredenciaisAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ...payload } : c)));
+    if (!error) { setCredenciaisAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ...payload } : c))); notificar(!feitoAtual ? "Check-in confirmado." : "Check-in desfeito."); }
   };
 
   const removerCredencial = async (id) => {
@@ -2415,6 +2464,7 @@ function AdminPanel() {
 
   return (
     <div>
+      <ToastStack toasts={toastsAdmin} />
       <div className="rounded-2xl p-5 mb-6 flex items-center justify-between gap-4 flex-wrap overflow-hidden relative"
         style={{ background: `linear-gradient(120deg, ${C.blueDeep}, ${C.blue})` }}>
         <div aria-hidden="true" className="absolute -right-8 -top-10 w-40 h-40 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }} />
@@ -2473,12 +2523,21 @@ function AdminPanel() {
                 [statsReais?.eventos, "Eventos no calendário", CalendarDays],
               ].map(([n, l, Icon], i) => {
                 const cor = PALETA_GRAFICOS[i % PALETA_GRAFICOS.length];
+                if (!statsReais) {
+                  return (
+                    <div key={l} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                      <Skeleton className="w-9 h-9" />
+                      <Skeleton className="w-12 h-5 mt-2.5" />
+                      <Skeleton className="w-20 h-3 mt-1.5" />
+                    </div>
+                  );
+                }
                 return (
                   <div key={l} className="glow-card rounded-2xl border p-4" style={{ borderColor: C.line }}>
                     <span className="flex items-center justify-center w-9 h-9 rounded-xl" style={{ background: `${cor}1a`, color: cor }}>
                       <Icon size={16} />
                     </span>
-                    <p className="font-display font-extrabold text-xl mt-2.5" style={{ color: C.ink }}>{statsReais ? n : "…"}</p>
+                    <p className="font-display font-extrabold text-xl mt-2.5" style={{ color: C.ink }}>{n}</p>
                     <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{l}</p>
                   </div>
                 );
@@ -2813,6 +2872,14 @@ function AdminPanel() {
                   </tr>
                 </thead>
                 <tbody>
+                  {!todosUsuariosAdmin && [0, 1, 2, 3].map((i) => (
+                    <tr key={`sk-${i}`} style={{ borderBottom: `1px solid ${C.line}` }}>
+                      <td className="px-3 py-2.5"><Skeleton className="w-28 h-3.5" /></td>
+                      <td className="px-3 py-2.5"><Skeleton className="w-36 h-3.5" /></td>
+                      <td className="px-3 py-2.5"><Skeleton className="w-20 h-5 rounded-full" /></td>
+                      <td className="px-3 py-2.5"><Skeleton className="w-16 h-3.5" /></td>
+                    </tr>
+                  ))}
                   {usuariosPaginaAtualAdmin.map((u) => (
                     <tr key={u.id} style={{ borderBottom: `1px solid ${C.line}` }}>
                       <td className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{u.nome || "—"}</td>
@@ -2828,7 +2895,6 @@ function AdminPanel() {
               {todosUsuariosAdmin && usuariosPaginaAtualAdmin.length === 0 && (
                 <p className="font-body text-sm p-4" style={{ color: "#7E93A7" }}>Nenhum usuário encontrado.</p>
               )}
-              {!todosUsuariosAdmin && <p className="font-body text-sm p-4" style={{ color: "#7E93A7" }}>Carregando...</p>}
             </div>
 
             {totalPaginasUsuariosAdmin > 1 && (
@@ -2918,7 +2984,7 @@ function AdminPanel() {
                       ) : (
                         <button onClick={() => iniciarEdicaoCategoria(c)} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#425A70" }}><Pencil size={14} /></button>
                       )}
-                      <button onClick={() => removerCategoria(c.id)} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#B4462F" }}><Trash2 size={14} /></button>
+                      <button onClick={() => { if (confirmarExclusao()) { removerCategoria(c.id); notificar("Categoria excluída."); } }} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#B4462F" }}><Trash2 size={14} /></button>
                     </div>
                   </div>
                 );
@@ -3136,7 +3202,7 @@ function AdminPanel() {
                   <button onClick={() => alternarAtivoProduto(p.id, !p.ativo)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
                     {p.ativo ? "Despublicar" : "Publicar"}
                   </button>
-                  <button onClick={() => removerProduto(p.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
+                  <button onClick={() => { if (confirmarExclusao()) { removerProduto(p.id); notificar("Produto removido."); } }} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
                 </div>
               ))}
               {listaProdutosFiltradaAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>{listaProdutos.length === 0 ? "Nenhum produto publicado ainda." : "Nenhum produto encontrado."}</p>}
@@ -3198,7 +3264,7 @@ function AdminPanel() {
                   <button onClick={() => alternarAtivaPromocao(p.id, !p.ativa)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
                     {p.ativa ? "Desativar" : "Ativar"}
                   </button>
-                  <button onClick={() => removerPromocao(p.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
+                  <button onClick={() => { if (confirmarExclusao()) { removerPromocao(p.id); notificar("Promoção removida."); } }} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
                 </div>
               ))}
               {promocoesAdmin && promocoesAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma promoção cadastrada ainda.</p>}
@@ -3258,7 +3324,7 @@ function AdminPanel() {
                       <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{f.titulo}</p>
                       <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{f.data_inicio} · {f.local}</p>
                     </div>
-                    <button onClick={() => removerFeiraEspecial(f.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                    <button onClick={() => { if (confirmarExclusao()) { removerFeiraEspecial(f.id); notificar("Feira removida."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                   </div>
                 ))}
                 {listaFeirasEspeciais.length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhuma feira especial cadastrada.</p>}
@@ -3422,7 +3488,7 @@ function AdminPanel() {
                     <option value="adiado">Adiado</option>
                     <option value="cancelado">Cancelado</option>
                   </select>
-                  <button onClick={() => removerEvento(ev.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                  <button onClick={() => { if (confirmarExclusao()) { removerEvento(ev.id); notificar("Evento removido."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
               {listaEventos.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum evento cadastrado ainda.</p>}
@@ -3504,6 +3570,17 @@ function AdminPanel() {
                       </tr>
                     </thead>
                     <tbody>
+                      {!credenciaisAdmin && [0, 1, 2].map((i) => (
+                        <tr key={`sk-${i}`} style={{ borderBottom: `1px solid ${C.line}` }}>
+                          <td className="px-3 py-2.5"><Skeleton className="w-8 h-8 rounded-full" /></td>
+                          <td className="px-3 py-2.5"><Skeleton className="w-24 h-3.5" /></td>
+                          <td className="px-3 py-2.5"><Skeleton className="w-20 h-3.5" /></td>
+                          <td className="px-3 py-2.5"><Skeleton className="w-16 h-3.5" /></td>
+                          <td className="px-3 py-2.5"><Skeleton className="w-14 h-5 rounded-full" /></td>
+                          <td className="px-3 py-2.5"><Skeleton className="w-20 h-5 rounded-full" /></td>
+                          <td className="px-3 py-2.5"><Skeleton className="w-12 h-3.5" /></td>
+                        </tr>
+                      ))}
                       {credenciaisFiltradasAdmin.map((c) => (
                         <tr key={c.id} style={{ borderBottom: `1px solid ${C.line}` }}>
                           <td className="px-3 py-2.5">
@@ -3548,7 +3625,7 @@ function AdminPanel() {
                                 <>
                                   <button onClick={() => setCredencialDigitalAberta(c)} title="Ver credencial digital" style={{ color: C.blue }}><BadgeCheck size={15} /></button>
                                   <button onClick={() => iniciarEdicaoCredencial(c)} title="Editar" style={{ color: "#425A70" }}><Pencil size={14} /></button>
-                                  <button onClick={() => removerCredencial(c.id)} title="Excluir" style={{ color: "#B4462F" }}><Trash2 size={14} /></button>
+                                  <button onClick={() => { if (confirmarExclusao()) { removerCredencial(c.id); notificar("Credencial excluída."); } }} title="Excluir" style={{ color: "#B4462F" }}><Trash2 size={14} /></button>
                                 </>
                               )}
                             </div>
@@ -3557,7 +3634,7 @@ function AdminPanel() {
                       ))}
                     </tbody>
                   </table>
-                  {credenciaisFiltradasAdmin.length === 0 && (
+                  {credenciaisAdmin && credenciaisFiltradasAdmin.length === 0 && (
                     <p className="font-body text-sm p-4" style={{ color: "#7E93A7" }}>Nenhuma credencial encontrada.</p>
                   )}
                 </div>
@@ -3666,7 +3743,7 @@ function AdminPanel() {
                         <button onClick={() => alternarAtivaEnquete(eq.id, !eq.ativa)} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
                           {eq.ativa ? "Encerrar" : "Reabrir"}
                         </button>
-                        <button onClick={() => removerEnquete(eq.id)} style={{ color: "#B4462F" }}><Trash2 size={14} /></button>
+                        <button onClick={() => { if (confirmarExclusao()) { removerEnquete(eq.id); notificar("Enquete excluída."); } }} style={{ color: "#B4462F" }}><Trash2 size={14} /></button>
                       </div>
                     </div>
                     <div className="flex flex-col gap-2">
@@ -3739,7 +3816,7 @@ function AdminPanel() {
                     <option value="aprovado">Aprovado</option>
                     <option value="pendente">Pendente</option>
                   </select>
-                  <button onClick={() => removerDepoimento(d.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                  <button onClick={() => { if (confirmarExclusao()) { removerDepoimento(d.id); notificar("Depoimento excluído."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
               {(depoimentosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhum depoimento cadastrado ainda.</p>}
@@ -3785,7 +3862,7 @@ function AdminPanel() {
                         <button onClick={() => moverFaq(i, 1)} disabled={i === (faqAdmin ?? []).length - 1} className="w-8 h-8 rounded-lg border flex items-center justify-center disabled:opacity-30" style={{ borderColor: C.line, color: "#425A70" }}><ArrowDown size={14} /></button>
                         <button onClick={() => alternarAtivaFaq(f.id, !f.ativa)} className="font-body text-[10px] font-bold px-2 py-2 rounded-lg border" style={{ borderColor: C.line, color: f.ativa ? "#1E8E5A" : "#7E93A7" }}>{f.ativa ? "Ativa" : "Oculta"}</button>
                         <button onClick={() => iniciarEdicaoFaq(f)} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#425A70" }}><Pencil size={14} /></button>
-                        <button onClick={() => removerFaq(f.id)} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#B4462F" }}><Trash2 size={14} /></button>
+                        <button onClick={() => { if (confirmarExclusao()) { removerFaq(f.id); notificar("Pergunta excluída."); } }} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#B4462F" }}><Trash2 size={14} /></button>
                       </div>
                     </div>
                   )}
@@ -3863,7 +3940,7 @@ function AdminPanel() {
                     <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{n.titulo}{n.destaque ? " ⭐" : ""}</p>
                     <p className="font-body text-xs truncate" style={{ color: "#7E93A7" }}>{n.resumo || n.conteudo}{n.categoria ? ` · ${n.categoria}` : ""}</p>
                   </div>
-                  <button onClick={() => removerNoticia(n.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                  <button onClick={() => { if (confirmarExclusao()) { removerNoticia(n.id); notificar("Notícia excluída."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
               {(noticiasAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhuma notícia publicada ainda.</p>}
@@ -3911,7 +3988,7 @@ function AdminPanel() {
                     <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{c.titulo}</p>
                     <p className="font-body text-xs truncate" style={{ color: "#7E93A7" }}>{c.instituicao}{c.data_inicio ? ` · ${c.data_inicio}` : ""}{c.certificado ? " · Com certificado" : ""}</p>
                   </div>
-                  <button onClick={() => removerCurso(c.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                  <button onClick={() => { if (confirmarExclusao()) { removerCurso(c.id); notificar("Curso excluído."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
               {(cursosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhum curso cadastrado ainda.</p>}
@@ -3958,7 +4035,7 @@ function AdminPanel() {
                       {v.empresas?.nome} · {v.salario}{v.tipo ? ` · ${v.tipo}` : ""}{v.prazo ? ` · até ${v.prazo}` : ""}
                     </p>
                   </div>
-                  <button onClick={() => removerVaga(v.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
+                  <button onClick={() => { if (confirmarExclusao()) { removerVaga(v.id); notificar("Vaga removida."); } }} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
                 </div>
               ))}
             </div>
@@ -4038,7 +4115,7 @@ function AdminPanel() {
                     <button onClick={() => salvarBanner(b)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-1.5" style={{ background: C.blue }}>
                       Salvar
                     </button>
-                    <button onClick={() => removerBanner(b.id)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: C.ink }}>
+                    <button onClick={() => { if (confirmarExclusao()) { removerBanner(b.id); notificar("Banner removido."); } }} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: C.ink }}>
                       Remover
                     </button>
                   </div>
@@ -4712,7 +4789,7 @@ function EmpresarioPanel() {
                     <button onClick={() => alternarAtivoMeuProduto(p.id, !p.ativo)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border shrink-0" style={{ borderColor: C.line, color: "#425A70" }}>
                       {p.ativo ? "Despublicar" : "Publicar"}
                     </button>
-                    <button onClick={() => removerMeuProduto(p.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                    <button onClick={() => { if (window.confirm("Tem certeza que quer excluir esse produto? Essa ação não pode ser desfeita.")) removerMeuProduto(p.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                   </div>
                   {!String(p.id).startsWith("demo-") && (
                     <div className="flex items-center gap-2 flex-wrap pl-14">
