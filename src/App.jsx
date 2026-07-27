@@ -10,7 +10,7 @@ import {
   Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
   Leaf, ArrowUp, ArrowDown
 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 
 // ---------------------------------------------------------------------------
@@ -27,6 +27,11 @@ const C = {
   amberDark: "#C6811F",
   line: "#DCE7F2",
 };
+
+// Paleta usada nos gráficos de barra/pizza e nos ícones dos cartões de
+// estatística do painel admin — dá variedade visual sem depender de cor
+// customizada nenhuma.
+const PALETA_GRAFICOS = ["#0A5AA8", "#E8A23D", "#25A85B", "#B4462F", "#7E5BEF", "#0EA5A5"];
 
 // Escurece uma cor hex em uma porcentagem — usado para gerar os tons mais
 // escuros (blueDark/blueDeep) a partir da única cor que o admin escolhe.
@@ -2144,6 +2149,29 @@ function AdminPanel() {
     setEditandoPrestador(null);
   };
 
+  // Resumo geral em barras (mesmos números dos cartões) e distribuição de
+  // empresas por categoria em pizza — usam dados que já foram buscados
+  // acima, sem nenhuma consulta nova ao banco.
+  const resumoBarrasAdmin = useMemo(() => ([
+    { nome: "Empresas", valor: statsReais?.empresas ?? 0 },
+    { nome: "Produtos", valor: statsReais?.produtos ?? 0 },
+    { nome: "Vagas", valor: statsReais?.vagas ?? 0 },
+    { nome: "Prestadores", valor: statsReais?.prestadores ?? 0 },
+    { nome: "Notícias", valor: statsReais?.noticias ?? 0 },
+    { nome: "Eventos", valor: statsReais?.eventos ?? 0 },
+  ]), [statsReais]);
+
+  const distribuicaoCategoriasAdmin = useMemo(() => {
+    const empresasAprovadas = (empresasPend ?? []).filter((e) => e.status === "aprovada");
+    if (empresasAprovadas.length === 0) return [];
+    const contagem = {};
+    empresasAprovadas.forEach((e) => {
+      const cat = e.categoria || "Sem categoria";
+      contagem[cat] = (contagem[cat] || 0) + 1;
+    });
+    return Object.entries(contagem).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 6);
+  }, [empresasPend]);
+
   const items = [
     { id: "dashboard", label: "Estatísticas", icon: LayoutDashboard },
     { id: "usuarios", label: "Cadastrar usuário", icon: UserCircle2 },
@@ -2166,8 +2194,33 @@ function AdminPanel() {
     { id: "identidade", label: "Identidade do site", icon: Palette },
   ];
 
+  const itemAtivo = items.find((it) => it.id === tab);
+
   return (
-    <div className="grid md:grid-cols-[220px_1fr] gap-6">
+    <div>
+      <div className="rounded-2xl p-5 mb-6 flex items-center justify-between gap-4 flex-wrap overflow-hidden relative"
+        style={{ background: `linear-gradient(120deg, ${C.blueDeep}, ${C.blue})` }}>
+        <div aria-hidden="true" className="absolute -right-8 -top-10 w-40 h-40 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }} />
+        <div aria-hidden="true" className="absolute right-16 bottom-[-3rem] w-28 h-28 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }} />
+        <div className="relative">
+          <p className="font-body text-[11px] font-bold uppercase tracking-wider text-white/70">Painel do administrador</p>
+          <h1 className="font-display text-xl md:text-2xl font-extrabold text-white mt-0.5">{itemAtivo?.label || "Estatísticas"}</h1>
+        </div>
+        <div className="relative flex items-center gap-2 shrink-0">
+          {[
+            [statsReais?.empresas, "Empresas"],
+            [statsReais?.produtos, "Produtos"],
+            [statsReais?.vagas, "Vagas"],
+          ].map(([n, l]) => (
+            <div key={l} className="rounded-xl px-3.5 py-2 text-center" style={{ background: "rgba(255,255,255,0.14)" }}>
+              <p className="font-display font-extrabold text-lg text-white leading-none">{statsReais ? n : "…"}</p>
+              <p className="font-body text-[10px] text-white/70 mt-1">{l}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-[220px_1fr] gap-6">
       <aside className="rounded-2xl border p-3 h-fit" style={{ borderColor: C.line }}>
         <p className="font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2" style={{ color: "#7E93A7" }}>Painel do administrador</p>
         {items.map((it) => {
@@ -2201,13 +2254,18 @@ function AdminPanel() {
                 [statsReais?.prestadores, "Prestadores aprovados", Wrench],
                 [statsReais?.noticias, "Notícias publicadas", Newspaper],
                 [statsReais?.eventos, "Eventos no calendário", CalendarDays],
-              ].map(([n, l, Icon]) => (
-                <div key={l} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
-                  <Icon size={16} color={C.blue} />
-                  <p className="font-display font-extrabold text-xl mt-2" style={{ color: C.ink }}>{statsReais ? n : "…"}</p>
-                  <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{l}</p>
-                </div>
-              ))}
+              ].map(([n, l, Icon], i) => {
+                const cor = PALETA_GRAFICOS[i % PALETA_GRAFICOS.length];
+                return (
+                  <div key={l} className="glow-card rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                    <span className="flex items-center justify-center w-9 h-9 rounded-xl" style={{ background: `${cor}1a`, color: cor }}>
+                      <Icon size={16} />
+                    </span>
+                    <p className="font-display font-extrabold text-xl mt-2.5" style={{ color: C.ink }}>{statsReais ? n : "…"}</p>
+                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{l}</p>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="grid md:grid-cols-2 gap-4 mb-6">
@@ -2243,38 +2301,94 @@ function AdminPanel() {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-4 mb-6">
               <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
-                <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Empresas em destaque (mais visualizadas)</p>
-                <div className="flex flex-col gap-2.5">
-                  {(empresasDestaqueReais ?? []).map((e, i) => (
-                    <div key={e.nome + i} className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-body text-sm font-semibold truncate" style={{ color: C.ink }}>{e.nome}</p>
-                        <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{e.categoria}</p>
-                      </div>
-                      <span className="font-body text-xs font-bold shrink-0" style={{ color: C.blue }}>{e.visualizacoes ?? 0} views</span>
-                    </div>
-                  ))}
-                  {empresasDestaqueReais && empresasDestaqueReais.length === 0 && (
-                    <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma empresa aprovada ainda.</p>
-                  )}
+                <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Resumo geral (todas as áreas)</p>
+                <div style={{ width: "100%", height: 200 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={resumoBarrasAdmin}>
+                      <XAxis dataKey="nome" tick={{ fontSize: 10, fill: "#7E93A7" }} axisLine={false} tickLine={false} interval={0} angle={-20} textAnchor="end" height={40} />
+                      <YAxis tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="valor" radius={[6, 6, 0, 0]}>
+                        {resumoBarrasAdmin.map((_, i) => <Cell key={i} fill={PALETA_GRAFICOS[i % PALETA_GRAFICOS.length]} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
 
               <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Empresas por categoria</p>
+                {distribuicaoCategoriasAdmin.length > 0 ? (
+                  <div style={{ width: "100%", height: 200 }}>
+                    <ResponsiveContainer>
+                      <PieChart>
+                        <Pie data={distribuicaoCategoriasAdmin} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2}>
+                          {distribuicaoCategoriasAdmin.map((_, i) => <Cell key={i} fill={PALETA_GRAFICOS[i % PALETA_GRAFICOS.length]} />)}
+                        </Pie>
+                        <Tooltip />
+                        <Legend wrapperStyle={{ fontSize: 11, fontFamily: "Inter, sans-serif" }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Sem empresas aprovadas o suficiente ainda.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="rounded-2xl border p-4 overflow-x-auto" style={{ borderColor: C.line }}>
+                <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Empresas em destaque (mais visualizadas)</p>
+                {(empresasDestaqueReais ?? []).length > 0 ? (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#7E93A7" }}>Empresa</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#7E93A7" }}>Categoria</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2 text-right" style={{ color: "#7E93A7" }}>Views</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(empresasDestaqueReais ?? []).map((e, i) => (
+                        <tr key={e.nome + i} style={{ borderBottom: i < empresasDestaqueReais.length - 1 ? `1px solid ${C.line}` : "none" }}>
+                          <td className="font-body text-sm font-semibold py-2 truncate max-w-[140px]" style={{ color: C.ink }}>{e.nome}</td>
+                          <td className="font-body text-xs py-2" style={{ color: "#7E93A7" }}>{e.categoria}</td>
+                          <td className="font-body text-xs font-bold py-2 text-right" style={{ color: C.blue }}>{e.visualizacoes ?? 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma empresa aprovada ainda.</p>
+                )}
+              </div>
+
+              <div className="rounded-2xl border p-4 overflow-x-auto" style={{ borderColor: C.line }}>
                 <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Últimos cadastros</p>
-                <div className="flex flex-col gap-2.5">
-                  {(ultimosCadastros ?? []).map((u, i) => (
-                    <div key={u.nome + i} className="flex items-center justify-between gap-2">
-                      <p className="font-body text-sm font-semibold truncate" style={{ color: C.ink }}>{u.nome}</p>
-                      <span className="font-body text-[11px] font-bold shrink-0 px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{u.tipo}</span>
-                    </div>
-                  ))}
-                  {ultimosCadastros && ultimosCadastros.length === 0 && (
-                    <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum cadastro ainda.</p>
-                  )}
-                </div>
+                {(ultimosCadastros ?? []).length > 0 ? (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#7E93A7" }}>Nome</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2 text-right" style={{ color: "#7E93A7" }}>Tipo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(ultimosCadastros ?? []).map((u, i) => (
+                        <tr key={u.nome + i} style={{ borderBottom: i < ultimosCadastros.length - 1 ? `1px solid ${C.line}` : "none" }}>
+                          <td className="font-body text-sm font-semibold py-2 truncate max-w-[160px]" style={{ color: C.ink }}>{u.nome}</td>
+                          <td className="py-2 text-right">
+                            <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{u.tipo}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum cadastro ainda.</p>
+                )}
               </div>
             </div>
           </div>
@@ -3550,6 +3664,7 @@ function AdminPanel() {
             </form>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
@@ -5924,7 +6039,9 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
             instagram: form.get("instagram"),
             google_maps_url: form.get("googleMaps") || null,
             foto_url: fotoUrl,
-            status: "pendente",
+            // Cadastro de prestador aprovado automaticamente — igual já
+            // acontece com empresa, aparece no site assim que termina.
+            status: "aprovado",
           });
         }
       }
