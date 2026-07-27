@@ -92,6 +92,11 @@ const fontImport = `
 .reveal { opacity: 0; transform: translateY(28px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.2,1); }
 .reveal.in { opacity: 1; transform: translateY(0); }
 
+@keyframes hero-in-left { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes hero-in-right { from { opacity: 0; transform: scale(0.92) rotate(-4deg); } to { opacity: 1; transform: scale(1) rotate(-8deg); } }
+.hero-in-left { animation: hero-in-left .9s cubic-bezier(.2,.8,.2,1) both; }
+.hero-in-right { animation: hero-in-right 1s cubic-bezier(.2,.8,.2,1) .15s both; }
+
 @keyframes promo-slide-in { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: translateX(0); } }
 .promo-slide { animation: promo-slide-in .5s cubic-bezier(.2,.8,.2,1) both; }
 
@@ -109,7 +114,7 @@ const fontImport = `
 .price-pop { animation: price-pop .5s cubic-bezier(.2,.8,.2,1) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .blob, .marquee-track, .reveal, .pulse-dot, .ring-pulse, .grad-text, .stamp, .promo-slide, .tech-grid, .scan-line, .price-pop { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
+  .blob, .marquee-track, .reveal, .pulse-dot, .ring-pulse, .grad-text, .stamp, .promo-slide, .tech-grid, .scan-line, .price-pop, .hero-in-left, .hero-in-right { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
 }
 `;
 
@@ -207,6 +212,43 @@ const vagas = [
   { cargo: "Atendente de loja", empresa: "Mercado Bom Preço", cidade: "Ivatuba - PR", salario: "R$ 1.518,00" },
   { cargo: "Auxiliar de padeiro", empresa: "Padaria Pão Nosso", cidade: "Ivatuba - PR", salario: "R$ 1.650,00" },
   { cargo: "Técnico em manutenção", empresa: "TechIva", cidade: "Ivatuba - PR", salario: "A combinar" },
+];
+
+const depoimentos = [
+  {
+    nome: "Ana Cláudia",
+    papel: "Dona da Padaria Pão Nosso",
+    texto: "Desde que entrei no Conecta Comércio, apareço pra muito mais gente da cidade. As vendas pelo WhatsApp aumentaram de verdade.",
+  },
+  {
+    nome: "Roberto Lima",
+    papel: "Materiais Const. Rocha",
+    texto: "Consegui divulgar promoções sem gastar com anúncio. A plataforma é simples e o suporte responde rápido.",
+  },
+  {
+    nome: "Juliana Freitas",
+    papel: "Cliente de Ivatuba",
+    texto: "Uso pra achar tudo perto de casa e ainda ajudo o comércio local. Ficou muito mais fácil encontrar quem presta serviço aqui.",
+  },
+];
+
+const faqItens = [
+  {
+    pergunta: "Preciso pagar para usar o Conecta Comércio?",
+    resposta: "Não. A navegação é livre para qualquer pessoa, sem cadastro. Cadastrar uma empresa, um serviço ou criar uma conta de cliente também é gratuito.",
+  },
+  {
+    pergunta: "Como cadastro minha empresa ou serviço?",
+    resposta: "Clique em \"Entrar / Cadastro\" no menu, escolha \"Tenho uma Empresa\" ou \"Sou Prestador de Serviço\" e preencha o formulário. Seu cadastro fica em análise até ser aprovado pelo administrador.",
+  },
+  {
+    pergunta: "Quanto tempo leva para meu cadastro ser aprovado?",
+    resposta: "Normalmente em até 1 dia útil. Assim que aprovado, você aparece automaticamente na vitrine do site.",
+  },
+  {
+    pergunta: "Posso editar minhas informações depois?",
+    resposta: "Sim. Empresários têm um painel próprio para editar dados, WhatsApp, Instagram e produtos a qualquer momento.",
+  },
 ];
 
 const comerciantesPublicidade = [
@@ -395,6 +437,44 @@ function EmpresaCard({ e, fav, onFav }) {
             style={{ borderColor: C.line, color: C.blue }}>
             <MapPin size={14} /> Ver Mapa
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PrestadorCard({ p }) {
+  const linkWhats = p.whatsapp ? `https://wa.me/55${String(p.whatsapp).replace(/\D/g, "")}` : null;
+  const linkInsta = p.instagram ? `https://instagram.com/${String(p.instagram).replace(/^@/, "")}` : null;
+  return (
+    <div className="glow-card rounded-2xl border overflow-hidden flex flex-col"
+      style={{ borderColor: C.line, background: "rgba(255,255,255,0.7)", backdropFilter: "blur(10px)" }}>
+      <div className="h-24 relative flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
+        {p.foto_url ? (
+          <img src={p.foto_url} alt={p.nome} className="w-full h-full object-cover" />
+        ) : (
+          <Wrench className="text-white/90" size={26} />
+        )}
+      </div>
+      <div className="p-4 flex flex-col gap-1.5 flex-1">
+        <p className="font-display font-bold text-sm leading-snug" style={{ color: C.ink }}>{p.nome}</p>
+        <p className="font-body text-xs font-semibold" style={{ color: C.blue }}>{p.servico}</p>
+        {p.endereco && (
+          <p className="font-body text-xs flex items-center gap-1" style={{ color: "#7E93A7" }}>
+            <MapPin size={11} /> {p.endereco}
+          </p>
+        )}
+        <div className="mt-auto flex gap-2 pt-2">
+          {linkWhats && (
+            <a href={linkWhats} target="_blank" rel="noreferrer" className="glow-btn flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold font-body text-white" style={{ background: "#25A85B" }}>
+              <MessageCircle size={14} /> WhatsApp
+            </a>
+          )}
+          {linkInsta && (
+            <a href={linkInsta} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-xs font-bold font-body border" style={{ borderColor: C.line, color: C.blue }}>
+              <Instagram size={14} />
+            </a>
+          )}
         </div>
       </div>
     </div>
@@ -1253,10 +1333,55 @@ function AdminPanel() {
     if (!error) setEnquetesAdmin((atual) => atual.filter((eq) => eq.id !== id));
   };
 
+  // -------------------------------------------------------------------------
+  // Prestadores de serviço — moderação (aprovar/recusar/editar), igual ao
+  // fluxo de empresas.
+  // -------------------------------------------------------------------------
+  const [prestadoresAdmin, setPrestadoresAdmin] = useState(null);
+  const [statusPrestador, setStatusPrestador] = useState({});
+  const [editandoPrestador, setEditandoPrestador] = useState(null);
+  const [formPrestador, setFormPrestador] = useState({ nome: "", servico: "", endereco: "", whatsapp: "", instagram: "" });
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("prestadores").select("*").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setPrestadoresAdmin(data || []);
+    });
+  }, []);
+
+  const listaPrestadores = prestadoresAdmin ?? [];
+
+  const mudarStatusPrestador = async (id, status) => {
+    if (!supabaseConfigurado) {
+      setPrestadoresAdmin((atual) => (atual ?? []).map((p) => (p.id === id ? { ...p, status } : p)));
+      return;
+    }
+    const { error } = await supabase.from("prestadores").update({ status }).eq("id", id);
+    if (!error) setPrestadoresAdmin((atual) => atual.map((p) => (p.id === id ? { ...p, status } : p)));
+    else setStatusPrestador((s) => ({ ...s, [id]: error.message }));
+  };
+
+  const iniciarEdicaoPrestador = (p) => {
+    setEditandoPrestador(p.id);
+    setFormPrestador({ nome: p.nome, servico: p.servico, endereco: p.endereco || "", whatsapp: p.whatsapp || "", instagram: p.instagram || "" });
+  };
+
+  const salvarEdicaoPrestador = async (id) => {
+    if (!supabaseConfigurado) {
+      setPrestadoresAdmin((atual) => atual.map((p) => (p.id === id ? { ...p, ...formPrestador } : p)));
+      setEditandoPrestador(null);
+      return;
+    }
+    const { error } = await supabase.from("prestadores").update(formPrestador).eq("id", id);
+    if (!error) setPrestadoresAdmin((atual) => atual.map((p) => (p.id === id ? { ...p, ...formPrestador } : p)));
+    setEditandoPrestador(null);
+  };
+
   const items = [
     { id: "dashboard", label: "Estatísticas", icon: LayoutDashboard },
     { id: "usuarios", label: "Cadastrar usuário", icon: UserCircle2 },
     { id: "empresas", label: "Comerciantes", icon: CheckCircle2 },
+    { id: "prestadores", label: "Prestadores de serviço", icon: Wrench },
     { id: "produtos", label: "Produtos", icon: ShoppingBag },
     { id: "feira", label: "Feira do Empreendedor", icon: PartyPopper },
     { id: "calendario", label: "Calendário de eventos", icon: CalendarDays },
@@ -1453,6 +1578,60 @@ function AdminPanel() {
                 </div>
               ))}
               {listaEmpresas.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma empresa cadastrada ainda.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "prestadores" && (
+          <div>
+            <SectionHeader eyebrow="Moderação" title="Prestadores de serviço" sub="Aprovar, recusar e editar já grava direto no banco" />
+            <div className="flex flex-col gap-3">
+              {listaPrestadores.map((p) => (
+                <div key={p.id} className="rounded-2xl border p-4 flex items-center gap-4 flex-wrap" style={{ borderColor: C.line }}>
+                  {p.foto_url ? (
+                    <img src={p.foto_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
+                      <Wrench size={17} />
+                    </span>
+                  )}
+                  {editandoPrestador === p.id ? (
+                    <div className="flex-1 min-w-[220px] grid sm:grid-cols-2 gap-2">
+                      <input value={formPrestador.nome} onChange={(e) => setFormPrestador((f) => ({ ...f, nome: e.target.value }))} placeholder="Nome"
+                        className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formPrestador.servico} onChange={(e) => setFormPrestador((f) => ({ ...f, servico: e.target.value }))} placeholder="Serviço"
+                        className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formPrestador.endereco} onChange={(e) => setFormPrestador((f) => ({ ...f, endereco: e.target.value }))} placeholder="Endereço"
+                        className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formPrestador.whatsapp} onChange={(e) => setFormPrestador((f) => ({ ...f, whatsapp: e.target.value }))} placeholder="WhatsApp"
+                        className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formPrestador.instagram} onChange={(e) => setFormPrestador((f) => ({ ...f, instagram: e.target.value }))} placeholder="Instagram"
+                        className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-w-0">
+                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
+                      <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{p.servico} · status: {p.status}</p>
+                      <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{p.whatsapp}{p.instagram ? ` · ${p.instagram}` : ""}{p.endereco ? ` · ${p.endereco}` : ""}</p>
+                      {statusPrestador[p.id] && <p className="font-body text-[11px] mt-1" style={{ color: "#B4462F" }}>{statusPrestador[p.id]}</p>}
+                    </div>
+                  )}
+                  {editandoPrestador === p.id ? (
+                    <button onClick={() => salvarEdicaoPrestador(p.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
+                  ) : (
+                    <>
+                      {p.status !== "aprovado" && (
+                        <button onClick={() => mudarStatusPrestador(p.id, "aprovado")} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: "#25A85B" }}>Aprovar</button>
+                      )}
+                      {p.status !== "recusado" && (
+                        <button onClick={() => mudarStatusPrestador(p.id, "recusado")} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Recusar</button>
+                      )}
+                      <button onClick={() => iniciarEdicaoPrestador(p)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
+                    </>
+                  )}
+                </div>
+              ))}
+              {listaPrestadores.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum prestador cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -2955,8 +3134,32 @@ function SiteHome({ onAuth, logoUrl, frase }) {
   const [servicosReais, setServicosReais] = useState(null);
   const [feiraConfigReal, setFeiraConfigReal] = useState(null);
   const [feirasEspeciaisReais, setFeirasEspeciaisReais] = useState(null);
+  const [prestadoresReais, setPrestadoresReais] = useState(null);
+  const [faqAberta, setFaqAberta] = useState(null);
   const empresasSecaoRef = useRef(null);
   const vagasSecaoRef = useRef(null);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("prestadores").select("*").eq("status", "aprovado").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setPrestadoresReais(data || []);
+    });
+  }, []);
+
+  const [indiceDepoimento, setIndiceDepoimento] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setIndiceDepoimento((i) => (i + 1) % depoimentos.length), 5500);
+    return () => clearInterval(t);
+  }, []);
+
+  // Navbar ganha sombra/blur mais forte assim que a página é rolada.
+  const [rolou, setRolou] = useState(false);
+  useEffect(() => {
+    const aoRolar = () => setRolou(window.scrollY > 12);
+    window.addEventListener("scroll", aoRolar, { passive: true });
+    aoRolar();
+    return () => window.removeEventListener("scroll", aoRolar);
+  }, []);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
@@ -3030,7 +3233,14 @@ function SiteHome({ onAuth, logoUrl, frase }) {
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b" style={{ borderColor: C.line }}>
+      <header
+        className="sticky top-0 z-30 backdrop-blur border-b transition-shadow duration-300"
+        style={{
+          borderColor: rolou ? "transparent" : C.line,
+          background: rolou ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.95)",
+          boxShadow: rolou ? "0 8px 30px -12px rgba(10,34,58,0.18)" : "none",
+        }}
+      >
         <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center gap-4">
           <div className="flex items-center gap-2 shrink-0">
             <LogoMark size={36} url={logoUrl} />
@@ -3081,7 +3291,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
         </div>
 
         <div className="max-w-6xl mx-auto px-4 md:px-6 pt-14 md:pt-20 pb-10 grid md:grid-cols-[1.1fr_0.9fr] gap-10 items-center relative">
-          <div>
+          <div className="hero-in-left">
             <div className="flex items-center gap-2 mb-3">
               <span className="relative flex h-2 w-2">
                 <span className="pulse-dot absolute inline-flex h-full w-full rounded-full" style={{ background: C.amber }} />
@@ -3138,7 +3348,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
           </div>
 
           {/* Signature: selo/carimbo "Compre em Ivatuba" com pulso */}
-          <div className="relative hidden md:flex items-center justify-center h-full">
+          <div className="hero-in-right relative hidden md:flex items-center justify-center h-full">
             <div className="stamp ring-pulse w-52 h-52 rounded-full border-4 border-dashed flex items-center justify-center text-center p-6"
               style={{ borderColor: "rgba(255,255,255,0.5)", transform: "rotate(-8deg)" }}>
               <div>
@@ -3363,6 +3573,80 @@ function SiteHome({ onAuth, logoUrl, frase }) {
         </div>
       </section>
 
+      {/* Prestadores de serviço */}
+      {(prestadoresReais ?? []).length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+          <Reveal>
+            <SectionHeader eyebrow="Autônomos e informais" title="Prestadores de serviço" sub="Encontre quem faz de tudo um pouco aqui em Ivatuba" />
+          </Reveal>
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {(prestadoresReais ?? []).map((p, i) => (
+              <Reveal key={p.id} delay={i * 70}>
+                <PrestadorCard p={p} />
+              </Reveal>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Depoimentos */}
+      <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <Reveal>
+          <SectionHeader eyebrow="Quem já usa" title="O que dizem sobre o Conecta Comércio" />
+        </Reveal>
+        <Reveal>
+          <div className="rounded-3xl border p-8 md:p-10 relative overflow-hidden" style={{ borderColor: C.line, background: "rgba(255,255,255,0.6)", backdropFilter: "blur(10px)" }}>
+            <div aria-hidden="true" className="blob absolute -top-16 right-[-4rem] w-64 h-64 rounded-full" style={{ background: C.blueTint, opacity: 0.6 }} />
+            <div key={indiceDepoimento} className="promo-slide relative">
+              <p className="font-display font-bold text-lg md:text-xl leading-snug max-w-2xl" style={{ color: C.ink }}>
+                "{depoimentos[indiceDepoimento].texto}"
+              </p>
+              <div className="mt-5 flex items-center gap-3">
+                <span className="w-10 h-10 rounded-full flex items-center justify-center font-display font-bold text-sm text-white" style={{ background: C.blue }}>
+                  {depoimentos[indiceDepoimento].nome.charAt(0)}
+                </span>
+                <div>
+                  <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{depoimentos[indiceDepoimento].nome}</p>
+                  <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{depoimentos[indiceDepoimento].papel}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-1.5 mt-6 relative">
+              {depoimentos.map((_, i) => (
+                <button key={i} onClick={() => setIndiceDepoimento(i)} aria-label={`Depoimento ${i + 1}`}
+                  className="rounded-full transition-all"
+                  style={{ width: i === indiceDepoimento ? 18 : 6, height: 6, background: i === indiceDepoimento ? C.blue : C.blueTint }} />
+              ))}
+            </div>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* FAQ */}
+      <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <Reveal>
+          <SectionHeader eyebrow="Dúvidas" title="Perguntas frequentes" />
+        </Reveal>
+        <div className="max-w-2xl flex flex-col gap-3">
+          {faqItens.map((item, i) => {
+            const aberta = faqAberta === i;
+            return (
+              <Reveal key={item.pergunta} delay={i * 60}>
+                <div className="rounded-2xl border overflow-hidden" style={{ borderColor: C.line, background: "rgba(255,255,255,0.7)", backdropFilter: "blur(8px)" }}>
+                  <button onClick={() => setFaqAberta(aberta ? null : i)} className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left">
+                    <span className="font-display font-bold text-sm" style={{ color: C.ink }}>{item.pergunta}</span>
+                    <ChevronRight size={18} color={C.blue} style={{ transform: aberta ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .3s ease", flexShrink: 0 }} />
+                  </button>
+                  <div style={{ maxHeight: aberta ? 200 : 0, overflow: "hidden", transition: "max-height .35s ease" }}>
+                    <p className="font-body text-sm px-5 pb-4" style={{ color: "#7E93A7" }}>{item.resposta}</p>
+                  </div>
+                </div>
+              </Reveal>
+            );
+          })}
+        </div>
+      </section>
+
       {/* CTA PWA / Cartão do Servidor */}
       <section className="max-w-6xl mx-auto px-4 md:px-6 pb-4">
         <div className="rounded-3xl p-8 md:p-10 grid md:grid-cols-[1fr_auto] gap-6 items-center"
@@ -3447,6 +3731,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
   const [erro, setErro] = useState("");
 
   const [logoEmpresa, setLogoEmpresa] = useState(null);
+  const [fotoPrestador, setFotoPrestador] = useState(null);
 
   const submeterCadastro = async (e, tipo) => {
     e.preventDefault();
@@ -3489,6 +3774,28 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
             status: "pendente",
           });
         }
+
+        if (tipo === "prestador") {
+          let fotoUrl = null;
+          if (fotoPrestador) {
+            const caminho = `prestadores/${Date.now()}-${fotoPrestador.name}`;
+            const { error: erroUpload } = await supabase.storage.from("fotos-empresas").upload(caminho, fotoPrestador);
+            if (!erroUpload) {
+              const { data: pub } = supabase.storage.from("fotos-empresas").getPublicUrl(caminho);
+              fotoUrl = pub.publicUrl;
+            }
+          }
+          await supabase.from("prestadores").insert({
+            dono_id: userId,
+            nome: form.get("nome"),
+            servico: form.get("servico"),
+            endereco: form.get("endereco"),
+            whatsapp: form.get("whatsapp"),
+            instagram: form.get("instagram"),
+            foto_url: fotoUrl,
+            status: "pendente",
+          });
+        }
       }
       setEnviado(true);
       setTimeout(() => onSucesso?.(), 1400);
@@ -3526,6 +3833,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
     escolha: { titulo: "Como você quer entrar?", desc: "Cada área tem seu próprio cadastro, pensado pra o que você precisa fazer." },
     "cadastro-cliente": { titulo: "Cadastro de Cliente", desc: "Favorite empresas, candidate-se a vagas e acompanhe as promoções da cidade." },
     "cadastro-empresario": { titulo: "Cadastro de Empresário", desc: "Cadastre sua empresa, publique produtos e vagas, e apareça na vitrine local." },
+    "cadastro-prestador": { titulo: "Cadastro de Prestador de Serviço", desc: "Divulgue seu serviço com contato e endereço no site oficial." },
   }[tela];
 
   return (
@@ -3646,6 +3954,19 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                   </p>
                 </div>
               </button>
+
+              <button onClick={() => irPara("cadastro-prestador")}
+                className="glow-card flex items-start gap-4 p-5 rounded-2xl border text-left" style={{ borderColor: C.line }}>
+                <span className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
+                  <Wrench size={22} />
+                </span>
+                <div>
+                  <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Sou Prestador de Serviço</p>
+                  <p className="font-body text-xs mt-1" style={{ color: "#7E93A7" }}>
+                    Quero divulgar meu serviço (autônomo ou informal) no site oficial, com contato e endereço.
+                  </p>
+                </div>
+              </button>
             </div>
           ) : tela === "cadastro-cliente" ? (
             <form onSubmit={(e) => submeterCadastro(e, "cliente")} className="flex flex-col gap-3.5">
@@ -3732,6 +4053,61 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               </button>
               <p className="font-body text-[11px] text-center" style={{ color: "#B7C6D6" }}>
                 Sua empresa fica em análise até ser aprovada pelo administrador da plataforma.
+              </p>
+            </form>
+          ) : tela === "cadastro-prestador" ? (
+            <form onSubmit={(e) => submeterCadastro(e, "prestador")} className="flex flex-col gap-3.5">
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                Seu nome completo
+                <input name="nome" required placeholder="Como você se chama" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                Serviço que presta
+                <input name="servico" required placeholder="Ex: Eletricista, Diarista, Cabeleireiro..." className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                Endereço (opcional)
+                <input name="endereco" placeholder="Rua, número, bairro" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <label className="font-body text-xs font-semibold flex items-center gap-2 cursor-pointer" style={{ color: C.blue }}>
+                <Camera size={14} /> {fotoPrestador ? `Foto: ${fotoPrestador.name}` : "Enviar sua foto (opcional)"}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => setFotoPrestador(e.target.files?.[0] || null)} />
+              </label>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  E-mail
+                  <input name="email" required type="email" placeholder="voce@email.com" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  WhatsApp
+                  <input name="whatsapp" required placeholder="(44) 90000-0000" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+              </div>
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                Instagram (opcional)
+                <input name="instagram" placeholder="@seuservico" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  Senha
+                  <input name="senha" required type="password" minLength={8} placeholder="Mínimo 8 caracteres" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  Confirmar senha
+                  <input name="confirmarSenha" required type="password" minLength={8} placeholder="Repita a senha" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+              </div>
+              <label className="flex items-start gap-2 mt-1">
+                <input required type="checkbox" className="mt-0.5" />
+                <span className="font-body text-xs" style={{ color: "#7E93A7" }}>
+                  Li e aceito os termos de uso da plataforma e a política de privacidade.
+                </span>
+              </label>
+              <button type="submit" disabled={carregando} className="glow-btn font-body font-bold text-sm text-white rounded-xl py-3 mt-1 disabled:opacity-60" style={{ background: C.blue }}>
+                {carregando ? "Enviando..." : "Cadastrar meu serviço"}
+              </button>
+              <p className="font-body text-[11px] text-center" style={{ color: "#B7C6D6" }}>
+                Seu cadastro fica em análise até ser aprovado pelo administrador da plataforma.
               </p>
             </form>
           ) : (
