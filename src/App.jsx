@@ -2278,6 +2278,92 @@ function AdminPanel() {
 
   const tiposCredenciaisAdmin = useMemo(() => Array.from(new Set((credenciaisAdmin ?? []).map((c) => c.tipo).filter(Boolean))), [credenciaisAdmin]);
 
+  // -------------------------------------------------------------------------
+  // Usuários cadastrados — FASE 20. Lista todo mundo que já se cadastrou
+  // (tabela perfis), com busca, ordenação, filtro por tipo, paginação e
+  // exportar em Excel (CSV) / PDF (impressão do navegador).
+  // -------------------------------------------------------------------------
+  const [todosUsuariosAdmin, setTodosUsuariosAdmin] = useState(null);
+  const [buscaTodosUsuariosAdmin, setBuscaTodosUsuariosAdmin] = useState("");
+  const [filtroTipoTodosUsuariosAdmin, setFiltroTipoTodosUsuariosAdmin] = useState("");
+  const [ordenacaoTodosUsuariosAdmin, setOrdenacaoTodosUsuariosAdmin] = useState("recentes");
+  const [paginaTodosUsuariosAdmin, setPaginaTodosUsuariosAdmin] = useState(1);
+  const ITENS_POR_PAGINA_USUARIOS = 15;
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("perfis").select("id, nome, email, tipo, telefone, criado_em").order("criado_em", { ascending: false })
+      .then(({ data, error }) => { if (!error) setTodosUsuariosAdmin(data || []); });
+  }, []);
+
+  useEffect(() => { setPaginaTodosUsuariosAdmin(1); }, [buscaTodosUsuariosAdmin, filtroTipoTodosUsuariosAdmin, ordenacaoTodosUsuariosAdmin]);
+
+  const todosUsuariosFiltradosAdmin = useMemo(() => {
+    let lista = todosUsuariosAdmin ?? [];
+    if (buscaTodosUsuariosAdmin.trim()) {
+      const q = buscaTodosUsuariosAdmin.toLowerCase();
+      lista = lista.filter((u) => (u.nome || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q));
+    }
+    if (filtroTipoTodosUsuariosAdmin) lista = lista.filter((u) => u.tipo === filtroTipoTodosUsuariosAdmin);
+    lista = [...lista];
+    if (ordenacaoTodosUsuariosAdmin === "nome") lista.sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+    else if (ordenacaoTodosUsuariosAdmin === "perfil") lista.sort((a, b) => (a.tipo || "").localeCompare(b.tipo || ""));
+    else if (ordenacaoTodosUsuariosAdmin === "antigos") lista.sort((a, b) => new Date(a.criado_em || 0) - new Date(b.criado_em || 0));
+    else lista.sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0)); // recentes
+    return lista;
+  }, [todosUsuariosAdmin, buscaTodosUsuariosAdmin, filtroTipoTodosUsuariosAdmin, ordenacaoTodosUsuariosAdmin]);
+
+  const totalPaginasUsuariosAdmin = Math.max(1, Math.ceil(todosUsuariosFiltradosAdmin.length / ITENS_POR_PAGINA_USUARIOS));
+  const usuariosPaginaAtualAdmin = todosUsuariosFiltradosAdmin.slice(
+    (paginaTodosUsuariosAdmin - 1) * ITENS_POR_PAGINA_USUARIOS,
+    paginaTodosUsuariosAdmin * ITENS_POR_PAGINA_USUARIOS
+  );
+
+  const rotuloTipoUsuario = (tipo) => ({ cliente: "Cliente", empresario: "Empresário", prestador: "Prestador", admin: "Administrador" }[tipo] || tipo || "—");
+
+  const exportarUsuariosExcel = () => {
+    const cabecalho = ["Nome", "E-mail", "Perfil", "Data de cadastro"];
+    const linhas = todosUsuariosFiltradosAdmin.map((u) => [
+      u.nome || "", u.email || "", rotuloTipoUsuario(u.tipo), u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "",
+    ]);
+    const csv = [cabecalho, ...linhas].map((linha) => linha.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "usuarios-conecta-comercio.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportarUsuariosPDF = () => {
+    const janela = window.open("", "_blank");
+    if (!janela) return;
+    const linhas = todosUsuariosFiltradosAdmin.map((u) => `
+      <tr><td>${u.nome || ""}</td><td>${u.email || ""}</td><td>${rotuloTipoUsuario(u.tipo)}</td><td>${u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : ""}</td></tr>
+    `).join("");
+    janela.document.write(`
+      <html><head><title>Usuários — Conecta Comércio</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:24px;color:#0E2233}
+        h2{margin-bottom:4px} p{color:#7E93A7;margin-top:0;font-size:12px}
+        table{width:100%;border-collapse:collapse;margin-top:16px}
+        th,td{border:1px solid #DCE7F2;padding:8px 10px;text-align:left;font-size:13px}
+        th{background:#EAF2FB;color:#0A5AA8}
+      </style></head>
+      <body>
+        <h2>Usuários cadastrados — Conecta Comércio</h2>
+        <p>${todosUsuariosFiltradosAdmin.length} usuário(s) · gerado em ${new Date().toLocaleDateString("pt-BR")}</p>
+        <table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Data de cadastro</th></tr></thead><tbody>${linhas}</tbody></table>
+      </body></html>
+    `);
+    janela.document.close();
+    janela.focus();
+    setTimeout(() => janela.print(), 300);
+  };
+
   // Resumo geral em barras (mesmos números dos cartões) e distribuição de
   // empresas por categoria em pizza — usam dados que já foram buscados
   // acima, sem nenhuma consulta nova ao banco.
@@ -2304,6 +2390,7 @@ function AdminPanel() {
   const items = [
     { id: "dashboard", label: "Estatísticas", icon: LayoutDashboard },
     { id: "usuarios", label: "Cadastrar usuário", icon: UserCircle2 },
+    { id: "todos-usuarios", label: "Usuários cadastrados", icon: Users },
     { id: "categorias", label: "Categorias", icon: Tag },
     { id: "empresas", label: "Comerciantes", icon: CheckCircle2 },
     { id: "prestadores", label: "Prestadores de serviço", icon: Wrench },
@@ -2674,6 +2761,89 @@ function AdminPanel() {
                 <UserCircle2 size={14} /> {criandoUsuarioAdmin ? "Criando..." : "Criar usuário"}
               </button>
             </form>
+          </div>
+        )}
+
+        {tab === "todos-usuarios" && (
+          <div>
+            <SectionHeader eyebrow="Acesso" title="Usuários cadastrados" sub="Todo mundo que já se cadastrou na plataforma" />
+            {!supabaseConfigurado && (
+              <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
+                <BadgeCheck size={14} className="mt-0.5 shrink-0" />
+                Modo demonstração: conecte o Supabase para ver os usuários reais.
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <input value={buscaTodosUsuariosAdmin} onChange={(e) => setBuscaTodosUsuariosAdmin(e.target.value)} placeholder="Buscar por nome ou e-mail..."
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none w-full max-w-xs" style={{ borderColor: C.line }} />
+              <select value={filtroTipoTodosUsuariosAdmin} onChange={(e) => setFiltroTipoTodosUsuariosAdmin(e.target.value)}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                <option value="">Todos os perfis</option>
+                <option value="cliente">Cliente</option>
+                <option value="empresario">Empresário</option>
+                <option value="prestador">Prestador</option>
+                <option value="admin">Administrador</option>
+              </select>
+              <select value={ordenacaoTodosUsuariosAdmin} onChange={(e) => setOrdenacaoTodosUsuariosAdmin(e.target.value)}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                <option value="recentes">Mais recentes</option>
+                <option value="antigos">Mais antigos</option>
+                <option value="nome">Nome (A-Z)</option>
+                <option value="perfil">Perfil (A-Z)</option>
+              </select>
+              <div className="flex items-center gap-2 ml-auto">
+                <button onClick={exportarUsuariosExcel} className="font-body text-xs font-bold px-3 py-2.5 rounded-lg border flex items-center gap-1.5" style={{ borderColor: C.line, color: "#425A70" }}>
+                  <FileText size={13} /> Excel
+                </button>
+                <button onClick={exportarUsuariosPDF} className="font-body text-xs font-bold px-3 py-2.5 rounded-lg border flex items-center gap-1.5" style={{ borderColor: C.line, color: "#425A70" }}>
+                  <FileText size={13} /> PDF
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
+              <table className="w-full text-left border-collapse min-w-[560px]">
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Nome</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>E-mail</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Perfil</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Cadastro</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usuariosPaginaAtualAdmin.map((u) => (
+                    <tr key={u.id} style={{ borderBottom: `1px solid ${C.line}` }}>
+                      <td className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{u.nome || "—"}</td>
+                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#7E93A7" }}>{u.email || "—"}</td>
+                      <td className="px-3 py-2.5">
+                        <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
+                      </td>
+                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#7E93A7" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {todosUsuariosAdmin && usuariosPaginaAtualAdmin.length === 0 && (
+                <p className="font-body text-sm p-4" style={{ color: "#7E93A7" }}>Nenhum usuário encontrado.</p>
+              )}
+              {!todosUsuariosAdmin && <p className="font-body text-sm p-4" style={{ color: "#7E93A7" }}>Carregando...</p>}
+            </div>
+
+            {totalPaginasUsuariosAdmin > 1 && (
+              <div className="flex items-center justify-center gap-3 mt-4">
+                <button onClick={() => setPaginaTodosUsuariosAdmin((p) => Math.max(1, p - 1))} disabled={paginaTodosUsuariosAdmin === 1}
+                  className="font-body text-xs font-bold px-3 py-2 rounded-lg border disabled:opacity-40" style={{ borderColor: C.line, color: "#425A70" }}>
+                  <ChevronLeft size={13} />
+                </button>
+                <p className="font-body text-xs font-semibold" style={{ color: "#7E93A7" }}>Página {paginaTodosUsuariosAdmin} de {totalPaginasUsuariosAdmin}</p>
+                <button onClick={() => setPaginaTodosUsuariosAdmin((p) => Math.min(totalPaginasUsuariosAdmin, p + 1))} disabled={paginaTodosUsuariosAdmin === totalPaginasUsuariosAdmin}
+                  className="font-body text-xs font-bold px-3 py-2 rounded-lg border disabled:opacity-40" style={{ borderColor: C.line, color: "#425A70" }}>
+                  <ChevronRight size={13} />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -6279,7 +6449,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
       const userId = data.user?.id;
       if (userId) {
         await supabase.from("perfis").insert({
-          id: userId, nome: form.get("nome"), tipo, telefone: form.get("whatsapp"),
+          id: userId, nome: form.get("nome"), tipo, telefone: form.get("whatsapp"), email: form.get("email"),
         });
 
         if (tipo === "empresario") {
