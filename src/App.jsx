@@ -2149,6 +2149,135 @@ function AdminPanel() {
     setEditandoPrestador(null);
   };
 
+  // -------------------------------------------------------------------------
+  // Credenciamento de eventos — FASE 19. Cada credencial fica ligada a um
+  // evento do Calendário; o "código" dela vira o link/QR Code da credencial
+  // digital pública (ver componente CredencialDigital). Check-in é manual:
+  // o organizador busca o nome na lista e clica em confirmar.
+  // -------------------------------------------------------------------------
+  const [eventoCredenciaisSelecionado, setEventoCredenciaisSelecionado] = useState("");
+  const [credenciaisAdmin, setCredenciaisAdmin] = useState(null); // null = nenhum evento escolhido ainda
+  const [novaCredencial, setNovaCredencial] = useState({ nome: "", telefone: "", tipo: "Participante" });
+  const [fotoCredencialAdmin, setFotoCredencialAdmin] = useState(null);
+  const [cadastrandoCredencial, setCadastrandoCredencial] = useState(false);
+  const [statusCredencial, setStatusCredencial] = useState("");
+  const [buscaCredenciaisAdmin, setBuscaCredenciaisAdmin] = useState("");
+  const [filtroTipoCredenciaisAdmin, setFiltroTipoCredenciaisAdmin] = useState("");
+  const [editandoCredencial, setEditandoCredencial] = useState(null);
+  const [formCredencial, setFormCredencial] = useState({ nome: "", telefone: "", tipo: "" });
+  const [credencialDigitalAberta, setCredencialDigitalAberta] = useState(null);
+
+  useEffect(() => {
+    if (!supabaseConfigurado || !eventoCredenciaisSelecionado) { setCredenciaisAdmin(null); return; }
+    supabase.from("credenciais").select("*").eq("evento_id", eventoCredenciaisSelecionado).order("criado_em", { ascending: false })
+      .then(({ data, error }) => { if (!error) setCredenciaisAdmin(data || []); });
+  }, [eventoCredenciaisSelecionado]);
+
+  const criarCredencial = async (e) => {
+    e.preventDefault();
+    setStatusCredencial("");
+    if (!eventoCredenciaisSelecionado) { setStatusCredencial("Selecione o evento primeiro."); return; }
+    if (!novaCredencial.nome.trim()) { setStatusCredencial("Informe o nome."); return; }
+    setCadastrandoCredencial(true);
+    try {
+      let foto_url = null;
+      if (fotoCredencialAdmin && supabaseConfigurado) {
+        const caminho = `credenciais/${Date.now()}-${fotoCredencialAdmin.name}`;
+        const { error: erroUpload } = await supabase.storage.from("fotos-empresas").upload(caminho, fotoCredencialAdmin);
+        if (!erroUpload) {
+          const { data: pub } = supabase.storage.from("fotos-empresas").getPublicUrl(caminho);
+          foto_url = pub.publicUrl;
+        }
+      }
+      if (!supabaseConfigurado) {
+        setCredenciaisAdmin((atual) => [
+          { id: `demo-${Date.now()}`, codigo: `demo-${Date.now()}`, evento_id: eventoCredenciaisSelecionado, ...novaCredencial, foto_url, status: "ativa", checkin_feito: false },
+          ...(atual ?? []),
+        ]);
+        setNovaCredencial({ nome: "", telefone: "", tipo: "Participante" });
+        setFotoCredencialAdmin(null);
+        setStatusCredencial("ok");
+        return;
+      }
+      const { data, error } = await supabase.from("credenciais").insert({
+        evento_id: eventoCredenciaisSelecionado, nome: novaCredencial.nome, telefone: novaCredencial.telefone,
+        tipo: novaCredencial.tipo || "Participante", foto_url, status: "ativa",
+      }).select().single();
+      if (error) { setStatusCredencial(error.message); return; }
+      setCredenciaisAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovaCredencial({ nome: "", telefone: "", tipo: "Participante" });
+      setFotoCredencialAdmin(null);
+      setStatusCredencial("ok");
+    } finally {
+      setCadastrandoCredencial(false);
+    }
+  };
+
+  const alternarStatusCredencial = async (id, statusAtual) => {
+    const novoStatus = statusAtual === "ativa" ? "inativa" : "ativa";
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setCredenciaisAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, status: novoStatus } : c)));
+      return;
+    }
+    const { error } = await supabase.from("credenciais").update({ status: novoStatus }).eq("id", id);
+    if (!error) setCredenciaisAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, status: novoStatus } : c)));
+  };
+
+  const alternarCheckinCredencial = async (id, feitoAtual) => {
+    const payload = { checkin_feito: !feitoAtual, checkin_em: !feitoAtual ? new Date().toISOString() : null };
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setCredenciaisAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ...payload } : c)));
+      return;
+    }
+    const { error } = await supabase.from("credenciais").update(payload).eq("id", id);
+    if (!error) setCredenciaisAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ...payload } : c)));
+  };
+
+  const removerCredencial = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setCredenciaisAdmin((atual) => atual.filter((c) => c.id !== id));
+      return;
+    }
+    const { error } = await supabase.from("credenciais").delete().eq("id", id);
+    if (!error) setCredenciaisAdmin((atual) => atual.filter((c) => c.id !== id));
+  };
+
+  const iniciarEdicaoCredencial = (c) => { setEditandoCredencial(c.id); setFormCredencial({ nome: c.nome, telefone: c.telefone || "", tipo: c.tipo || "" }); };
+
+  const salvarEdicaoCredencial = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setCredenciaisAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ...formCredencial } : c)));
+      setEditandoCredencial(null);
+      return;
+    }
+    const { error } = await supabase.from("credenciais").update(formCredencial).eq("id", id);
+    if (!error) setCredenciaisAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ...formCredencial } : c)));
+    setEditandoCredencial(null);
+  };
+
+  const credenciaisFiltradasAdmin = useMemo(() => {
+    let lista = credenciaisAdmin ?? [];
+    if (buscaCredenciaisAdmin.trim()) {
+      const q = buscaCredenciaisAdmin.toLowerCase();
+      lista = lista.filter((c) => (c.nome || "").toLowerCase().includes(q));
+    }
+    if (filtroTipoCredenciaisAdmin) lista = lista.filter((c) => c.tipo === filtroTipoCredenciaisAdmin);
+    return lista;
+  }, [credenciaisAdmin, buscaCredenciaisAdmin, filtroTipoCredenciaisAdmin]);
+
+  const statsCredenciaisAdmin = useMemo(() => {
+    const lista = credenciaisAdmin ?? [];
+    return {
+      total: lista.length,
+      ativas: lista.filter((c) => c.status === "ativa").length,
+      inativas: lista.filter((c) => c.status === "inativa").length,
+      checkins: lista.filter((c) => c.checkin_feito).length,
+      tipos: new Set(lista.map((c) => c.tipo).filter(Boolean)).size,
+    };
+  }, [credenciaisAdmin]);
+
+  const tiposCredenciaisAdmin = useMemo(() => Array.from(new Set((credenciaisAdmin ?? []).map((c) => c.tipo).filter(Boolean))), [credenciaisAdmin]);
+
   // Resumo geral em barras (mesmos números dos cartões) e distribuição de
   // empresas por categoria em pizza — usam dados que já foram buscados
   // acima, sem nenhuma consulta nova ao banco.
@@ -2182,6 +2311,7 @@ function AdminPanel() {
     { id: "promocoes", label: "Promoções", icon: Tag },
     { id: "feira", label: "Feira do Empreendedor", icon: PartyPopper },
     { id: "calendario", label: "Calendário de eventos", icon: CalendarDays },
+    { id: "credenciais", label: "Credenciamento", icon: BadgeCheck },
     { id: "cursos", label: "Cursos", icon: GraduationCap },
     { id: "servicos", label: "Serviços do Empreendedor", icon: Landmark },
     { id: "enquetes", label: "Enquetes", icon: Vote },
@@ -3127,6 +3257,163 @@ function AdminPanel() {
               ))}
               {listaEventos.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum evento cadastrado ainda.</p>}
             </div>
+          </div>
+        )}
+
+        {tab === "credenciais" && (
+          <div>
+            <SectionHeader eyebrow="Eventos" title="Credenciamento" sub="Crachá digital com QR Code e check-in manual na porta" />
+
+            <select value={eventoCredenciaisSelecionado} onChange={(e) => setEventoCredenciaisSelecionado(e.target.value)}
+              className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none w-full max-w-sm mb-5 bg-white" style={{ borderColor: C.line }}>
+              <option value="">Selecione o evento</option>
+              {listaEventos.map((ev) => <option key={ev.id} value={ev.id}>{ev.titulo} — {ev.data_inicio}</option>)}
+            </select>
+
+            {!eventoCredenciaisSelecionado ? (
+              <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Escolha um evento do calendário acima pra ver e cadastrar as credenciais dele.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                  {[
+                    [statsCredenciaisAdmin.total, "Total", UserCircle2],
+                    [statsCredenciaisAdmin.ativas, "Ativas", CheckCircle2],
+                    [statsCredenciaisAdmin.inativas, "Inativas", X],
+                    [statsCredenciaisAdmin.checkins, "Check-ins", BadgeCheck],
+                    [statsCredenciaisAdmin.tipos, "Tipos", Tag],
+                  ].map(([n, l, Icon], i) => {
+                    const cor = PALETA_GRAFICOS[i % PALETA_GRAFICOS.length];
+                    return (
+                      <div key={l} className="rounded-2xl border p-3.5" style={{ borderColor: C.line }}>
+                        <span className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: `${cor}1a`, color: cor }}>
+                          <Icon size={14} />
+                        </span>
+                        <p className="font-display font-extrabold text-lg mt-2" style={{ color: C.ink }}>{n}</p>
+                        <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{l}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <form onSubmit={criarCredencial} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+                  <input value={novaCredencial.nome} onChange={(e) => setNovaCredencial((v) => ({ ...v, nome: e.target.value }))} placeholder="Nome completo" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                  <input value={novaCredencial.telefone} onChange={(e) => setNovaCredencial((v) => ({ ...v, telefone: e.target.value }))} placeholder="Telefone (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  <input value={novaCredencial.tipo} onChange={(e) => setNovaCredencial((v) => ({ ...v, tipo: e.target.value }))} placeholder="Tipo (ex: Participante, Palestrante)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  <label className="font-body text-xs font-bold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: C.blue }}>
+                    <Camera size={14} /> {fotoCredencialAdmin ? `Foto: ${fotoCredencialAdmin.name}` : "Anexar foto (opcional)"}
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => setFotoCredencialAdmin(e.target.files?.[0] || null)} />
+                  </label>
+                  {statusCredencial && statusCredencial !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusCredencial}</p>}
+                  {statusCredencial === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Credencial cadastrada!</p>}
+                  <button type="submit" disabled={cadastrandoCredencial} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                    {cadastrandoCredencial ? "Cadastrando..." : "Gerar credencial"}
+                  </button>
+                </form>
+
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <input value={buscaCredenciaisAdmin} onChange={(e) => setBuscaCredenciaisAdmin(e.target.value)} placeholder="Buscar por nome..."
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none w-full max-w-xs" style={{ borderColor: C.line }} />
+                  <select value={filtroTipoCredenciaisAdmin} onChange={(e) => setFiltroTipoCredenciaisAdmin(e.target.value)}
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                    <option value="">Todos os tipos</option>
+                    {tiposCredenciaisAdmin.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+
+                <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
+                  <table className="w-full text-left border-collapse min-w-[640px]">
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Foto</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Nome</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Telefone</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Tipo</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Status</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Check-in</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {credenciaisFiltradasAdmin.map((c) => (
+                        <tr key={c.id} style={{ borderBottom: `1px solid ${C.line}` }}>
+                          <td className="px-3 py-2.5">
+                            {c.foto_url ? (
+                              <img loading="lazy" decoding="async" src={c.foto_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                            ) : (
+                              <span className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: C.blueTint, color: C.blue }}><UserCircle2 size={15} /></span>
+                            )}
+                          </td>
+                          {editandoCredencial === c.id ? (
+                            <>
+                              <td className="px-3 py-2.5"><input value={formCredencial.nome} onChange={(e) => setFormCredencial((f) => ({ ...f, nome: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-32" style={{ borderColor: C.line }} /></td>
+                              <td className="px-3 py-2.5"><input value={formCredencial.telefone} onChange={(e) => setFormCredencial((f) => ({ ...f, telefone: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-28" style={{ borderColor: C.line }} /></td>
+                              <td className="px-3 py-2.5"><input value={formCredencial.tipo} onChange={(e) => setFormCredencial((f) => ({ ...f, tipo: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-28" style={{ borderColor: C.line }} /></td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{c.nome}</td>
+                              <td className="font-body text-xs px-3 py-2.5" style={{ color: "#7E93A7" }}>{c.telefone || "—"}</td>
+                              <td className="font-body text-xs px-3 py-2.5" style={{ color: "#7E93A7" }}>{c.tipo}</td>
+                            </>
+                          )}
+                          <td className="px-3 py-2.5">
+                            <button onClick={() => alternarStatusCredencial(c.id, c.status)}
+                              className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
+                              style={{ background: c.status === "ativa" ? "#E7F6EE" : "#FBEAE5", color: c.status === "ativa" ? "#1E8E5A" : "#B4462F" }}>
+                              {c.status === "ativa" ? "Ativa" : "Inativa"}
+                            </button>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <button onClick={() => alternarCheckinCredencial(c.id, c.checkin_feito)}
+                              className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
+                              style={{ background: c.checkin_feito ? C.blueTint : "#F3F0FA", color: c.checkin_feito ? C.blue : "#7E5BEF" }}>
+                              {c.checkin_feito ? "Feito ✓" : "Fazer check-in"}
+                            </button>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-2.5">
+                              {editandoCredencial === c.id ? (
+                                <button onClick={() => salvarEdicaoCredencial(c.id)} className="font-body text-xs font-bold" style={{ color: C.blue }}>Salvar</button>
+                              ) : (
+                                <>
+                                  <button onClick={() => setCredencialDigitalAberta(c)} title="Ver credencial digital" style={{ color: C.blue }}><BadgeCheck size={15} /></button>
+                                  <button onClick={() => iniciarEdicaoCredencial(c)} title="Editar" style={{ color: "#425A70" }}><Pencil size={14} /></button>
+                                  <button onClick={() => removerCredencial(c.id)} title="Excluir" style={{ color: "#B4462F" }}><Trash2 size={14} /></button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {credenciaisFiltradasAdmin.length === 0 && (
+                    <p className="font-body text-sm p-4" style={{ color: "#7E93A7" }}>Nenhuma credencial encontrada.</p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {credencialDigitalAberta && (
+              <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.55)" }} onClick={() => setCredencialDigitalAberta(null)}>
+                <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-xs overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                  <div className="p-5 text-center text-white" style={{ background: `linear-gradient(120deg, ${C.blueDeep}, ${C.blue})` }}>
+                    <p className="font-body text-[11px] uppercase tracking-wider text-white/70">Credencial digital</p>
+                    <p className="font-display font-bold text-base mt-1">{credencialDigitalAberta.nome}</p>
+                  </div>
+                  <div className="p-5 flex flex-col items-center gap-3">
+                    <img loading="lazy" decoding="async"
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(String(credencialDigitalAberta.codigo))}`}
+                      alt="QR Code" className="w-44 h-44" />
+                    <p className="font-body text-xs text-center" style={{ color: "#7E93A7" }}>
+                      Link pra enviar por WhatsApp:<br />
+                      <span className="font-semibold break-all" style={{ color: C.blue }}>{`${window.location.origin}/#/credencial-${credencialDigitalAberta.codigo}`}</span>
+                    </p>
+                    <button onClick={() => setCredencialDigitalAberta(null)} className="font-body text-xs font-bold px-4 py-2 rounded-lg border w-full" style={{ borderColor: C.line, color: "#425A70" }}>Fechar</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -6577,6 +6864,74 @@ function modoDaHash(hash) {
 }
 
 // ---------------------------------------------------------------------------
+// Credencial digital pública — página própria (sem menu, sem precisar de
+// login) aberta pelo link/QR Code de uma credencial de evento. Mostra o
+// nome, tipo e status; o check-in em si é feito pelo organizador no painel.
+// ---------------------------------------------------------------------------
+function CredencialDigital({ codigo }) {
+  const [credencial, setCredencial] = useState(undefined); // undefined = carregando, null = não encontrada
+  const [evento, setEvento] = useState(null);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) { setCredencial(null); return; }
+    supabase.from("credenciais").select("*").eq("codigo", codigo).single().then(({ data }) => {
+      setCredencial(data ?? null);
+      if (data?.evento_id) {
+        supabase.from("eventos_calendario").select("titulo, data_inicio").eq("id", data.evento_id).single()
+          .then(({ data: ev }) => setEvento(ev ?? null));
+      }
+    });
+  }, [codigo]);
+
+  if (credencial === undefined) return <LoadingBrand texto="Carregando credencial..." />;
+
+  if (!credencial) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: C.blueTint2 }}>
+        <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Credencial não encontrada.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 py-10" style={{ background: C.blueTint2 }}>
+      <div className="w-full max-w-sm rounded-3xl overflow-hidden border bg-white" style={{ borderColor: C.line }}>
+        <div className="p-6 text-center text-white" style={{ background: `linear-gradient(120deg, ${C.blueDeep}, ${C.blue})` }}>
+          <p className="font-body text-[11px] uppercase tracking-wider text-white/70">Credencial digital</p>
+          <p className="font-display font-extrabold text-lg mt-1">{evento?.titulo || "Evento"}</p>
+          {evento?.data_inicio && <p className="font-body text-xs text-white/70 mt-0.5">{evento.data_inicio}</p>}
+        </div>
+        <div className="p-6 flex flex-col items-center gap-4">
+          {credencial.foto_url ? (
+            <img loading="lazy" decoding="async" src={credencial.foto_url} alt="" className="w-20 h-20 rounded-full object-cover border" style={{ borderColor: C.line }} />
+          ) : (
+            <span className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: C.blueTint, color: C.blue }}>
+              <UserCircle2 size={36} />
+            </span>
+          )}
+          <div className="text-center">
+            <p className="font-display font-bold text-lg" style={{ color: C.ink }}>{credencial.nome}</p>
+            <p className="font-body text-xs mt-0.5" style={{ color: "#7E93A7" }}>{credencial.tipo}</p>
+          </div>
+          <img loading="lazy" decoding="async"
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(String(credencial.codigo))}`}
+            alt="QR Code" className="w-44 h-44" />
+          <span className="font-body text-[11px] font-bold px-3 py-1 rounded-full"
+            style={{ background: credencial.status === "ativa" ? "#E7F6EE" : "#FBEAE5", color: credencial.status === "ativa" ? "#1E8E5A" : "#B4462F" }}>
+            {credencial.status === "ativa" ? "Credencial ativa" : "Credencial inativa"}
+          </span>
+          {credencial.checkin_feito && (
+            <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>
+              Check-in feito{credencial.checkin_em ? ` em ${new Date(credencial.checkin_em).toLocaleString("pt-BR")}` : ""}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // App raiz — alterna entre Site publico, Painel Admin e Painel Empresario.
 // Cada painel e acessado por um link proprio (ver ROTA_HASH acima); o site
 // publico em si nunca exige cadastro para ser visitado.
@@ -6685,6 +7040,7 @@ export default function ConectaComercio() {
   // "Painel Empresário" sejam links reais (copiaveis/compartilhaveis), nao
   // so um estado interno.
   useEffect(() => {
+    if (window.location.hash.startsWith("#/credencial-")) return; // link de credencial digital — não mexe na URL
     const alvo = ROTA_HASH[modo] || "#/";
     if (window.location.hash !== alvo) window.history.replaceState(null, "", alvo);
   }, [modo]);
@@ -6698,6 +7054,12 @@ export default function ConectaComercio() {
     if (perfil.tipo === "admin") return true; // admin tem acesso a todos os painéis do site
     return perfil.tipo === restrito;
   };
+
+  // Credencial digital pública (link/QR Code de um evento) — página própria,
+  // sem menu e sem exigir login, então sai daqui antes do layout normal.
+  if (window.location.hash.startsWith("#/credencial-")) {
+    return <CredencialDigital codigo={window.location.hash.replace("#/credencial-", "")} />;
+  }
 
   return (
     <div className="font-body min-h-screen" style={{ background: "#fff" }}>
