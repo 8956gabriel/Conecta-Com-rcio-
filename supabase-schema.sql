@@ -12,7 +12,7 @@ create extension if not exists postgis;
 create table public.perfis (
   id uuid primary key references auth.users(id) on delete cascade,
   nome text not null,
-  tipo text not null check (tipo in ('cliente','empresario','admin')) default 'cliente',
+  tipo text not null check (tipo in ('cliente','empresario','admin','prestador')) default 'cliente',
   telefone text,
   criado_em timestamptz not null default now()
 );
@@ -39,6 +39,23 @@ create table public.empresas (
   aceita_cartao_servidor boolean default false,
   status text not null check (status in ('pendente','aprovada','recusada')) default 'pendente',
   visualizacoes integer not null default 0,
+  criado_em timestamptz not null default now()
+);
+
+-- -----------------------------------------------------------------------------
+-- PRESTADORES DE SERVIÇO
+-- -----------------------------------------------------------------------------
+create table public.prestadores (
+  id uuid primary key default gen_random_uuid(),
+  dono_id uuid not null references public.perfis(id) on delete cascade,
+  nome text not null,
+  servico text not null,
+  descricao text,
+  foto_url text,
+  endereco text,
+  whatsapp text,
+  instagram text,
+  status text not null check (status in ('pendente','aprovado','recusado')) default 'pendente',
   criado_em timestamptz not null default now()
 );
 
@@ -230,11 +247,25 @@ create table public.eventos_calendario (
   criado_em timestamptz not null default now()
 );
 
+-- -----------------------------------------------------------------------------
+-- SITE CONFIG (identidade visual) — linha única, editável só pelo admin
+-- -----------------------------------------------------------------------------
+create table public.site_config (
+  id integer primary key default 1,
+  cor_principal text not null default '#2C6ECB',
+  logo_url text,
+  frase text not null default 'Compre em Ivatuba, fortaleça quem é daqui.',
+  atualizado_em timestamptz not null default now(),
+  constraint site_config_singleton check (id = 1)
+);
+insert into public.site_config (id) values (1) on conflict (id) do nothing;
+
 -- =============================================================================
 -- ROW LEVEL SECURITY (RLS)
 -- =============================================================================
 alter table public.perfis enable row level security;
 alter table public.empresas enable row level security;
+alter table public.prestadores enable row level security;
 alter table public.produtos enable row level security;
 alter table public.promocoes enable row level security;
 alter table public.vagas enable row level security;
@@ -249,10 +280,13 @@ alter table public.feirantes enable row level security;
 alter table public.servicos_empreendedor enable row level security;
 alter table public.feira_config enable row level security;
 alter table public.eventos_calendario enable row level security;
+alter table public.site_config enable row level security;
 
 -- Leitura pública do conteúdo aprovado
 create policy "leitura publica empresas aprovadas" on public.empresas
   for select using (status = 'aprovada');
+create policy "leitura publica prestadores aprovados" on public.prestadores
+  for select using (status = 'aprovado');
 create policy "leitura publica produtos" on public.produtos for select using (true);
 create policy "leitura publica vagas" on public.vagas for select using (status = 'aberta');
 create policy "leitura publica cursos" on public.cursos for select using (true);
@@ -315,6 +349,14 @@ create policy "empresario edita sua empresa" on public.empresas
   for update using (auth.uid() = dono_id);
 create policy "empresario cadastra empresa" on public.empresas
   for insert with check (auth.uid() = dono_id);
+create policy "prestador edita seu cadastro" on public.prestadores
+  for update using (auth.uid() = dono_id);
+create policy "prestador se cadastra" on public.prestadores
+  for insert with check (auth.uid() = dono_id);
+create policy "admin gerencia prestadores" on public.prestadores
+  for all using (
+    exists (select 1 from public.perfis p where p.id = auth.uid() and p.tipo = 'admin')
+  );
 create policy "empresario gerencia seus produtos" on public.produtos
   for all using (
     exists (select 1 from public.empresas e where e.id = empresa_id and e.dono_id = auth.uid())
