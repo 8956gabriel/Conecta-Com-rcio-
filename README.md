@@ -147,6 +147,13 @@ por IA continuam funcionando normalmente, pois usam só a Anthropic).
   trocar a logo de qualquer empresa na moderação
 - **Painel do Empresário — Meus produtos**: lista os produtos reais (com foto), permite
   publicar/despublicar e remover; "Novo produto" já atualiza a lista na hora
+- **Prestador de serviço**: novo tipo de cadastro (igual ao de empresário) para autônomos e
+  informais — nome, serviço, foto, endereço, WhatsApp e Instagram. Fica em análise até o admin
+  aprovar (aba "Prestadores de serviço" no painel admin) e depois aparece numa seção própria
+  na home, com botão direto de WhatsApp e Instagram
+- **Site com mais vida**: navbar ganha sombra ao rolar a página, hero com animação de entrada,
+  seção de depoimentos em carrossel e FAQ com accordion — tudo mantendo as cores e a fonte
+  originais da marca
 
 ### O que ainda é só interface (próximo passo)
 - Painel do empresário: promoções, visualizações, editar detalhes de um produto já existente
