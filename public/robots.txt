@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://conecta-com-rcio.vercel.app/sitemap.xml
