@@ -1,7 +1,8 @@
-// Permite que um administrador crie contas de usuário (cliente, empresário
-// ou admin) direto pelo painel, sem passar pelo auto-cadastro público.
-// Usa a chave de serviço do Supabase (SUPABASE_SERVICE_ROLE_KEY), que nunca
-// pode ficar no navegador - por isso essa conta é criada aqui, no servidor.
+// Permite que um administrador crie contas de usuário (cliente, empresário,
+// prestador de serviço ou admin) direto pelo painel, sem passar pelo
+// auto-cadastro público. Usa a chave de serviço do Supabase
+// (SUPABASE_SERVICE_ROLE_KEY), que nunca pode ficar no navegador - por isso
+// essa conta é criada aqui, no servidor.
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -44,13 +45,21 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { nome, email, senha, tipo, empresaNome, empresaCategoria } = req.body || {};
+    const {
+      nome, email, senha, tipo,
+      empresaNome, empresaCategoria, empresaWhatsapp, empresaInstagram, empresaEndereco, empresaGoogleMaps,
+      prestadorServico, prestadorWhatsapp, prestadorInstagram, prestadorEndereco, prestadorGoogleMaps,
+    } = req.body || {};
     if (!nome || !email || !senha) {
       res.status(400).json({ error: "Preencha nome, e-mail e senha." });
       return;
     }
-    if (!["cliente", "empresario", "admin"].includes(tipo)) {
+    if (!["cliente", "empresario", "prestador", "admin"].includes(tipo)) {
       res.status(400).json({ error: "Tipo de conta inválido." });
+      return;
+    }
+    if (tipo === "prestador" && !prestadorServico) {
+      res.status(400).json({ error: "Informe o serviço prestado." });
       return;
     }
     if (String(senha).length < 6) {
@@ -80,17 +89,36 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Se for empresário e o admin informou o nome da empresa, já cadastra a
-    // empresa vinculada a essa conta, aprovada, sem precisar de outro passo.
     if (tipo === "empresario" && empresaNome) {
       const { error: erroEmpresa } = await admin.from("empresas").insert({
         dono_id: novoUsuario.user.id,
         nome: empresaNome,
         categoria: empresaCategoria || "Outros",
+        whatsapp: empresaWhatsapp || null,
+        instagram: empresaInstagram || null,
+        endereco: empresaEndereco || null,
+        google_maps_url: empresaGoogleMaps || null,
         status: "aprovada",
       });
       if (erroEmpresa) {
         res.status(200).json({ ok: true, id: novoUsuario.user.id, avisoEmpresa: "Usuário criado, mas a empresa não pôde ser cadastrada: " + erroEmpresa.message });
+        return;
+      }
+    }
+
+    if (tipo === "prestador") {
+      const { error: erroPrestador } = await admin.from("prestadores").insert({
+        dono_id: novoUsuario.user.id,
+        nome,
+        servico: prestadorServico,
+        whatsapp: prestadorWhatsapp || null,
+        instagram: prestadorInstagram || null,
+        endereco: prestadorEndereco || null,
+        google_maps_url: prestadorGoogleMaps || null,
+        status: "aprovado",
+      });
+      if (erroPrestador) {
+        res.status(200).json({ ok: true, id: novoUsuario.user.id, avisoEmpresa: "Usuário criado, mas o prestador não pôde ser cadastrado: " + erroPrestador.message });
         return;
       }
     }
