@@ -7,7 +7,7 @@ import {
   CheckCircle2, Image as ImageIcon, Users, TrendingUp, Send, PlusCircle,
   Pencil, Trash2, Tag, UserCircle2, ChevronLeft, ShieldCheck, BarChart3, Vote, Sparkles,
   FileText, Receipt, ClipboardList, HandCoins, ExternalLink,
-  Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake
+  Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
@@ -16,9 +16,9 @@ import { supabase, supabaseConfigurado } from "./supabaseClient";
 // Tokens
 // ---------------------------------------------------------------------------
 const C = {
-  blue: "#0A5AA8",
-  blueDark: "#073F73",
-  blueDeep: "#052A4D",
+  blue: "var(--cor-principal, #0A5AA8)",
+  blueDark: "var(--cor-principal-escura, #073F73)",
+  blueDeep: "var(--cor-principal-profunda, #052A4D)",
   blueTint: "#EAF2FB",
   blueTint2: "#F5F9FD",
   ink: "#0E2233",
@@ -26,6 +26,29 @@ const C = {
   amberDark: "#C6811F",
   line: "#DCE7F2",
 };
+
+// Escurece uma cor hex em uma porcentagem — usado para gerar os tons mais
+// escuros (blueDark/blueDeep) a partir da única cor que o admin escolhe.
+function escurecerCor(hex, quantidade) {
+  try {
+    const n = hex.replace("#", "");
+    const r = Math.max(0, Math.round(parseInt(n.substring(0, 2), 16) * (1 - quantidade)));
+    const g = Math.max(0, Math.round(parseInt(n.substring(2, 4), 16) * (1 - quantidade)));
+    const b = Math.max(0, Math.round(parseInt(n.substring(4, 6), 16) * (1 - quantidade)));
+    return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+  } catch {
+    return hex;
+  }
+}
+
+// Aplica a cor principal do site nas variáveis CSS globais — chamado assim
+// que a configuração de identidade visual é carregada (ou salva pelo admin).
+function aplicarCorPrincipal(hex) {
+  if (!hex) return;
+  document.documentElement.style.setProperty("--cor-principal", hex);
+  document.documentElement.style.setProperty("--cor-principal-escura", escurecerCor(hex, 0.32));
+  document.documentElement.style.setProperty("--cor-principal-profunda", escurecerCor(hex, 0.55));
+}
 
 const fontImport = `
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap');
@@ -277,7 +300,14 @@ const noticias = [
 // ---------------------------------------------------------------------------
 // UI bits
 // ---------------------------------------------------------------------------
-function LogoMark({ size = 40, iconSize }) {
+function LogoMark({ size = 40, iconSize, url }) {
+  if (url) {
+    return (
+      <span className="rounded-full overflow-hidden shrink-0" style={{ width: size, height: size }}>
+        <img src={url} alt="Logo" className="w-full h-full object-cover" />
+      </span>
+    );
+  }
   return (
     <span
       className="rounded-full flex items-center justify-center shrink-0"
@@ -492,11 +522,12 @@ function AdminPanel() {
   const [empresasPend, setEmpresasPend] = useState(null); // null = carregando/indisponível
   const [statusEmpresa, setStatusEmpresa] = useState({});
   const [editandoEmpresa, setEditandoEmpresa] = useState(null);
-  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "" });
+  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "" });
+  const [enviandoLogoEmpresa, setEnviandoLogoEmpresa] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("empresas").select("id, nome, categoria, status, criado_em").order("criado_em", { ascending: false })
+    supabase.from("empresas").select("id, nome, categoria, status, logo_url, criado_em").order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setEmpresasPend(data || []); });
   }, []);
 
@@ -512,7 +543,22 @@ function AdminPanel() {
     else setStatusEmpresa((s) => ({ ...s, [id]: error.message }));
   };
 
-  const iniciarEdicaoEmpresa = (e) => { setEditandoEmpresa(e.id); setFormEmpresa({ nome: e.nome, categoria: e.categoria }); };
+  const iniciarEdicaoEmpresa = (e) => { setEditandoEmpresa(e.id); setFormEmpresa({ nome: e.nome, categoria: e.categoria, logo_url: e.logo_url || "" }); };
+
+  const enviarLogoEmpresaAdmin = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setFormEmpresa((f) => ({ ...f, logo_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoLogoEmpresa(true);
+    const caminho = `logos/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("logos").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoLogoEmpresa(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("logos").getPublicUrl(caminho);
+        setFormEmpresa((f) => ({ ...f, logo_url: pub.publicUrl }));
+      }
+    });
+  };
 
   const salvarEdicaoEmpresa = async (id) => {
     if (!supabaseConfigurado) {
@@ -520,7 +566,7 @@ function AdminPanel() {
       setEditandoEmpresa(null);
       return;
     }
-    const { error } = await supabase.from("empresas").update({ nome: formEmpresa.nome, categoria: formEmpresa.categoria }).eq("id", id);
+    const { error } = await supabase.from("empresas").update({ nome: formEmpresa.nome, categoria: formEmpresa.categoria, logo_url: formEmpresa.logo_url }).eq("id", id);
     if (!error) setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, ...formEmpresa } : e)));
     setEditandoEmpresa(null);
   };
@@ -599,7 +645,23 @@ function AdminPanel() {
   };
 
   const [feirasEspeciaisAdmin, setFeirasEspeciaisAdmin] = useState(null);
-  const [novaFeiraEspecial, setNovaFeiraEspecial] = useState({ titulo: "", data_inicio: "", local: "" });
+  const [novaFeiraEspecial, setNovaFeiraEspecial] = useState({ titulo: "", data_inicio: "", local: "", imagem_url: "", link_url: "" });
+  const [enviandoFotoFeiraEspecial, setEnviandoFotoFeiraEspecial] = useState(false);
+
+  const enviarFotoFeiraEspecial = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setNovaFeiraEspecial((f) => ({ ...f, imagem_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoFotoFeiraEspecial(true);
+    const caminho = `feiras/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoFeiraEspecial(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+        setNovaFeiraEspecial((f) => ({ ...f, imagem_url: pub.publicUrl }));
+      }
+    });
+  };
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
@@ -615,13 +677,13 @@ function AdminPanel() {
     if (!novaFeiraEspecial.titulo || !novaFeiraEspecial.data_inicio) return;
     if (!supabaseConfigurado) {
       setFeirasEspeciaisAdmin((atual) => [...(atual ?? listaFeirasEspeciais), { id: `demo-${Date.now()}`, ...novaFeiraEspecial }]);
-      setNovaFeiraEspecial({ titulo: "", data_inicio: "", local: "" });
+      setNovaFeiraEspecial({ titulo: "", data_inicio: "", local: "", imagem_url: "", link_url: "" });
       return;
     }
     const { data, error } = await supabase.from("eventos_calendario").insert({ ...novaFeiraEspecial, tipo: "feira" }).select().single();
     if (!error) {
       setFeirasEspeciaisAdmin((atual) => [...(atual ?? []), data]);
-      setNovaFeiraEspecial({ titulo: "", data_inicio: "", local: "" });
+      setNovaFeiraEspecial({ titulo: "", data_inicio: "", local: "", imagem_url: "", link_url: "" });
     }
   };
 
@@ -714,8 +776,486 @@ function AdminPanel() {
     });
   };
 
+  // -------------------------------------------------------------------------
+  // Banners da home — upload de imagem de verdade (Storage) + tabela banners.
+  // -------------------------------------------------------------------------
+  const [bannersAdmin, setBannersAdmin] = useState(null);
+  const [enviandoBanner, setEnviandoBanner] = useState(null);
+  const [statusBanner, setStatusBanner] = useState({});
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("banners").select("*").order("ordem").then(({ data, error }) => {
+      if (!error) setBannersAdmin(data || []);
+    });
+  }, []);
+
+  const listaBanners = bannersAdmin ?? [
+    { id: "demo-1", titulo: "Banner principal", imagem_url: null, link_url: "", ordem: 1, ativo: true },
+    { id: "demo-2", titulo: "Campanha Compre em Ivatuba", imagem_url: null, link_url: "", ordem: 2, ativo: true },
+  ];
+
+  const atualizarBanner = (id, campo, valor) =>
+    setBannersAdmin((atual) => (atual ?? listaBanners).map((b) => (b.id === id ? { ...b, [campo]: valor } : b)));
+
+  const enviarImagemBanner = (id, e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { atualizarBanner(id, "imagem_url", URL.createObjectURL(arquivo)); return; }
+    setEnviandoBanner(id);
+    const caminho = `banners/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoBanner(null);
+      if (error) { setStatusBanner((s) => ({ ...s, [id]: error.message })); return; }
+      const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+      atualizarBanner(id, "imagem_url", pub.publicUrl);
+    });
+  };
+
+  const salvarBanner = async (banner) => {
+    setStatusBanner((s) => ({ ...s, [banner.id]: "" }));
+    if (!banner.imagem_url) { setStatusBanner((s) => ({ ...s, [banner.id]: "Envie uma imagem antes de salvar." })); return; }
+    if (!supabaseConfigurado) { setStatusBanner((s) => ({ ...s, [banner.id]: "ok" })); return; }
+    try {
+      const registro = { titulo: banner.titulo, imagem_url: banner.imagem_url, link_url: banner.link_url, ordem: banner.ordem ?? 0, ativo: banner.ativo !== false };
+      const ehNovo = String(banner.id).startsWith("demo-") || String(banner.id).startsWith("novo-");
+      const { data, error } = ehNovo
+        ? await supabase.from("banners").insert(registro).select().single()
+        : await supabase.from("banners").update(registro).eq("id", banner.id).select().single();
+      if (error) throw error;
+      setBannersAdmin((atual) => (atual ?? listaBanners).map((b) => (b.id === banner.id ? data : b)));
+      setStatusBanner((s) => ({ ...s, [banner.id]: "ok" }));
+    } catch (err) {
+      setStatusBanner((s) => ({ ...s, [banner.id]: err.message || "Erro ao salvar" }));
+    }
+  };
+
+  const removerBanner = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-") || String(id).startsWith("novo-")) {
+      setBannersAdmin((atual) => (atual ?? listaBanners).filter((b) => b.id !== id));
+      return;
+    }
+    const { error } = await supabase.from("banners").delete().eq("id", id);
+    if (!error) setBannersAdmin((atual) => atual.filter((b) => b.id !== id));
+  };
+
+  // -------------------------------------------------------------------------
+  // Cadastrar usuário direto pelo admin — sem passar pelo cadastro público.
+  // Usa um endpoint de servidor (api/admin-criar-usuario) com a chave de
+  // serviço, porque criar conta de outra pessoa exige privilégio de admin
+  // que não pode ficar no navegador.
+  // -------------------------------------------------------------------------
+  const [novoUsuarioAdmin, setNovoUsuarioAdmin] = useState({ nome: "", email: "", senha: "", tipo: "cliente", empresaNome: "", empresaCategoria: "" });
+  const [criandoUsuarioAdmin, setCriandoUsuarioAdmin] = useState(false);
+  const [statusUsuarioAdmin, setStatusUsuarioAdmin] = useState("");
+
+  const criarUsuarioAdmin = async (e) => {
+    e.preventDefault();
+    setStatusUsuarioAdmin("");
+    if (!supabaseConfigurado) {
+      setStatusUsuarioAdmin("Modo demonstração: conecte o Supabase para criar usuários de verdade.");
+      return;
+    }
+    setCriandoUsuarioAdmin(true);
+    try {
+      const { data: sessaoAtual } = await supabase.auth.getSession();
+      const token = sessaoAtual?.session?.access_token;
+      const resp = await fetch("/api/admin-criar-usuario", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify(novoUsuarioAdmin),
+      });
+      const dados = await resp.json();
+      if (!resp.ok) throw new Error(dados.error || "Não foi possível criar o usuário agora.");
+      setStatusUsuarioAdmin("ok");
+      setNovoUsuarioAdmin({ nome: "", email: "", senha: "", tipo: "cliente", empresaNome: "", empresaCategoria: "" });
+    } catch (err) {
+      setStatusUsuarioAdmin(err.message || "Erro ao criar usuário.");
+    } finally {
+      setCriandoUsuarioAdmin(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // Identidade visual do site — cor principal, logo e frase de destaque.
+  // -------------------------------------------------------------------------
+  const [siteConfigAdmin, setSiteConfigAdmin] = useState(null);
+  const [enviandoLogoSite, setEnviandoLogoSite] = useState(false);
+  const [salvandoIdentidade, setSalvandoIdentidade] = useState(false);
+  const [statusIdentidade, setStatusIdentidade] = useState("");
+
+  useEffect(() => {
+    if (!supabaseConfigurado) { setSiteConfigAdmin({ cor_principal: "#0A5AA8", logo_url: null, frase: "" }); return; }
+    supabase.from("site_config").select("*").eq("id", 1).single().then(({ data }) => {
+      setSiteConfigAdmin(data || { cor_principal: "#0A5AA8", logo_url: null, frase: "" });
+    });
+  }, []);
+
+  const enviarLogoSite = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setSiteConfigAdmin((v) => ({ ...v, logo_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoLogoSite(true);
+    const caminho = `site/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("logos").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoLogoSite(false);
+      if (error) { setStatusIdentidade(error.message); return; }
+      const { data: pub } = supabase.storage.from("logos").getPublicUrl(caminho);
+      setSiteConfigAdmin((v) => ({ ...v, logo_url: pub.publicUrl }));
+    });
+  };
+
+  const salvarIdentidade = async (e) => {
+    e.preventDefault();
+    setStatusIdentidade("");
+    aplicarCorPrincipal(siteConfigAdmin.cor_principal);
+    if (!supabaseConfigurado) { setStatusIdentidade("ok"); return; }
+    setSalvandoIdentidade(true);
+    try {
+      const { error } = await supabase.from("site_config").upsert({
+        id: 1,
+        cor_principal: siteConfigAdmin.cor_principal,
+        logo_url: siteConfigAdmin.logo_url,
+        frase: siteConfigAdmin.frase,
+      });
+      if (error) throw error;
+      setStatusIdentidade("ok");
+    } catch (err) {
+      setStatusIdentidade(err.message || "Erro ao salvar identidade visual");
+    } finally {
+      setSalvandoIdentidade(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // Notícias — cadastro real com foto e link.
+  // -------------------------------------------------------------------------
+  const [noticiasAdmin, setNoticiasAdmin] = useState(null);
+  const [novaNoticia, setNovaNoticia] = useState({ titulo: "", conteudo: "", imagem_url: "", link_url: "" });
+  const [enviandoFotoNoticia, setEnviandoFotoNoticia] = useState(false);
+  const [publicandoNoticia, setPublicandoNoticia] = useState(false);
+  const [statusNoticia, setStatusNoticia] = useState("");
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("noticias").select("*").order("publicada_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setNoticiasAdmin(data || []);
+    });
+  }, []);
+
+  const enviarFotoNoticia = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setNovaNoticia((v) => ({ ...v, imagem_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoFotoNoticia(true);
+    const caminho = `noticias/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoNoticia(false);
+      if (error) { setStatusNoticia(error.message); return; }
+      const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+      setNovaNoticia((v) => ({ ...v, imagem_url: pub.publicUrl }));
+    });
+  };
+
+  const publicarNoticia = async (e) => {
+    e.preventDefault();
+    setStatusNoticia("");
+    if (!novaNoticia.titulo) { setStatusNoticia("Informe ao menos o título."); return; }
+    if (!supabaseConfigurado) {
+      setNoticiasAdmin((atual) => [{ id: `demo-${Date.now()}`, ...novaNoticia, publicada_em: new Date().toISOString() }, ...(atual ?? [])]);
+      setNovaNoticia({ titulo: "", conteudo: "", imagem_url: "", link_url: "" });
+      setStatusNoticia("ok");
+      return;
+    }
+    setPublicandoNoticia(true);
+    try {
+      const { data, error } = await supabase.from("noticias").insert(novaNoticia).select().single();
+      if (error) throw error;
+      setNoticiasAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovaNoticia({ titulo: "", conteudo: "", imagem_url: "", link_url: "" });
+      setStatusNoticia("ok");
+    } catch (err) {
+      setStatusNoticia(err.message || "Erro ao publicar notícia");
+    } finally {
+      setPublicandoNoticia(false);
+    }
+  };
+
+  const removerNoticia = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setNoticiasAdmin((atual) => (atual ?? []).filter((n) => n.id !== id));
+      return;
+    }
+    const { error } = await supabase.from("noticias").delete().eq("id", id);
+    if (!error) setNoticiasAdmin((atual) => atual.filter((n) => n.id !== id));
+  };
+
+  // -------------------------------------------------------------------------
+  // Notificações push — cadastro real com foto e link, grava histórico.
+  // -------------------------------------------------------------------------
+  const [notificacoesAdmin, setNotificacoesAdmin] = useState(null);
+  const [novaNotificacao, setNovaNotificacao] = useState({ titulo: "", mensagem: "", imagem_url: "", link_url: "" });
+  const [enviandoFotoNotificacao, setEnviandoFotoNotificacao] = useState(false);
+  const [enviandoNotificacao, setEnviandoNotificacao] = useState(false);
+  const [statusNotificacao, setStatusNotificacao] = useState("");
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("notificacoes").select("*").order("enviada_em", { ascending: false }).limit(10).then(({ data, error }) => {
+      if (!error) setNotificacoesAdmin(data || []);
+    });
+  }, []);
+
+  const enviarFotoNotificacao = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setNovaNotificacao((v) => ({ ...v, imagem_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoFotoNotificacao(true);
+    const caminho = `notificacoes/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoNotificacao(false);
+      if (error) { setStatusNotificacao(error.message); return; }
+      const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+      setNovaNotificacao((v) => ({ ...v, imagem_url: pub.publicUrl }));
+    });
+  };
+
+  const enviarNotificacao = async (e) => {
+    e.preventDefault();
+    setStatusNotificacao("");
+    if (!novaNotificacao.titulo || !novaNotificacao.mensagem) { setStatusNotificacao("Preencha título e mensagem."); return; }
+    if (!supabaseConfigurado) {
+      setNotificacoesAdmin((atual) => [{ id: `demo-${Date.now()}`, ...novaNotificacao, enviada_em: new Date().toISOString() }, ...(atual ?? [])]);
+      setNovaNotificacao({ titulo: "", mensagem: "", imagem_url: "", link_url: "" });
+      setStatusNotificacao("ok");
+      return;
+    }
+    setEnviandoNotificacao(true);
+    try {
+      const { data, error } = await supabase.from("notificacoes").insert(novaNotificacao).select().single();
+      if (error) throw error;
+      setNotificacoesAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovaNotificacao({ titulo: "", mensagem: "", imagem_url: "", link_url: "" });
+      setStatusNotificacao("ok");
+    } catch (err) {
+      setStatusNotificacao(err.message || "Erro ao enviar notificação");
+    } finally {
+      setEnviandoNotificacao(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // Vagas — admin cadastra vagas publicadas vinculadas a uma empresa.
+  // -------------------------------------------------------------------------
+  const [vagasAdmin, setVagasAdmin] = useState(null);
+  const [novaVaga, setNovaVaga] = useState({ empresa_id: "", cargo: "", salario: "", requisitos: "", cidade: "Ivatuba - PR" });
+  const [publicandoVaga, setPublicandoVaga] = useState(false);
+  const [statusVaga, setStatusVaga] = useState("");
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("vagas").select("*, empresas(nome)").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setVagasAdmin(data || []);
+    });
+  }, []);
+
+  const publicarVaga = async (e) => {
+    e.preventDefault();
+    setStatusVaga("");
+    if (!novaVaga.cargo) { setStatusVaga("Informe ao menos o cargo."); return; }
+    if (!supabaseConfigurado) {
+      setVagasAdmin((atual) => [{ id: `demo-${Date.now()}`, ...novaVaga, status: "aberta" }, ...(atual ?? [])]);
+      setNovaVaga({ empresa_id: "", cargo: "", salario: "", requisitos: "", cidade: "Ivatuba - PR" });
+      setStatusVaga("ok");
+      return;
+    }
+    if (!novaVaga.empresa_id) { setStatusVaga("Escolha a empresa da vaga."); return; }
+    setPublicandoVaga(true);
+    try {
+      const { data, error } = await supabase.from("vagas").insert(novaVaga).select("*, empresas(nome)").single();
+      if (error) throw error;
+      setVagasAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovaVaga({ empresa_id: "", cargo: "", salario: "", requisitos: "", cidade: "Ivatuba - PR" });
+      setStatusVaga("ok");
+    } catch (err) {
+      setStatusVaga(err.message || "Erro ao publicar vaga");
+    } finally {
+      setPublicandoVaga(false);
+    }
+  };
+
+  const removerVaga = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setVagasAdmin((atual) => (atual ?? []).filter((v) => v.id !== id));
+      return;
+    }
+    const { error } = await supabase.from("vagas").delete().eq("id", id);
+    if (!error) setVagasAdmin((atual) => atual.filter((v) => v.id !== id));
+  };
+
+  // -------------------------------------------------------------------------
+  // Feirantes — admin cadastra direto (com foto), já aprovado, aparece no site.
+  // -------------------------------------------------------------------------
+  const [novoFeiranteAdmin, setNovoFeiranteAdmin] = useState({ nome: "", produto: "", whatsapp: "", instagram: "" });
+  const [fotoFeiranteAdmin, setFotoFeiranteAdmin] = useState(null);
+  const [enviandoFeiranteAdmin, setEnviandoFeiranteAdmin] = useState(false);
+  const [statusFeiranteAdmin, setStatusFeiranteAdmin] = useState("");
+
+  const cadastrarFeiranteAdmin = async (e) => {
+    e.preventDefault();
+    setStatusFeiranteAdmin("");
+    if (!novoFeiranteAdmin.nome || !novoFeiranteAdmin.produto || !novoFeiranteAdmin.whatsapp) {
+      setStatusFeiranteAdmin("Preencha nome, produto e WhatsApp.");
+      return;
+    }
+    if (!supabaseConfigurado) {
+      setFeirantes((atual) => [{ id: `demo-${Date.now()}`, ...novoFeiranteAdmin, status: "aprovado", fotos_urls: [] }, ...(atual ?? [])]);
+      setNovoFeiranteAdmin({ nome: "", produto: "", whatsapp: "", instagram: "" });
+      setFotoFeiranteAdmin(null);
+      setStatusFeiranteAdmin("ok");
+      return;
+    }
+    setEnviandoFeiranteAdmin(true);
+    try {
+      let fotosUrls = [];
+      if (fotoFeiranteAdmin) {
+        const caminho = `feirantes/${Date.now()}-${fotoFeiranteAdmin.name}`;
+        const { error: erroUpload } = await supabase.storage.from("fotos-feirantes").upload(caminho, fotoFeiranteAdmin);
+        if (!erroUpload) {
+          const { data: pub } = supabase.storage.from("fotos-feirantes").getPublicUrl(caminho);
+          fotosUrls = [pub.publicUrl];
+        }
+      }
+      const { data, error } = await supabase.from("feirantes").insert({ ...novoFeiranteAdmin, status: "aprovado", fotos_urls: fotosUrls }).select().single();
+      if (error) throw error;
+      setFeirantes((atual) => [data, ...(atual ?? [])]);
+      setNovoFeiranteAdmin({ nome: "", produto: "", whatsapp: "", instagram: "" });
+      setFotoFeiranteAdmin(null);
+      setStatusFeiranteAdmin("ok");
+    } catch (err) {
+      setStatusFeiranteAdmin(err.message || "Erro ao cadastrar feirante");
+    } finally {
+      setEnviandoFeiranteAdmin(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // Produtos — admin cadastra direto para qualquer empresa (não só modera).
+  // -------------------------------------------------------------------------
+  const [novoProdutoAdmin, setNovoProdutoAdmin] = useState({ empresa_id: "", nome: "", descricao: "", preco: "", categoria: "" });
+  const [fotoProdutoAdmin, setFotoProdutoAdmin] = useState(null);
+  const [cadastrandoProdutoAdmin, setCadastrandoProdutoAdmin] = useState(false);
+  const [statusProdutoAdmin, setStatusProdutoAdmin] = useState("");
+
+  const cadastrarProdutoAdmin = async (e) => {
+    e.preventDefault();
+    setStatusProdutoAdmin("");
+    if (!novoProdutoAdmin.nome) { setStatusProdutoAdmin("Informe ao menos o nome do produto."); return; }
+    if (!supabaseConfigurado) {
+      setProdutosAdmin((atual) => [{ id: `demo-${Date.now()}`, ...novoProdutoAdmin, ativo: true }, ...(atual ?? listaProdutos)]);
+      setNovoProdutoAdmin({ empresa_id: "", nome: "", descricao: "", preco: "", categoria: "" });
+      setFotoProdutoAdmin(null);
+      setStatusProdutoAdmin("ok");
+      return;
+    }
+    if (!novoProdutoAdmin.empresa_id) { setStatusProdutoAdmin("Escolha a empresa do produto."); return; }
+    setCadastrandoProdutoAdmin(true);
+    try {
+      let fotoUrl = null;
+      if (fotoProdutoAdmin) {
+        const caminho = `produtos/${Date.now()}-${fotoProdutoAdmin.name}`;
+        const { error: erroUpload } = await supabase.storage.from("fotos-produtos").upload(caminho, fotoProdutoAdmin);
+        if (!erroUpload) {
+          const { data: pub } = supabase.storage.from("fotos-produtos").getPublicUrl(caminho);
+          fotoUrl = pub.publicUrl;
+        }
+      }
+      const registro = {
+        empresa_id: novoProdutoAdmin.empresa_id,
+        nome: novoProdutoAdmin.nome,
+        descricao: novoProdutoAdmin.descricao,
+        preco: novoProdutoAdmin.preco ? Number(novoProdutoAdmin.preco) : null,
+        categoria: novoProdutoAdmin.categoria,
+        foto_url: fotoUrl,
+        ativo: true,
+      };
+      const { data, error } = await supabase.from("produtos").insert(registro).select("*, empresas(nome)").single();
+      if (error) throw error;
+      setProdutosAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovoProdutoAdmin({ empresa_id: "", nome: "", descricao: "", preco: "", categoria: "" });
+      setFotoProdutoAdmin(null);
+      setStatusProdutoAdmin("ok");
+    } catch (err) {
+      setStatusProdutoAdmin(err.message || "Erro ao cadastrar produto");
+    } finally {
+      setCadastrandoProdutoAdmin(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // Enquetes — cadastro real (pergunta + opções) e encerrar/reabrir.
+  // -------------------------------------------------------------------------
+  const [enquetesAdmin, setEnquetesAdmin] = useState(null);
+  const [novaEnquete, setNovaEnquete] = useState({ pergunta: "", opcao1: "", opcao2: "", opcao3: "" });
+  const [publicandoEnquete, setPublicandoEnquete] = useState(false);
+  const [statusEnquete, setStatusEnquete] = useState("");
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("enquetes").select("*").order("criada_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setEnquetesAdmin(data || []);
+    });
+  }, []);
+
+  const listaEnquetes = enquetesAdmin ?? enquetes.map((e, i) => ({ id: `demo-${i}`, ...e }));
+
+  const publicarEnquete = async (e) => {
+    e.preventDefault();
+    setStatusEnquete("");
+    const opcoesTexto = [novaEnquete.opcao1, novaEnquete.opcao2, novaEnquete.opcao3].filter((t) => t.trim());
+    if (!novaEnquete.pergunta || opcoesTexto.length < 2) { setStatusEnquete("Informe a pergunta e ao menos 2 opções."); return; }
+    const opcoes = opcoesTexto.map((texto) => ({ texto, votos: 0 }));
+    if (!supabaseConfigurado) {
+      setEnquetesAdmin((atual) => [{ id: `demo-${Date.now()}`, pergunta: novaEnquete.pergunta, opcoes, ativa: true }, ...(atual ?? listaEnquetes)]);
+      setNovaEnquete({ pergunta: "", opcao1: "", opcao2: "", opcao3: "" });
+      setStatusEnquete("ok");
+      return;
+    }
+    setPublicandoEnquete(true);
+    try {
+      const { data, error } = await supabase.from("enquetes").insert({ pergunta: novaEnquete.pergunta, opcoes, ativa: true }).select().single();
+      if (error) throw error;
+      setEnquetesAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovaEnquete({ pergunta: "", opcao1: "", opcao2: "", opcao3: "" });
+      setStatusEnquete("ok");
+    } catch (err) {
+      setStatusEnquete(err.message || "Erro ao publicar enquete");
+    } finally {
+      setPublicandoEnquete(false);
+    }
+  };
+
+  const alternarAtivaEnquete = async (id, ativa) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setEnquetesAdmin((atual) => (atual ?? listaEnquetes).map((eq) => (eq.id === id ? { ...eq, ativa } : eq)));
+      return;
+    }
+    const { error } = await supabase.from("enquetes").update({ ativa }).eq("id", id);
+    if (!error) setEnquetesAdmin((atual) => atual.map((eq) => (eq.id === id ? { ...eq, ativa } : eq)));
+  };
+
+  const removerEnquete = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setEnquetesAdmin((atual) => (atual ?? listaEnquetes).filter((eq) => eq.id !== id));
+      return;
+    }
+    const { error } = await supabase.from("enquetes").delete().eq("id", id);
+    if (!error) setEnquetesAdmin((atual) => atual.filter((eq) => eq.id !== id));
+  };
+
   const items = [
     { id: "dashboard", label: "Estatísticas", icon: LayoutDashboard },
+    { id: "usuarios", label: "Cadastrar usuário", icon: UserCircle2 },
     { id: "empresas", label: "Comerciantes", icon: CheckCircle2 },
     { id: "produtos", label: "Produtos", icon: ShoppingBag },
     { id: "feira", label: "Feira do Empreendedor", icon: PartyPopper },
@@ -726,6 +1266,7 @@ function AdminPanel() {
     { id: "vagas", label: "Vagas", icon: Briefcase },
     { id: "banners", label: "Banners", icon: ImageIcon },
     { id: "notificacoes", label: "Notificações", icon: Bell },
+    { id: "identidade", label: "Identidade do site", icon: Palette },
   ];
 
   return (
@@ -779,6 +1320,84 @@ function AdminPanel() {
           </div>
         )}
 
+        {tab === "usuarios" && (
+          <div>
+            <SectionHeader eyebrow="Acesso" title="Cadastrar usuário direto pelo painel" sub="Cria a conta de login e o perfil (cliente, empresário ou admin) sem precisar de auto-cadastro" />
+            <form onSubmit={criarUsuarioAdmin} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg" style={{ borderColor: C.line }}>
+              <input
+                required
+                value={novoUsuarioAdmin.nome}
+                onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, nome: e.target.value }))}
+                placeholder="Nome completo"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                style={{ borderColor: C.line }}
+              />
+              <input
+                required
+                type="email"
+                value={novoUsuarioAdmin.email}
+                onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, email: e.target.value }))}
+                placeholder="E-mail"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                style={{ borderColor: C.line }}
+              />
+              <input
+                required
+                type="password"
+                minLength={6}
+                value={novoUsuarioAdmin.senha}
+                onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, senha: e.target.value }))}
+                placeholder="Senha provisória (mín. 6 caracteres)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                style={{ borderColor: C.line }}
+              />
+              <select
+                value={novoUsuarioAdmin.tipo}
+                onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, tipo: e.target.value }))}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                style={{ borderColor: C.line }}
+              >
+                <option value="cliente">Cliente</option>
+                <option value="empresario">Empresário</option>
+                <option value="admin">Administrador</option>
+              </select>
+              {novoUsuarioAdmin.tipo === "empresario" && (
+                <div className="rounded-xl border p-3 flex flex-col gap-2" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                  <p className="font-body text-xs font-bold" style={{ color: C.ink }}>Cadastrar a empresa deste empresário junto (opcional)</p>
+                  <input
+                    value={novoUsuarioAdmin.empresaNome}
+                    onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, empresaNome: e.target.value }))}
+                    placeholder="Nome da empresa"
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                    style={{ borderColor: C.line }}
+                  />
+                  <input
+                    value={novoUsuarioAdmin.empresaCategoria}
+                    onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, empresaCategoria: e.target.value }))}
+                    placeholder="Categoria da empresa"
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                    style={{ borderColor: C.line }}
+                  />
+                </div>
+              )}
+              {statusUsuarioAdmin && statusUsuarioAdmin !== "ok" && (
+                <p className="font-body text-xs" style={{ color: "#D64545" }}>{statusUsuarioAdmin}</p>
+              )}
+              {statusUsuarioAdmin === "ok" && (
+                <p className="font-body text-xs" style={{ color: "#3AA76D" }}>Usuário criado com sucesso!</p>
+              )}
+              <button
+                type="submit"
+                disabled={criandoUsuarioAdmin}
+                className="font-body text-sm font-bold text-white rounded-lg py-2.5 flex items-center justify-center gap-2"
+                style={{ background: C.blue, opacity: criandoUsuarioAdmin ? 0.7 : 1 }}
+              >
+                <UserCircle2 size={14} /> {criandoUsuarioAdmin ? "Criando..." : "Criar usuário"}
+              </button>
+            </form>
+          </div>
+        )}
+
         {tab === "empresas" && (
           <div>
             <SectionHeader eyebrow="Moderação" title="Empresas aguardando aprovação" sub="Aprovar, recusar e editar já grava direto no banco" />
@@ -791,15 +1410,25 @@ function AdminPanel() {
             <div className="flex flex-col gap-3">
               {listaEmpresas.map((p) => (
                 <div key={p.id} className="rounded-2xl border p-4 flex items-center gap-4 flex-wrap" style={{ borderColor: C.line }}>
-                  <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
-                    <Building2 size={17} />
-                  </span>
+                  {p.logo_url ? (
+                    <img src={p.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
+                      <Building2 size={17} />
+                    </span>
+                  )}
                   {editandoEmpresa === p.id ? (
-                    <div className="flex-1 min-w-[200px] flex gap-2">
-                      <input value={formEmpresa.nome} onChange={(e) => setFormEmpresa((f) => ({ ...f, nome: e.target.value }))}
-                        className="flex-1 font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
-                      <input value={formEmpresa.categoria} onChange={(e) => setFormEmpresa((f) => ({ ...f, categoria: e.target.value }))}
-                        className="w-36 font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                    <div className="flex-1 min-w-[200px] flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <input value={formEmpresa.nome} onChange={(e) => setFormEmpresa((f) => ({ ...f, nome: e.target.value }))}
+                          className="flex-1 font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                        <input value={formEmpresa.categoria} onChange={(e) => setFormEmpresa((f) => ({ ...f, categoria: e.target.value }))}
+                          className="w-36 font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      </div>
+                      <label className="font-body text-xs font-bold cursor-pointer w-fit flex items-center gap-1.5" style={{ color: C.blue }}>
+                        <Camera size={13} /> {enviandoLogoEmpresa ? "Enviando..." : "Trocar logo"}
+                        <input type="file" accept="image/*" className="hidden" onChange={enviarLogoEmpresaAdmin} />
+                      </label>
                     </div>
                   ) : (
                     <div className="flex-1 min-w-0">
@@ -830,6 +1459,27 @@ function AdminPanel() {
 
         {tab === "produtos" && (
           <div>
+            <SectionHeader eyebrow="Catálogo" title="Cadastrar produto" sub="Escolha a empresa e publique direto pelo painel" />
+            <form onSubmit={cadastrarProdutoAdmin} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <select value={novoProdutoAdmin.empresa_id} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, empresa_id: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }}>
+                <option value="">Selecione a empresa</option>
+                {listaEmpresas.map((emp) => <option key={emp.id} value={emp.id}>{emp.nome}</option>)}
+              </select>
+              <input value={novoProdutoAdmin.nome} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, nome: e.target.value }))} placeholder="Nome do produto" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <input value={novoProdutoAdmin.preco} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, preco: e.target.value }))} type="number" step="0.01" placeholder="Preço" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novoProdutoAdmin.categoria} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, categoria: e.target.value }))} placeholder="Categoria" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novoProdutoAdmin.descricao} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <label className="font-body text-xs font-bold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: C.blue }}>
+                <Camera size={14} /> {fotoProdutoAdmin ? `Foto: ${fotoProdutoAdmin.name}` : "Anexar foto (opcional)"}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => setFotoProdutoAdmin(e.target.files?.[0] || null)} />
+              </label>
+              {statusProdutoAdmin && statusProdutoAdmin !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusProdutoAdmin}</p>}
+              {statusProdutoAdmin === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Produto cadastrado!</p>}
+              <button type="submit" disabled={cadastrandoProdutoAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                {cadastrandoProdutoAdmin ? "Cadastrando..." : "Cadastrar produto"}
+              </button>
+            </form>
+
             <SectionHeader eyebrow="Moderação" title="Produtos publicados" sub="Publicar/despublicar e remover já grava direto no banco" />
             <div className="flex flex-col gap-3">
               {listaProdutos.map((p) => (
@@ -893,6 +1543,12 @@ function AdminPanel() {
                   className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 <input value={novaFeiraEspecial.local} onChange={(e) => setNovaFeiraEspecial((f) => ({ ...f, local: e.target.value }))} placeholder="Local"
                   className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                <input value={novaFeiraEspecial.link_url} onChange={(e) => setNovaFeiraEspecial((f) => ({ ...f, link_url: e.target.value }))} placeholder="Link de divulgação (opcional)"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-3" style={{ borderColor: C.line }} />
+                <label className="font-body text-xs font-bold cursor-pointer sm:col-span-3 flex items-center gap-2" style={{ color: C.blue }}>
+                  <Camera size={14} /> {enviandoFotoFeiraEspecial ? "Enviando..." : novaFeiraEspecial.imagem_url ? "Foto anexada — trocar" : "Anexar foto"}
+                  <input type="file" accept="image/*" className="hidden" onChange={enviarFotoFeiraEspecial} />
+                </label>
                 <button type="submit" className="font-body text-xs font-bold text-white rounded-lg py-2.5 sm:col-span-3 flex items-center justify-center gap-1.5" style={{ background: C.amberDark }}>
                   <PlusCircle size={14} /> Cadastrar feira especial
                 </button>
@@ -900,6 +1556,7 @@ function AdminPanel() {
               <div className="flex flex-col gap-2 max-w-lg">
                 {listaFeirasEspeciais.map((f) => (
                   <div key={f.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ borderColor: C.line }}>
+                    {f.imagem_url && <img src={f.imagem_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{f.titulo}</p>
                       <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{f.data_inicio} · {f.local}</p>
@@ -912,7 +1569,26 @@ function AdminPanel() {
             </div>
 
             <div>
-              <SectionHeader eyebrow="Cadastros" title="Feirantes" sub="Aprovar ou recusar quem se cadastrou pelo site" />
+              <SectionHeader eyebrow="Cadastros" title="Feirantes" sub="Cadastre direto (já aparece aprovado no site) ou modere quem se cadastrou sozinho" />
+              <form onSubmit={cadastrarFeiranteAdmin} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-4" style={{ borderColor: C.line }}>
+                <input value={novoFeiranteAdmin.nome} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, nome: e.target.value }))} placeholder="Nome do feirante"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                <input value={novoFeiranteAdmin.produto} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, produto: e.target.value }))} placeholder="Produto/serviço"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={novoFeiranteAdmin.whatsapp} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, whatsapp: e.target.value }))} placeholder="WhatsApp"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={novoFeiranteAdmin.instagram} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, instagram: e.target.value }))} placeholder="Instagram (opcional)"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                <label className="font-body text-xs font-bold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: C.blue }}>
+                  <Camera size={14} /> {fotoFeiranteAdmin ? `Foto: ${fotoFeiranteAdmin.name}` : "Anexar foto (opcional)"}
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => setFotoFeiranteAdmin(e.target.files?.[0] || null)} />
+                </label>
+                {statusFeiranteAdmin && statusFeiranteAdmin !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusFeiranteAdmin}</p>}
+                {statusFeiranteAdmin === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Feirante cadastrado!</p>}
+                <button type="submit" disabled={enviandoFeiranteAdmin} className="font-body text-xs font-bold text-white rounded-lg py-2.5 sm:col-span-2 flex items-center justify-center gap-1.5 disabled:opacity-60" style={{ background: C.blue }}>
+                  <PlusCircle size={14} /> {enviandoFeiranteAdmin ? "Cadastrando..." : "Cadastrar feirante"}
+                </button>
+              </form>
               <div className="flex flex-col gap-3">
                 {(feirantes ?? []).map((f) => (
                   <div key={f.id} className="rounded-2xl border p-4 flex items-center gap-4 flex-wrap" style={{ borderColor: C.line }}>
@@ -1045,27 +1721,36 @@ function AdminPanel() {
             <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
               <SectionHeader eyebrow="Engajamento" title="Enquetes" sub="Pergunte à comunidade e acompanhe os resultados em tempo real" />
             </div>
-            <div className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+            <form onSubmit={publicarEnquete} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
               <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Criar nova enquete</p>
-              <input placeholder="Pergunta da enquete" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <input placeholder="Opção 1" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <input placeholder="Opção 2" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <button className="glow-btn font-body text-sm font-bold text-white rounded-lg py-2.5 flex items-center justify-center gap-2" style={{ background: C.blue }}>
-                <Vote size={14} /> Publicar enquete
+              <input value={novaEnquete.pergunta} onChange={(e) => setNovaEnquete((v) => ({ ...v, pergunta: e.target.value }))} placeholder="Pergunta da enquete" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaEnquete.opcao1} onChange={(e) => setNovaEnquete((v) => ({ ...v, opcao1: e.target.value }))} placeholder="Opção 1" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaEnquete.opcao2} onChange={(e) => setNovaEnquete((v) => ({ ...v, opcao2: e.target.value }))} placeholder="Opção 2" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaEnquete.opcao3} onChange={(e) => setNovaEnquete((v) => ({ ...v, opcao3: e.target.value }))} placeholder="Opção 3 (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              {statusEnquete && statusEnquete !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusEnquete}</p>}
+              {statusEnquete === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Publicada!</p>}
+              <button type="submit" disabled={publicandoEnquete} className="glow-btn font-body text-sm font-bold text-white rounded-lg py-2.5 flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: C.blue }}>
+                <Vote size={14} /> {publicandoEnquete ? "Publicando..." : "Publicar enquete"}
               </button>
-            </div>
+            </form>
 
             <div className="flex flex-col gap-4">
-              {enquetes.map((eq) => {
+              {listaEnquetes.map((eq) => {
                 const total = eq.opcoes.reduce((s, o) => s + o.votos, 0);
                 return (
-                  <div key={eq.pergunta} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div key={eq.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{eq.pergunta}</p>
-                      <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full shrink-0"
-                        style={{ background: eq.ativa ? "#E7F6EE" : C.blueTint, color: eq.ativa ? "#1E8E5A" : "#7E93A7" }}>
-                        {eq.ativa ? "Ativa" : "Encerrada"}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
+                          style={{ background: eq.ativa ? "#E7F6EE" : C.blueTint, color: eq.ativa ? "#1E8E5A" : "#7E93A7" }}>
+                          {eq.ativa ? "Ativa" : "Encerrada"}
+                        </span>
+                        <button onClick={() => alternarAtivaEnquete(eq.id, !eq.ativa)} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
+                          {eq.ativa ? "Encerrar" : "Reabrir"}
+                        </button>
+                        <button onClick={() => removerEnquete(eq.id)} style={{ color: "#B4462F" }}><Trash2 size={14} /></button>
+                      </div>
                     </div>
                     <div className="flex flex-col gap-2">
                       {eq.opcoes.map((o) => {
@@ -1093,27 +1778,63 @@ function AdminPanel() {
 
         {tab === "noticias" && (
           <div>
-            <SectionHeader eyebrow="Comunicação" title="Cadastrar notícia" />
-            <div className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg" style={{ borderColor: C.line }}>
-              <input placeholder="Título da notícia" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <textarea placeholder="Conteúdo" rows={4} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <button className="font-body text-sm font-bold text-white rounded-lg py-2.5" style={{ background: C.blue }}>Publicar notícia</button>
+            <SectionHeader eyebrow="Comunicação" title="Cadastrar notícia" sub="Foto e link são opcionais — aparece com data mais recente primeiro" />
+            <form onSubmit={publicarNoticia} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <input value={novaNoticia.titulo} onChange={(e) => setNovaNoticia((v) => ({ ...v, titulo: e.target.value }))} placeholder="Título da notícia" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novaNoticia.conteudo} onChange={(e) => setNovaNoticia((v) => ({ ...v, conteudo: e.target.value }))} placeholder="Conteúdo" rows={4} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaNoticia.link_url} onChange={(e) => setNovaNoticia((v) => ({ ...v, link_url: e.target.value }))} placeholder="Link (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <label className="font-body text-xs font-bold cursor-pointer flex items-center gap-2" style={{ color: C.blue }}>
+                <Camera size={14} /> {enviandoFotoNoticia ? "Enviando..." : novaNoticia.imagem_url ? "Foto anexada — trocar" : "Anexar foto (opcional)"}
+                <input type="file" accept="image/*" className="hidden" onChange={enviarFotoNoticia} />
+              </label>
+              {statusNoticia && statusNoticia !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusNoticia}</p>}
+              {statusNoticia === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Publicada!</p>}
+              <button type="submit" disabled={publicandoNoticia} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+                {publicandoNoticia ? "Publicando..." : "Publicar notícia"}
+              </button>
+            </form>
+            <div className="flex flex-col gap-3 max-w-lg">
+              {(noticiasAdmin ?? []).map((n) => (
+                <div key={n.id} className="rounded-2xl border p-4 flex items-center gap-3" style={{ borderColor: C.line }}>
+                  {n.imagem_url && <img src={n.imagem_url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{n.titulo}</p>
+                    <p className="font-body text-xs truncate" style={{ color: "#7E93A7" }}>{n.conteudo}</p>
+                  </div>
+                  <button onClick={() => removerNoticia(n.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                </div>
+              ))}
+              {(noticiasAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhuma notícia publicada ainda.</p>}
             </div>
           </div>
         )}
 
         {tab === "vagas" && (
           <div>
-            <SectionHeader eyebrow="Empregabilidade" title="Vagas publicadas" />
+            <SectionHeader eyebrow="Empregabilidade" title="Cadastrar vaga" sub="Escolha a empresa e publique — aparece direto no site" />
+            <form onSubmit={publicarVaga} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <select value={novaVaga.empresa_id} onChange={(e) => setNovaVaga((v) => ({ ...v, empresa_id: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }}>
+                <option value="">Selecione a empresa</option>
+                {listaEmpresas.map((emp) => <option key={emp.id} value={emp.id}>{emp.nome}</option>)}
+              </select>
+              <input value={novaVaga.cargo} onChange={(e) => setNovaVaga((v) => ({ ...v, cargo: e.target.value }))} placeholder="Cargo" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <input value={novaVaga.salario} onChange={(e) => setNovaVaga((v) => ({ ...v, salario: e.target.value }))} placeholder="Salário" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaVaga.cidade} onChange={(e) => setNovaVaga((v) => ({ ...v, cidade: e.target.value }))} placeholder="Cidade" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novaVaga.requisitos} onChange={(e) => setNovaVaga((v) => ({ ...v, requisitos: e.target.value }))} placeholder="Requisitos" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              {statusVaga && statusVaga !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusVaga}</p>}
+              {statusVaga === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Vaga publicada!</p>}
+              <button type="submit" disabled={publicandoVaga} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                {publicandoVaga ? "Publicando..." : "Publicar vaga"}
+              </button>
+            </form>
             <div className="flex flex-col gap-3">
-              {vagas.map((v) => (
-                <div key={v.cargo} className="rounded-2xl border p-4 flex items-center gap-4" style={{ borderColor: C.line }}>
+              {(vagasAdmin ?? vagas.map((v, i) => ({ id: `demo-${i}`, cargo: v.cargo, salario: v.salario, empresas: { nome: v.empresa } }))).map((v) => (
+                <div key={v.id} className="rounded-2xl border p-4 flex items-center gap-4" style={{ borderColor: C.line }}>
                   <div className="flex-1">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
-                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{v.empresa} · {v.salario}</p>
+                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{v.empresas?.nome} · {v.salario}</p>
                   </div>
-                  <button className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
-                  <button className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
+                  <button onClick={() => removerVaga(v.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
                 </div>
               ))}
             </div>
@@ -1122,31 +1843,140 @@ function AdminPanel() {
 
         {tab === "banners" && (
           <div>
-            <SectionHeader eyebrow="Vitrine" title="Gerenciar banners da home" />
+            <SectionHeader eyebrow="Vitrine" title="Gerenciar banners da home" sub="Envie a imagem, defina o link e a ordem — grava direto no banco" />
             <div className="grid sm:grid-cols-2 gap-4">
-              {["Banner principal", "Campanha Compre em Ivatuba"].map((b) => (
-                <div key={b} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
-                  <div className="h-24 rounded-xl flex items-center justify-center mb-3" style={{ background: C.blueTint }}>
-                    <ImageIcon size={22} color={C.blue} />
+              {listaBanners.map((b) => (
+                <div key={b.id} className="rounded-2xl border p-4 flex flex-col gap-2" style={{ borderColor: C.line }}>
+                  <div className="h-28 rounded-xl flex items-center justify-center mb-1 overflow-hidden" style={{ background: C.blueTint }}>
+                    {b.imagem_url ? (
+                      <img src={b.imagem_url} alt={b.titulo || "Banner"} className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon size={22} color={C.blue} />
+                    )}
                   </div>
-                  <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{b}</p>
-                  <button className="font-body text-xs font-bold mt-2" style={{ color: C.blue }}>Substituir imagem</button>
+                  <input
+                    value={b.titulo || ""}
+                    onChange={(e) => atualizarBanner(b.id, "titulo", e.target.value)}
+                    placeholder="Título do banner"
+                    className="font-body text-sm border rounded-lg px-3 py-2 outline-none"
+                    style={{ borderColor: C.line }}
+                  />
+                  <input
+                    value={b.link_url || ""}
+                    onChange={(e) => atualizarBanner(b.id, "link_url", e.target.value)}
+                    placeholder="Link ao clicar (opcional)"
+                    className="font-body text-sm border rounded-lg px-3 py-2 outline-none"
+                    style={{ borderColor: C.line }}
+                  />
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      value={b.ordem ?? 0}
+                      onChange={(e) => atualizarBanner(b.id, "ordem", Number(e.target.value))}
+                      placeholder="Ordem"
+                      className="font-body text-sm border rounded-lg px-3 py-2 outline-none w-24"
+                      style={{ borderColor: C.line }}
+                    />
+                    <label className="flex items-center gap-2 font-body text-xs" style={{ color: C.ink }}>
+                      <input type="checkbox" checked={b.ativo !== false} onChange={(e) => atualizarBanner(b.id, "ativo", e.target.checked)} />
+                      Ativo
+                    </label>
+                  </div>
+                  <label className="font-body text-xs font-bold cursor-pointer" style={{ color: C.blue }}>
+                    {enviandoBanner === b.id ? "Enviando..." : "Substituir imagem"}
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => enviarImagemBanner(b.id, e)} />
+                  </label>
+                  {statusBanner[b.id] && statusBanner[b.id] !== "ok" && (
+                    <p className="font-body text-xs" style={{ color: "#D64545" }}>{statusBanner[b.id]}</p>
+                  )}
+                  {statusBanner[b.id] === "ok" && (
+                    <p className="font-body text-xs" style={{ color: "#3AA76D" }}>Salvo!</p>
+                  )}
+                  <div className="flex gap-2 mt-1">
+                    <button onClick={() => salvarBanner(b)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-1.5" style={{ background: C.blue }}>
+                      Salvar
+                    </button>
+                    <button onClick={() => removerBanner(b.id)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: C.ink }}>
+                      Remover
+                    </button>
+                  </div>
                 </div>
               ))}
+              <button
+                onClick={() => setBannersAdmin((atual) => [...(atual ?? listaBanners), { id: `novo-${Date.now()}`, titulo: "", imagem_url: null, link_url: "", ordem: (atual ?? listaBanners).length + 1, ativo: true }])}
+                className="rounded-2xl border-2 border-dashed p-4 flex flex-col items-center justify-center gap-2 min-h-[180px]"
+                style={{ borderColor: C.line, color: C.blue }}
+              >
+                <ImageIcon size={22} />
+                <span className="font-body text-xs font-bold">Adicionar novo banner</span>
+              </button>
             </div>
           </div>
         )}
 
         {tab === "notificacoes" && (
           <div>
-            <SectionHeader eyebrow="Engajamento" title="Enviar notificação push" />
-            <div className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg" style={{ borderColor: C.line }}>
-              <input placeholder="Título da notificação" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <textarea placeholder="Mensagem" rows={3} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <button className="font-body text-sm font-bold text-white rounded-lg py-2.5 flex items-center justify-center gap-2" style={{ background: C.blue }}>
-                <Send size={14} /> Enviar para todos os usuários
+            <SectionHeader eyebrow="Engajamento" title="Enviar notificação push" sub="Fica salva no histórico — foto e link são opcionais" />
+            <form onSubmit={enviarNotificacao} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <input value={novaNotificacao.titulo} onChange={(e) => setNovaNotificacao((v) => ({ ...v, titulo: e.target.value }))} placeholder="Título da notificação" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novaNotificacao.mensagem} onChange={(e) => setNovaNotificacao((v) => ({ ...v, mensagem: e.target.value }))} placeholder="Mensagem" rows={3} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaNotificacao.link_url} onChange={(e) => setNovaNotificacao((v) => ({ ...v, link_url: e.target.value }))} placeholder="Link (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <label className="font-body text-xs font-bold cursor-pointer flex items-center gap-2" style={{ color: C.blue }}>
+                <Camera size={14} /> {enviandoFotoNotificacao ? "Enviando..." : novaNotificacao.imagem_url ? "Foto anexada — trocar" : "Anexar foto (opcional)"}
+                <input type="file" accept="image/*" className="hidden" onChange={enviarFotoNotificacao} />
+              </label>
+              {statusNotificacao && statusNotificacao !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusNotificacao}</p>}
+              {statusNotificacao === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Enviada!</p>}
+              <button type="submit" disabled={enviandoNotificacao} className="font-body text-sm font-bold text-white rounded-lg py-2.5 flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: C.blue }}>
+                <Send size={14} /> {enviandoNotificacao ? "Enviando..." : "Enviar para todos os usuários"}
               </button>
+            </form>
+            <div className="flex flex-col gap-2 max-w-lg">
+              {(notificacoesAdmin ?? []).map((n) => (
+                <div key={n.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ borderColor: C.line }}>
+                  {n.imagem_url && <img src={n.imagem_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{n.titulo}</p>
+                    <p className="font-body text-[11px] truncate" style={{ color: "#7E93A7" }}>{n.mensagem}</p>
+                  </div>
+                </div>
+              ))}
             </div>
+          </div>
+        )}
+
+        {tab === "identidade" && (
+          <div>
+            <SectionHeader eyebrow="Marca" title="Identidade do site" sub="Cor principal, logo e frase de destaque da home — aplicado em todo o site" />
+            <form onSubmit={salvarIdentidade} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg" style={{ borderColor: C.line }}>
+              <label className="font-body text-xs font-bold" style={{ color: C.ink }}>Cor principal</label>
+              <div className="flex items-center gap-3">
+                <input type="color" value={siteConfigAdmin?.cor_principal || "#0A5AA8"} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, cor_principal: e.target.value }))} className="h-10 w-16 rounded-lg border cursor-pointer" style={{ borderColor: C.line }} />
+                <input value={siteConfigAdmin?.cor_principal || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, cor_principal: e.target.value }))} placeholder="#0A5AA8" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none flex-1" style={{ borderColor: C.line }} />
+              </div>
+
+              <label className="font-body text-xs font-bold mt-2" style={{ color: C.ink }}>Logo</label>
+              <div className="flex items-center gap-3">
+                {siteConfigAdmin?.logo_url ? (
+                  <img src={siteConfigAdmin.logo_url} alt="Logo" className="w-12 h-12 rounded-full object-cover border" style={{ borderColor: C.line }} />
+                ) : (
+                  <LogoMark size={48} />
+                )}
+                <label className="font-body text-xs font-bold cursor-pointer" style={{ color: C.blue }}>
+                  {enviandoLogoSite ? "Enviando..." : "Substituir logo"}
+                  <input type="file" accept="image/*" className="hidden" onChange={enviarLogoSite} />
+                </label>
+              </div>
+
+              <label className="font-body text-xs font-bold mt-2" style={{ color: C.ink }}>Frase de destaque (aparece na home)</label>
+              <textarea value={siteConfigAdmin?.frase || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, frase: e.target.value }))} placeholder="Empresas, produtos, vagas e cursos da sua cidade..." rows={3} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+
+              {statusIdentidade && statusIdentidade !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusIdentidade}</p>}
+              {statusIdentidade === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Salvo! Recarregue o site para ver tudo aplicado.</p>}
+              <button type="submit" disabled={salvandoIdentidade || !siteConfigAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 mt-1 disabled:opacity-60" style={{ background: C.blue }}>
+                {salvandoIdentidade ? "Salvando..." : "Salvar identidade"}
+              </button>
+            </form>
           </div>
         )}
       </div>
@@ -1161,7 +1991,7 @@ function AdminPanel() {
 // Modal "Novo produto" com IA — gera descrição de vendas a partir de poucas
 // palavras, e dá dicas sobre a FOTO REAL do produto (nunca gera foto falsa).
 // ---------------------------------------------------------------------------
-function ModalNovoProduto({ onFechar }) {
+function ModalNovoProduto({ onFechar, onSalvo }) {
   const [nome, setNome] = useState("");
   const [categoria, setCategoria] = useState("");
   const [preco, setPreco] = useState("");
@@ -1298,6 +2128,7 @@ function ModalNovoProduto({ onFechar }) {
       });
       if (error) throw error;
       setSalvo(true);
+      onSalvo?.();
     } catch (err) {
       setErroSalvar(err.message || "Não foi possível salvar agora. Tente de novo.");
     } finally {
@@ -1470,6 +2301,29 @@ function EmpresarioPanel() {
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [statusPerfil, setStatusPerfil] = useState("");
 
+  // Produtos reais desta empresa — substitui a lista de exemplo assim que
+  // soubermos o id da empresa (buscado no efeito abaixo).
+  const [meusProdutosReais, setMeusProdutosReais] = useState(null);
+
+  const carregarMeusProdutos = (idEmpresa) => {
+    if (!supabaseConfigurado || !idEmpresa) return;
+    supabase.from("produtos").select("*").eq("empresa_id", idEmpresa).order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMeusProdutosReais(data || []);
+    });
+  };
+
+  const alternarAtivoMeuProduto = async (id, ativo) => {
+    if (!supabaseConfigurado) { setMeusProdutosReais((atual) => (atual ?? []).map((p) => (p.id === id ? { ...p, ativo } : p))); return; }
+    const { error } = await supabase.from("produtos").update({ ativo }).eq("id", id);
+    if (!error) setMeusProdutosReais((atual) => atual.map((p) => (p.id === id ? { ...p, ativo } : p)));
+  };
+
+  const removerMeuProduto = async (id) => {
+    if (!supabaseConfigurado) { setMeusProdutosReais((atual) => (atual ?? []).filter((p) => p.id !== id)); return; }
+    const { error } = await supabase.from("produtos").delete().eq("id", id);
+    if (!error) setMeusProdutosReais((atual) => atual.filter((p) => p.id !== id));
+  };
+
   useEffect(() => {
     if (!supabaseConfigurado) {
       setPerfilForm({
@@ -1489,6 +2343,7 @@ function EmpresarioPanel() {
           nome: data.nome || "", whatsapp: data.whatsapp || "", instagram: data.instagram || "",
           endereco: data.endereco || "", horario_atendimento: data.horario_atendimento || "",
         });
+        carregarMeusProdutos(data.id);
       }
     })();
   }, []);
@@ -1587,19 +2442,28 @@ function EmpresarioPanel() {
               </button>
             </div>
             <div className="flex flex-col gap-3 -mt-4">
-              {meusProdutos.map((p) => (
-                <div key={p.nome} className="rounded-2xl border p-4 flex items-center gap-4" style={{ borderColor: C.line }}>
-                  <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
-                    <ShoppingBag size={16} />
-                  </span>
+              {(meusProdutosReais ?? meusProdutos.map((p, i) => ({ id: `demo-${i}`, ...p, preco_exibicao: p.preco }))).map((p) => (
+                <div key={p.id} className="rounded-2xl border p-4 flex items-center gap-4" style={{ borderColor: C.line }}>
+                  {p.foto_url ? (
+                    <img src={p.foto_url} alt={p.nome} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
+                      <ShoppingBag size={16} />
+                    </span>
+                  )}
                   <div className="flex-1">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
-                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{p.preco} · {p.ativo ? "Ativo" : "Inativo"}</p>
+                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{p.preco_exibicao ?? (p.preco != null ? `R$ ${Number(p.preco).toFixed(2)}` : "Sem preço")} · {p.ativo ? "Ativo" : "Inativo"}</p>
                   </div>
-                  <button style={{ color: "#425A70" }}><Pencil size={15} /></button>
-                  <button style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                  <button onClick={() => alternarAtivoMeuProduto(p.id, !p.ativo)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
+                    {p.ativo ? "Despublicar" : "Publicar"}
+                  </button>
+                  <button onClick={() => removerMeuProduto(p.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
+              {(meusProdutosReais ?? []).length === 0 && meusProdutosReais !== null && (
+                <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Você ainda não cadastrou nenhum produto.</p>
+              )}
             </div>
           </div>
         )}
@@ -1658,7 +2522,7 @@ function EmpresarioPanel() {
         )}
       </div>
 
-      {modalProdutoAberto && <ModalNovoProduto onFechar={() => setModalProdutoAberto(false)} />}
+      {modalProdutoAberto && <ModalNovoProduto onFechar={() => setModalProdutoAberto(false)} onSalvo={() => carregarMeusProdutos(empresaId)} />}
     </div>
   );
 }
@@ -2082,7 +2946,7 @@ function CalendarioEventos() {
   );
 }
 
-function SiteHome({ onAuth }) {
+function SiteHome({ onAuth, logoUrl, frase }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [modalFeiranteAberto, setModalFeiranteAberto] = useState(false);
   const [query, setQuery] = useState("");
@@ -2169,7 +3033,7 @@ function SiteHome({ onAuth }) {
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b" style={{ borderColor: C.line }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center gap-4">
           <div className="flex items-center gap-2 shrink-0">
-            <LogoMark size={36} />
+            <LogoMark size={36} url={logoUrl} />
             <span className="font-display font-extrabold text-lg leading-none" style={{ color: C.blue }}>
               Conecta<span style={{ color: C.ink }}>Comércio</span>
             </span>
@@ -2229,7 +3093,7 @@ function SiteHome({ onAuth }) {
               O comércio de Ivatuba,<br /> em movimento.
             </h1>
             <p className="font-body text-white/80 text-[15px] mt-4 max-w-md">
-              Empresas, produtos, vagas e cursos da sua cidade, atualizados agora mesmo — e cada compra ajuda o dinheiro a girar aqui.
+              {frase || "Empresas, produtos, vagas e cursos da sua cidade, atualizados agora mesmo — e cada compra ajuda o dinheiro a girar aqui."}
             </p>
 
             <div className="mt-7 bg-white rounded-2xl p-2 flex items-center gap-2 shadow-2xl max-w-lg glow-card" style={{ borderColor: "transparent" }}>
@@ -2582,6 +3446,8 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
 
+  const [logoEmpresa, setLogoEmpresa] = useState(null);
+
   const submeterCadastro = async (e, tipo) => {
     e.preventDefault();
     setErro("");
@@ -2605,11 +3471,21 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
         });
 
         if (tipo === "empresario") {
+          let logoUrl = null;
+          if (logoEmpresa) {
+            const caminho = `logos/${Date.now()}-${logoEmpresa.name}`;
+            const { error: erroUpload } = await supabase.storage.from("logos").upload(caminho, logoEmpresa);
+            if (!erroUpload) {
+              const { data: pub } = supabase.storage.from("logos").getPublicUrl(caminho);
+              logoUrl = pub.publicUrl;
+            }
+          }
           await supabase.from("empresas").insert({
             dono_id: userId,
             nome: form.get("nomeEmpresa"),
             categoria: form.get("categoria") || "A definir",
             whatsapp: form.get("whatsapp"),
+            logo_url: logoUrl,
             status: "pendente",
           });
         }
@@ -2820,6 +3696,10 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                 Categoria
                 <input name="categoria" placeholder="Ex: Alimentação, Beleza, Serviços..." className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <label className="font-body text-xs font-semibold flex items-center gap-2 cursor-pointer" style={{ color: C.blue }}>
+                <Camera size={14} /> {logoEmpresa ? `Logo: ${logoEmpresa.name}` : "Enviar logo da empresa (opcional)"}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => setLogoEmpresa(e.target.files?.[0] || null)} />
               </label>
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
@@ -3048,6 +3928,19 @@ export default function ConectaComercio() {
   const [destinoPosLogin, setDestinoPosLogin] = useState(null);
   const [mensagemAcesso, setMensagemAcesso] = useState("");
 
+  // Identidade visual do site (cor, logo, frase) — editada pelo admin na aba
+  // "Identidade" e aplicada aqui globalmente assim que a página carrega.
+  const [siteConfig, setSiteConfig] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("site_config").select("*").eq("id", 1).single().then(({ data }) => {
+      if (data) {
+        setSiteConfig(data);
+        if (data.cor_principal) aplicarCorPrincipal(data.cor_principal);
+      }
+    });
+  }, []);
+
   const [sessao, setSessao] = useState(undefined); // undefined = carregando, null = sem sessão
   const [perfil, setPerfil] = useState(null);
 
@@ -3167,7 +4060,7 @@ export default function ConectaComercio() {
         </div>
       </div>
 
-      {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} />}
+      {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} />}
       {modo === "conta" && <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />}
 
       {modo === "admin" && (
