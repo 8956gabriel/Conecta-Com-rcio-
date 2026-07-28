@@ -8,7 +8,7 @@ import {
   Pencil, Trash2, Tag, UserCircle2, ChevronLeft, ShieldCheck, BarChart3, Vote, Sparkles,
   FileText, Receipt, ClipboardList, HandCoins, ExternalLink,
   Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
-  Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2
+  Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
@@ -1744,8 +1744,17 @@ function AdminPanel() {
       contar("noticias"),
       contar("eventos_calendario"),
       contar("prestadores", (q) => q.eq("status", "aprovado")),
-    ]).then(([empresas, produtos, vagas, noticiasN, eventos, prestadoresN]) => {
-      setStatsReais({ empresas, produtos, vagas, noticias: noticiasN, eventos, prestadores: prestadoresN });
+      // Uso de cada funcionalidade adicionada nas fases 45-53 — pra saber o
+      // que os moradores/comerciantes realmente estão usando.
+      contar("mural_comunidade", (q) => q.eq("status", "aprovado")),
+      contar("classificados", (q) => q.eq("status", "aprovado")),
+      contar("ouvidoria_denuncias"),
+      contar("prestador_agenda", (q) => q.eq("status", "reservado")),
+      contar("empresas", (q) => q.eq("plano_premium", true)),
+      contar("cupons", (q) => q.eq("ativo", true)),
+      contar("combos", (q) => q.eq("ativo", true)),
+    ]).then(([empresas, produtos, vagas, noticiasN, eventos, prestadoresN, mural, classificados, ouvidoria, agendamentos, premium, cupons, combos]) => {
+      setStatsReais({ empresas, produtos, vagas, noticias: noticiasN, eventos, prestadores: prestadoresN, mural, classificados, ouvidoria, agendamentos, premium, cupons, combos });
     });
 
     supabase.from("empresas").select("nome, categoria, visualizacoes").eq("status", "aprovada")
@@ -2424,6 +2433,7 @@ function AdminPanel() {
       if (!resp.ok) throw new Error(dados.error || "Não foi possível criar o usuário agora.");
       setStatusUsuarioAdmin("ok");
       setNovoUsuarioAdmin({ nome: "", email: "", senha: "", tipo: "cliente", empresaNome: "", empresaCategoria: "", empresaWhatsapp: "", empresaInstagram: "", empresaEndereco: "", empresaGoogleMaps: "", empresaAceitaCartaoServidor: false, prestadorServico: "", prestadorWhatsapp: "", prestadorInstagram: "", prestadorEndereco: "", prestadorGoogleMaps: "" });
+      carregarTodosUsuariosAdmin(); // atualiza a lista de "Usuários cadastrados" na hora
     } catch (err) {
       setStatusUsuarioAdmin(err.message || "Erro ao criar usuário.");
     } finally {
@@ -3876,11 +3886,13 @@ function AdminPanel() {
   const [paginaTodosUsuariosAdmin, setPaginaTodosUsuariosAdmin] = useState(1);
   const ITENS_POR_PAGINA_USUARIOS = 15;
 
-  useEffect(() => {
+  const carregarTodosUsuariosAdmin = () => {
     if (!supabaseConfigurado) return;
     supabase.from("perfis").select("id, nome, email, tipo, telefone, instagram, cpf, cnpj, bloqueado, criado_em").order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setTodosUsuariosAdmin(data || []); });
-  }, []);
+  };
+
+  useEffect(() => { carregarTodosUsuariosAdmin(); }, []);
 
   useEffect(() => { setPaginaTodosUsuariosAdmin(1); }, [buscaTodosUsuariosAdmin, filtroTipoTodosUsuariosAdmin, ordenacaoTodosUsuariosAdmin]);
 
@@ -4268,6 +4280,67 @@ function AdminPanel() {
                 )}
               </div>
             </div>
+
+            {/* Uso de cada funcionalidade — pra saber o que está sendo usado
+                de verdade e o que ainda precisa de divulgação. */}
+            <div className="rounded-2xl border p-4 mb-6" style={{ borderColor: C.line }}>
+              <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Uso de cada funcionalidade</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  [statsReais?.mural, "Posts no mural", Users],
+                  [statsReais?.classificados, "Classificados aprovados", Repeat],
+                  [statsReais?.ouvidoria, "Denúncias na ouvidoria", MessageCircle],
+                  [statsReais?.agendamentos, "Horários reservados", Clock],
+                  [statsReais?.premium, "Comerciantes Premium", Sparkles],
+                  [statsReais?.cupons, "Cupons ativos", Tag],
+                  [statsReais?.combos, "Combos ativos", HandCoins],
+                ].map(([n, l, Icon], i) => {
+                  const cor = PALETA_GRAFICOS[i % PALETA_GRAFICOS.length];
+                  if (!statsReais) {
+                    return (
+                      <div key={l} className="rounded-xl border p-3" style={{ borderColor: C.line }}>
+                        <Skeleton className="w-8 h-8" />
+                        <Skeleton className="w-10 h-4 mt-2" />
+                        <Skeleton className="w-16 h-2.5 mt-1.5" />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={l} className="rounded-xl border p-3" style={{ borderColor: C.line }}>
+                      <span className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: `${cor}1a`, color: cor }}>
+                        <Icon size={14} />
+                      </span>
+                      <p className="font-display font-extrabold text-lg mt-2" style={{ color: C.ink }}>{n}</p>
+                      <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{l}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Resumo simples de usuários — total e por tipo, pra ter noção
+                rápida de quem está usando o site sem precisar abrir a lista. */}
+            <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+              <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Resumo de usuários</p>
+              {!todosUsuariosAdmin ? (
+                <Skeleton className="w-full h-16" />
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {[
+                    ["Total cadastrados", todosUsuariosAdmin.length],
+                    ["Clientes", todosUsuariosAdmin.filter((u) => u.tipo === "cliente").length],
+                    ["Empresários", todosUsuariosAdmin.filter((u) => u.tipo === "empresario").length],
+                    ["Prestadores", todosUsuariosAdmin.filter((u) => u.tipo === "prestador").length],
+                    ["Bloqueados", todosUsuariosAdmin.filter((u) => u.bloqueado).length],
+                  ].map(([l, n]) => (
+                    <div key={l} className="rounded-xl p-3 text-center" style={{ background: C.blueTint2 }}>
+                      <p className="font-display font-extrabold text-lg" style={{ color: C.ink }}>{n}</p>
+                      <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{l}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -4449,10 +4522,16 @@ function AdminPanel() {
           <div>
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <SectionHeader eyebrow="Acesso" title="Usuários cadastrados" sub="Todo mundo que já se cadastrou na plataforma" />
-              <button onClick={() => { setNovoUsuarioAdmin((v) => ({ ...v, tipo: "cliente" })); setTab("usuarios"); }}
-                className="font-body text-xs font-bold text-white rounded-lg px-4 py-2.5 flex items-center gap-1.5 shrink-0" style={{ background: C.blue }}>
-                <PlusCircle size={14} /> Novo cadastro
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={carregarTodosUsuariosAdmin} title="Atualizar lista"
+                  className="font-body text-xs font-bold rounded-lg px-3 py-2.5 flex items-center gap-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>
+                  <RefreshCw size={14} /> Atualizar
+                </button>
+                <button onClick={() => { setNovoUsuarioAdmin((v) => ({ ...v, tipo: "cliente" })); setTab("usuarios"); }}
+                  className="font-body text-xs font-bold text-white rounded-lg px-4 py-2.5 flex items-center gap-1.5" style={{ background: C.blue }}>
+                  <PlusCircle size={14} /> Novo cadastro
+                </button>
+              </div>
             </div>
             {!supabaseConfigurado && (
               <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
