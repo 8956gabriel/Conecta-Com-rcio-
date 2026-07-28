@@ -8,7 +8,7 @@ import {
   Pencil, Trash2, Tag, UserCircle2, ChevronLeft, ShieldCheck, BarChart3, Vote, Sparkles,
   FileText, Receipt, ClipboardList, HandCoins, ExternalLink,
   Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
-  Leaf, ArrowUp, ArrowDown, Phone
+  Leaf, ArrowUp, ArrowDown, Phone, Repeat
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
@@ -2274,6 +2274,7 @@ function AdminPanel() {
     termos_uso: "", politica_privacidade: "",
     utilidade_ativo: false,
     ouvidoria_ativo: false,
+    classificados_ativo: false,
   };
 
   useEffect(() => {
@@ -2424,6 +2425,7 @@ function AdminPanel() {
         politica_privacidade: siteConfigAdmin.politica_privacidade || null,
         utilidade_ativo: !!siteConfigAdmin.utilidade_ativo,
         ouvidoria_ativo: !!siteConfigAdmin.ouvidoria_ativo,
+        classificados_ativo: !!siteConfigAdmin.classificados_ativo,
       });
       if (error) throw error;
       setStatusIdentidade("ok");
@@ -3262,6 +3264,28 @@ function AdminPanel() {
   };
 
   // -------------------------------------------------------------------------
+  // Classificados entre moradores — compra, venda e doação direto entre
+  // pessoas, com moderação antes de aparecer pra todo mundo. FASE 49.
+  // -------------------------------------------------------------------------
+  const [classificadosAdmin, setClassificadosAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("classificados").select("*").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setClassificadosAdmin(data || []);
+    });
+  }, []);
+
+  const moderarClassificado = async (id, status) => {
+    const { error } = await supabase.from("classificados").update({ status }).eq("id", id);
+    if (!error) { setClassificadosAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, status } : c))); notificar("Status atualizado."); }
+  };
+
+  const apagarClassificado = async (id) => {
+    const { error } = await supabase.from("classificados").delete().eq("id", id);
+    if (!error) { setClassificadosAdmin((atual) => atual.filter((c) => c.id !== id)); notificar("Anúncio excluído."); }
+  };
+
+  // -------------------------------------------------------------------------
   // Avaliações de empresas — o público comenta, o admin só modera (apaga
   // comentário abusivo/spam). FASE 34.
   // -------------------------------------------------------------------------
@@ -3783,6 +3807,7 @@ function AdminPanel() {
     { id: "turismo", label: "Turismo", icon: MapPinned },
     { id: "utilidade", label: "Utilidade pública", icon: Phone },
     { id: "ouvidoria", label: "Ouvidoria", icon: MessageCircle },
+    { id: "classificados", label: "Classificados", icon: Repeat },
     { id: "mural", label: "Mural da comunidade", icon: Users },
     { id: "enquetes", label: "Enquetes", icon: Vote },
     { id: "cupons", label: "Cupons de desconto", icon: Tag },
@@ -5648,6 +5673,72 @@ function AdminPanel() {
                 </div>
               ))}
               {(ouvidoriaAdmin ?? []).filter((d) => d.status !== "recebido").length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma por aqui ainda.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "classificados" && (
+          <div>
+            <SectionHeader eyebrow="Comunidade" title="Classificados" sub="Compra, venda e doação direto entre moradores — aprove antes de aparecer no site" />
+            <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer mb-6" style={{ color: "#425A70" }}>
+              <input type="checkbox" checked={!!siteConfigAdmin?.classificados_ativo} onChange={(e) => { setSiteConfigAdmin((v) => ({ ...v, classificados_ativo: e.target.checked })); }} />
+              Mostrar a aba Classificados no menu do site
+            </label>
+            {siteConfigAdmin?.classificados_ativo !== undefined && (
+              <button onClick={salvarIdentidade} className="font-body text-xs font-bold rounded-lg px-3 py-2 border mb-6 -mt-4" style={{ borderColor: C.line, color: C.blue }}>
+                Salvar essa opção
+              </button>
+            )}
+
+            {(classificadosAdmin ?? []).filter((c) => c.status === "pendente").length > 0 && (
+              <div className="mb-8">
+                <p className="font-body text-xs font-bold mb-2" style={{ color: "#8A5A12" }}>Aguardando aprovação ({(classificadosAdmin ?? []).filter((c) => c.status === "pendente").length})</p>
+                <div className="flex flex-col gap-3 max-w-2xl">
+                  {(classificadosAdmin ?? []).filter((c) => c.status === "pendente").map((c) => (
+                    <div key={c.id} className="rounded-2xl border p-4 flex gap-3" style={{ borderColor: C.amber, background: "#FFF9EE" }}>
+                      {c.foto_url && <img loading="lazy" decoding="async" src={c.foto_url} alt="" className="w-20 h-20 rounded-lg object-cover shrink-0" />}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>
+                          {c.titulo} <span className="font-body text-[10px] font-normal uppercase" style={{ color: "#8A5A12" }}>· {c.tipo === "venda" ? "venda" : c.tipo === "doacao" ? "doação" : "procura"}</span>
+                        </p>
+                        {c.preco != null && <p className="font-body text-xs font-bold" style={{ color: C.blue }}>R$ {Number(c.preco).toFixed(2).replace(".", ",")}</p>}
+                        <p className="font-body text-sm mt-1" style={{ color: "#425A70" }}>{c.descricao}</p>
+                        <p className="font-body text-[11px] mt-1" style={{ color: "#8896A6" }}>{c.nome}{c.whatsapp ? ` · ${c.whatsapp}` : ""}</p>
+                        <div className="flex gap-2 mt-2">
+                          <button onClick={() => moderarClassificado(c.id, "aprovado")} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 text-white" style={{ background: "#25A85B" }}>Aprovar</button>
+                          <button onClick={() => moderarClassificado(c.id, "recusado")} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ color: "#B4462F" }}>Recusar</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Publicados</p>
+            <div className="flex flex-col gap-3 max-w-2xl">
+              {(classificadosAdmin ?? []).filter((c) => c.status === "aprovado" || c.status === "concluido").map((c) => (
+                <div key={c.id} className="rounded-2xl border p-4 flex gap-3" style={{ borderColor: C.line }}>
+                  {c.foto_url && <img loading="lazy" decoding="async" src={c.foto_url} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>
+                        {c.titulo} <span className="font-body text-[10px] font-normal uppercase" style={{ color: "#5C7186" }}>· {c.tipo === "venda" ? "venda" : c.tipo === "doacao" ? "doação" : "procura"}</span>
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => moderarClassificado(c.id, c.status === "concluido" ? "aprovado" : "concluido")}
+                          className="font-body text-[11px] font-bold px-2.5 py-1 rounded-lg border" style={{ borderColor: C.line, color: c.status === "concluido" ? "#1E8E5A" : "#425A70" }}>
+                          {c.status === "concluido" ? "Concluído" : "Marcar concluído"}
+                        </button>
+                        <button onClick={() => { if (confirmarExclusao("Excluir esse anúncio?")) apagarClassificado(c.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                      </div>
+                    </div>
+                    {c.preco != null && <p className="font-body text-xs font-bold" style={{ color: C.blue }}>R$ {Number(c.preco).toFixed(2).replace(".", ",")}</p>}
+                    <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{c.descricao}</p>
+                  </div>
+                </div>
+              ))}
+              {(classificadosAdmin ?? []).filter((c) => c.status === "aprovado" || c.status === "concluido").length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum anúncio publicado ainda.</p>}
             </div>
           </div>
         )}
@@ -10743,7 +10834,7 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
@@ -10753,6 +10844,7 @@ function modoDaHash(hash) {
   if (h.startsWith("#/mural")) return "mural";
   if (h.startsWith("#/utilidade")) return "utilidade";
   if (h.startsWith("#/ouvidoria")) return "ouvidoria";
+  if (h.startsWith("#/classificados")) return "classificados";
   if (h.startsWith("#/termos")) return "termos";
   if (h.startsWith("#/privacidade")) return "privacidade";
   if (h.startsWith("#/empresa") || h.startsWith("#/vendedor")) return "empresario";
@@ -11198,6 +11290,170 @@ function PaginaOuvidoria() {
 }
 
 // ---------------------------------------------------------------------------
+// Classificados entre moradores — compra, venda e doação direto entre
+// pessoas, separado das empresas formais. Passa por aprovação antes de
+// aparecer pra todo mundo, igual ao mural. FASE 49.
+// ---------------------------------------------------------------------------
+const CATEGORIAS_CLASSIFICADOS = ["Móveis", "Eletrônicos e celulares", "Roupas e calçados", "Casa e decoração", "Veículos", "Outros"];
+
+function PaginaClassificados() {
+  const [itens, setItens] = useState(null);
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+
+  const [tipo, setTipo] = useState("venda");
+  const [titulo, setTitulo] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [preco, setPreco] = useState("");
+  const [categoria, setCategoria] = useState(CATEGORIAS_CLASSIFICADOS[0]);
+  const [nome, setNome] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [foto, setFoto] = useState(null);
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+  const [erro, setErro] = useState("");
+  const [mostrarForm, setMostrarForm] = useState(false);
+
+  useEffect(() => {
+    document.title = "Classificados — Conecta Comércio";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute("content", "Compra, venda e doação direto entre moradores de Ivatuba - PR.");
+    return () => {
+      document.title = "Conecta Comércio · Ivatuba - PR";
+      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+    };
+  }, []);
+
+  const carregar = () => {
+    if (!supabaseConfigurado) { setItens([]); return; }
+    supabase.from("classificados").select("*").eq("status", "aprovado").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      setItens(error ? [] : data || []);
+    });
+  };
+  useEffect(carregar, []);
+
+  const itensFiltrados = (itens || []).filter((i) => filtroTipo === "todos" || i.tipo === filtroTipo);
+
+  const publicar = async (e) => {
+    e.preventDefault();
+    setErro("");
+    if (!titulo.trim() || !descricao.trim() || !nome.trim() || !whatsapp.trim()) { setErro("Preencha título, descrição, nome e WhatsApp."); return; }
+    if (!supabaseConfigurado) { setEnviado(true); return; }
+    setEnviando(true);
+    try {
+      let foto_url = null;
+      if (foto) {
+        const caminho = `classificados/${Date.now()}-${foto.name}`;
+        const { error: erroUpload } = await supabase.storage.from("banners").upload(caminho, foto);
+        if (!erroUpload) {
+          const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+          foto_url = pub.publicUrl;
+        }
+      }
+      const { error } = await supabase.from("classificados").insert({
+        tipo, titulo, descricao, preco: tipo === "venda" && preco ? Number(preco) : null,
+        categoria, nome, whatsapp, foto_url, status: "pendente",
+      });
+      if (error) throw error;
+      setEnviado(true);
+    } catch (err) {
+      setErro(err.message || "Não consegui publicar agora. Tente de novo.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const labelTipo = { venda: "Venda", doacao: "Doação", procura: "Procura" };
+  const corTipo = { venda: C.blue, doacao: "#1E8E5A", procura: "#8A5A12" };
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 md:px-6 py-10">
+      <SectionHeader eyebrow="Comunidade" title="Classificados" sub="Compra, venda e doação direto entre moradores" />
+
+      <div className="flex items-center gap-2 flex-wrap mt-6 mb-4">
+        {["todos", "venda", "doacao", "procura"].map((t) => (
+          <button key={t} onClick={() => setFiltroTipo(t)}
+            className="font-body text-xs font-bold px-3 py-1.5 rounded-full border"
+            style={{ borderColor: filtroTipo === t ? C.blue : C.line, background: filtroTipo === t ? C.blueTint : "transparent", color: filtroTipo === t ? C.blue : "#5C7186" }}>
+            {t === "todos" ? "Todos" : labelTipo[t]}
+          </button>
+        ))}
+        <button onClick={() => setMostrarForm((v) => !v)} className="font-body text-xs font-bold px-3 py-1.5 rounded-full text-white ml-auto" style={{ background: C.blue }}>
+          {mostrarForm ? "Fechar" : "Anunciar algo"}
+        </button>
+      </div>
+
+      {mostrarForm && (
+        <div className="rounded-2xl border p-5 mb-6" style={{ borderColor: C.line }}>
+          {enviado ? (
+            <p className="font-body text-sm font-semibold flex items-center gap-1.5" style={{ color: "#1E8E5A" }}>
+              <CheckCircle2 size={15} /> Recebemos seu anúncio! Ele aparece aqui assim que for aprovado.
+            </p>
+          ) : (
+            <form onSubmit={publicar} className="flex flex-col gap-2.5">
+              <div className="grid sm:grid-cols-2 gap-2.5">
+                <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }}>
+                  <option value="venda">Quero vender</option>
+                  <option value="doacao">Quero doar</option>
+                  <option value="procura">Estou procurando</option>
+                </select>
+                <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }}>
+                  {CATEGORIAS_CLASSIFICADOS.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Título do anúncio" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} placeholder="Descreva o item..." className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              {tipo === "venda" && (
+                <input value={preco} onChange={(e) => setPreco(e.target.value)} type="number" step="0.01" placeholder="Preço (R$)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              )}
+              <div className="grid sm:grid-cols-2 gap-2.5">
+                <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Seu WhatsApp" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </div>
+              <label className="font-body text-xs font-bold cursor-pointer w-fit flex items-center gap-1.5" style={{ color: C.blue }}>
+                <Camera size={14} /> {foto ? `Foto: ${foto.name}` : "Anexar foto (opcional)"}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => setFoto(e.target.files?.[0] || null)} />
+              </label>
+              {erro && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{erro}</p>}
+              <button type="submit" disabled={enviando} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+                {enviando ? "Publicando..." : "Publicar anúncio"}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {itens === null && (
+        <div className="grid sm:grid-cols-2 gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}</div>
+      )}
+      {itens && itensFiltrados.length === 0 && (
+        <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum anúncio por aqui ainda.</p>
+      )}
+      <div className="grid sm:grid-cols-2 gap-3">
+        {itensFiltrados.map((item) => {
+          const linkWhats = item.whatsapp ? `https://wa.me/55${String(item.whatsapp).replace(/\D/g, "")}` : null;
+          return (
+            <div key={item.id} className="rounded-2xl border overflow-hidden bg-white flex flex-col" style={{ borderColor: C.line }}>
+              {item.foto_url && <img loading="lazy" decoding="async" src={item.foto_url} alt="" className="w-full h-32 object-cover" />}
+              <div className="p-3.5 flex flex-col gap-1 flex-1">
+                <span className="w-fit font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint2, color: corTipo[item.tipo] }}>{labelTipo[item.tipo]}</span>
+                <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{item.titulo}</p>
+                {item.preco != null && <p className="font-body text-xs font-bold" style={{ color: C.blue }}>R$ {Number(item.preco).toFixed(2).replace(".", ",")}</p>}
+                <p className="font-body text-xs" style={{ color: "#5C7186" }}>{item.descricao}</p>
+                {linkWhats && (
+                  <a href={linkWhats} target="_blank" rel="noreferrer" className="mt-auto pt-2 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold font-body text-white" style={{ background: "#25A85B" }}>
+                    <MessageCircle size={13} /> WhatsApp
+                  </a>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Página pública de estatísticas — números reais da plataforma, sem precisar
 // de login. Serve tanto pra transparência com a comunidade quanto pra dar ao
 // Google uma página com conteúdo textual rico (bom pra indexação/SEO).
@@ -11490,6 +11746,7 @@ export default function ConectaComercio() {
     ...(siteConfig?.mural_ativo ? [{ id: "mural", label: "Mural", icon: Users }] : []),
     ...(siteConfig?.utilidade_ativo ? [{ id: "utilidade", label: "Utilidade pública", icon: Phone }] : []),
     ...(siteConfig?.ouvidoria_ativo ? [{ id: "ouvidoria", label: "Ouvidoria", icon: MessageCircle }] : []),
+    ...(siteConfig?.classificados_ativo ? [{ id: "classificados", label: "Classificados", icon: Repeat }] : []),
     { id: "estatisticas", label: "Números", icon: TrendingUp },
     { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
@@ -11602,6 +11859,7 @@ export default function ConectaComercio() {
       {modo === "mural" && <PaginaMural perfil={perfil} />}
       {modo === "utilidade" && <PaginaUtilidadePublica />}
       {modo === "ouvidoria" && <PaginaOuvidoria />}
+      {modo === "classificados" && <PaginaClassificados />}
       {modo === "termos" && <PaginaLegal titulo="Termos de uso" texto={siteConfig?.termos_uso} />}
       {modo === "privacidade" && <PaginaLegal titulo="Política de privacidade" texto={siteConfig?.politica_privacidade} />}
       {modo === "conta" && (sessao && perfil ? <MinhaConta perfil={perfil} sessao={sessao} /> : <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />)}
