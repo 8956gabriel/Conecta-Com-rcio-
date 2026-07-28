@@ -1519,14 +1519,14 @@ function AdminPanel() {
   const [empresasPend, setEmpresasPend] = useState(null); // null = carregando/indisponível
   const [statusEmpresa, setStatusEmpresa] = useState({});
   const [editandoEmpresa, setEditandoEmpresa] = useState(null);
-  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, patrocinado_ate: "", fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false });
+  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, patrocinado_ate: "", fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false, possui_mei: false });
   const [enviandoLogoEmpresa, setEnviandoLogoEmpresa] = useState(false);
   const [enviandoBannerEmpresa, setEnviandoBannerEmpresa] = useState(false);
   const [enviandoFotoGaleria, setEnviandoFotoGaleria] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em, email, whatsapp, instagram, cpf, cnpj").order("criado_em", { ascending: false })
+    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em, email, whatsapp, instagram, cpf, cnpj, possui_mei").order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setEmpresasPend(data || []); });
   }, []);
 
@@ -1574,7 +1574,7 @@ function AdminPanel() {
       destaque: !!e.destaque, fotos_urls: e.fotos_urls || [],
       email: e.email || "", whatsapp: e.whatsapp || "", instagram: e.instagram || "",
       cpf: e.cpf || "", cnpj: e.cnpj || "", aceita_cartao_servidor: !!e.aceita_cartao_servidor, patrocinado: !!e.patrocinado,
-      patrocinado_ate: e.patrocinado_ate || "",
+      patrocinado_ate: e.patrocinado_ate || "", possui_mei: !!e.possui_mei,
     });
   };
 
@@ -1640,7 +1640,7 @@ function AdminPanel() {
       email: formEmpresa.email || null, whatsapp: formEmpresa.whatsapp || null, instagram: formEmpresa.instagram || null,
       cpf: formEmpresa.cpf || null, cnpj: formEmpresa.cnpj || null,
       aceita_cartao_servidor: formEmpresa.aceita_cartao_servidor, patrocinado: formEmpresa.patrocinado,
-      patrocinado_ate: formEmpresa.patrocinado_ate || null,
+      patrocinado_ate: formEmpresa.patrocinado_ate || null, possui_mei: formEmpresa.possui_mei,
     }).eq("id", id);
     if (!error) setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, ...formEmpresa } : e)));
     setEditandoEmpresa(null);
@@ -1822,6 +1822,18 @@ function AdminPanel() {
     else notificar("Não consegui excluir: " + error.message, "erro");
   };
 
+  // Marca se o feirante realmente montou barraca no dia (diferente de só
+  // ter cadastro aprovado) e se tem MEI — entram no painel de Critérios de
+  // participação. FASE 44.
+  const marcarCompareceuFeirante = async (id, compareceu) => {
+    const { error } = await supabase.from("feirantes").update({ compareceu }).eq("id", id);
+    if (!error) setFeirantes((atual) => atual.map((f) => (f.id === id ? { ...f, compareceu } : f)));
+  };
+  const alternarMeiFeirante = async (id, possui_mei) => {
+    const { error } = await supabase.from("feirantes").update({ possui_mei }).eq("id", id);
+    if (!error) setFeirantes((atual) => atual.map((f) => (f.id === id ? { ...f, possui_mei } : f)));
+  };
+
   const [feirasEspeciaisAdmin, setFeirasEspeciaisAdmin] = useState(null);
   const [novaFeiraEspecial, setNovaFeiraEspecial] = useState({ titulo: "", data_inicio: "", local: "", imagem_url: "", link_url: "" });
   const [enviandoFotoFeiraEspecial, setEnviandoFotoFeiraEspecial] = useState(false);
@@ -1952,6 +1964,18 @@ function AdminPanel() {
       supabase.from("evento_participantes").select("*").eq("evento_id", eventoId).order("criado_em", { ascending: false }).then(({ data, error }) => {
         if (!error) setParticipantesPorEvento((atual) => ({ ...atual, [eventoId]: data || [] }));
       });
+    }
+  };
+
+  // Marca quem realmente compareceu no dia (diferente de só ter confirmado
+  // presença antes) — usado no painel de Critérios de participação. FASE 44.
+  const marcarCompareceuEvento = async (eventoId, participanteId, compareceu) => {
+    const { error } = await supabase.from("evento_participantes").update({ compareceu }).eq("id", participanteId);
+    if (!error) {
+      setParticipantesPorEvento((atual) => ({
+        ...atual,
+        [eventoId]: (atual[eventoId] || []).map((p) => (p.id === participanteId ? { ...p, compareceu } : p)),
+      }));
     }
   };
 
@@ -2587,7 +2611,7 @@ function AdminPanel() {
   // -------------------------------------------------------------------------
   // Feirantes — admin cadastra direto (com foto), já aprovado, aparece no site.
   // -------------------------------------------------------------------------
-  const feiranteVazio = { nome: "", produto: "", whatsapp: "", instagram: "", categoria: "", descricao: "", local: "", numero_estande: "", empresa_id: "", email: "", cpf: "", cnpj: "" };
+  const feiranteVazio = { nome: "", produto: "", whatsapp: "", instagram: "", categoria: "", descricao: "", local: "", numero_estande: "", empresa_id: "", email: "", cpf: "", cnpj: "", possui_mei: false };
   const [novoFeiranteAdmin, setNovoFeiranteAdmin] = useState(feiranteVazio);
   const [fotoFeiranteAdmin, setFotoFeiranteAdmin] = useState(null);
   const [enviandoFeiranteAdmin, setEnviandoFeiranteAdmin] = useState(false);
@@ -2979,6 +3003,60 @@ function AdminPanel() {
     const { error } = await supabase.from("mural_comunidade").delete().eq("id", id);
     if (!error) { setMuralAdmin((atual) => atual.filter((m) => m.id !== id)); notificar("Publicação excluída."); }
   };
+
+  // -------------------------------------------------------------------------
+  // Critérios de participação — reúne "possui MEI" e presença real (não só
+  // inscrição/confirmação) em cursos, eventos do calendário e feira, por
+  // empresa, pra ajudar a decidir quem convidar pras próximas festas. FASE 44.
+  // -------------------------------------------------------------------------
+  const somenteDigitos = (v) => (v || "").replace(/\D/g, "");
+
+  const [participantesEventosTodos, setParticipantesEventosTodos] = useState(null);
+  const [inscricoesCursosTodos, setInscricoesCursosTodos] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("evento_participantes").select("telefone, compareceu").eq("compareceu", true).then(({ data, error }) => {
+      if (!error) setParticipantesEventosTodos(data || []);
+    });
+    supabase.from("curso_inscricoes").select("telefone, presenca_confirmada").eq("presenca_confirmada", true).then(({ data, error }) => {
+      if (!error) setInscricoesCursosTodos(data || []);
+    });
+  }, []);
+
+  const criteriosPorEmpresa = useMemo(() => {
+    const contarPorTelefone = (lista) => {
+      const mapa = {};
+      (lista || []).forEach((item) => {
+        const tel = somenteDigitos(item.telefone);
+        if (!tel) return;
+        mapa[tel] = (mapa[tel] || 0) + 1;
+      });
+      return mapa;
+    };
+    const eventosPorTel = contarPorTelefone(participantesEventosTodos);
+    const cursosPorTel = contarPorTelefone(inscricoesCursosTodos);
+    const feirasPorEmpresaId = {};
+    (feirantes || []).forEach((f) => {
+      if (f.compareceu && f.empresa_id) feirasPorEmpresaId[f.empresa_id] = (feirasPorEmpresaId[f.empresa_id] || 0) + 1;
+    });
+    return (empresasPend || []).map((e) => {
+      const tel = somenteDigitos(e.whatsapp);
+      return {
+        ...e,
+        eventosComparecidos: eventosPorTel[tel] || 0,
+        cursosConcluidos: cursosPorTel[tel] || 0,
+        feirasParticipadas: feirasPorEmpresaId[e.id] || 0,
+      };
+    });
+  }, [empresasPend, feirantes, participantesEventosTodos, inscricoesCursosTodos]);
+
+  const feirantesAvulsos = useMemo(() => (feirantes || []).filter((f) => !f.empresa_id), [feirantes]);
+  const [buscaCriteriosAdmin, setBuscaCriteriosAdmin] = useState("");
+  const criteriosFiltrados = useMemo(() => {
+    if (!buscaCriteriosAdmin.trim()) return criteriosPorEmpresa;
+    const q = buscaCriteriosAdmin.toLowerCase();
+    return criteriosPorEmpresa.filter((e) => (e.nome || "").toLowerCase().includes(q));
+  }, [criteriosPorEmpresa, buscaCriteriosAdmin]);
 
   // -------------------------------------------------------------------------
   // Avaliações de empresas — o público comenta, o admin só modera (apaga
@@ -3489,6 +3567,7 @@ function AdminPanel() {
     { id: "todos-usuarios", label: "Usuários cadastrados", icon: Users },
     { id: "categorias", label: "Categorias", icon: Tag },
     { id: "empresas", label: "Comerciantes", icon: CheckCircle2 },
+    { id: "criterios", label: "Critérios de participação", icon: ClipboardList },
     { id: "prestadores", label: "Prestadores de serviço", icon: Wrench },
     { id: "produtos", label: "Produtos", icon: ShoppingBag },
     { id: "promocoes", label: "Promoções", icon: Tag },
@@ -4194,6 +4273,10 @@ function AdminPanel() {
                         Mostrar em destaque na Vitrine Local
                       </label>
                       <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                        <input type="checkbox" checked={formEmpresa.possui_mei} onChange={(e) => setFormEmpresa((f) => ({ ...f, possui_mei: e.target.checked }))} />
+                        Possui MEI
+                      </label>
+                      <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
                         <input type="checkbox" checked={formEmpresa.aceita_cartao_servidor} onChange={(e) => setFormEmpresa((f) => ({ ...f, aceita_cartao_servidor: e.target.checked }))} />
                         Aceita Cartão do Servidor
                       </label>
@@ -4262,6 +4345,80 @@ function AdminPanel() {
               <button onClick={() => setQtdEmpresasAdminVisiveis((n) => n + 15)} className="font-body text-xs font-bold px-4 py-2.5 rounded-lg border mt-3" style={{ borderColor: C.line, color: "#425A70" }}>
                 Carregar mais
               </button>
+            )}
+          </div>
+        )}
+
+        {tab === "criterios" && (
+          <div>
+            <SectionHeader eyebrow="Seleção" title="Critérios de participação" sub="Quem tem MEI e quem já participou de verdade de cursos, eventos e feiras — pra ajudar a decidir quem chamar pras próximas festas" />
+            <input value={buscaCriteriosAdmin} onChange={(e) => setBuscaCriteriosAdmin(e.target.value)} placeholder="Buscar empresa pelo nome..."
+              className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none w-full max-w-sm mb-4" style={{ borderColor: C.line }} />
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Empresa</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>MEI</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Eventos</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Cursos</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Feiras</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {criteriosFiltrados.map((e) => (
+                    <tr key={e.id} className="border-t" style={{ borderColor: C.line }}>
+                      <td className="font-body text-sm px-3 py-2.5" style={{ color: C.ink }}>{e.nome}</td>
+                      <td className="px-3 py-2.5">
+                        {e.possui_mei ? (
+                          <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>Tem MEI</span>
+                        ) : (
+                          <span className="font-body text-[10px] px-2 py-0.5 rounded-full" style={{ background: C.blueTint2, color: "#8896A6" }}>Sem MEI</span>
+                        )}
+                      </td>
+                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{e.eventosComparecidos}</td>
+                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{e.cursosConcluidos}</td>
+                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{e.feirasParticipadas}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {criteriosFiltrados.length === 0 && <p className="font-body text-sm mt-3" style={{ color: "#5C7186" }}>Nenhuma empresa encontrada.</p>}
+            </div>
+            <p className="font-body text-[11px] mt-3" style={{ color: "#8896A6" }}>
+              Eventos e cursos contam quem foi marcado como "Compareceu"/presença confirmada, cruzando pelo WhatsApp cadastrado na empresa. Feiras contam feirantes vinculados à empresa marcados como "Compareceu na feira".
+            </p>
+
+            {feirantesAvulsos.length > 0 && (
+              <div className="mt-8">
+                <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Feirantes sem empresa vinculada</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Nome</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>MEI</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Compareceu na feira</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feirantesAvulsos.map((f) => (
+                        <tr key={f.id} className="border-t" style={{ borderColor: C.line }}>
+                          <td className="font-body text-sm px-3 py-2.5" style={{ color: C.ink }}>{f.nome}</td>
+                          <td className="px-3 py-2.5">
+                            {f.possui_mei ? (
+                              <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>Tem MEI</span>
+                            ) : (
+                              <span className="font-body text-[10px] px-2 py-0.5 rounded-full" style={{ background: C.blueTint2, color: "#8896A6" }}>Sem MEI</span>
+                            )}
+                          </td>
+                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{f.compareceu ? "Sim" : "Não"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -4581,6 +4738,10 @@ function AdminPanel() {
                   <Camera size={14} /> {fotoFeiranteAdmin ? `Foto: ${fotoFeiranteAdmin.name}` : "Anexar foto (opcional)"}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => setFotoFeiranteAdmin(e.target.files?.[0] || null)} />
                 </label>
+                <label className="font-body text-xs font-semibold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: "#425A70" }}>
+                  <input type="checkbox" checked={!!novoFeiranteAdmin.possui_mei} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, possui_mei: e.target.checked }))} />
+                  Possui MEI
+                </label>
                 {statusFeiranteAdmin && statusFeiranteAdmin !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusFeiranteAdmin}</p>}
                 {statusFeiranteAdmin === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Feirante cadastrado!</p>}
                 <button type="submit" disabled={enviandoFeiranteAdmin} className="font-body text-xs font-bold text-white rounded-lg py-2.5 sm:col-span-2 flex items-center justify-center gap-1.5 disabled:opacity-60" style={{ background: C.blue }}>
@@ -4629,6 +4790,16 @@ function AdminPanel() {
                         {listaEventos.filter((ev) => ev.tipo === "feira").map((ev) => <option key={ev.id} value={ev.id}>{ev.titulo}</option>)}
                       </select>
                       <button onClick={() => salvarLocalFeirante(f.id)} className="font-body text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.blueTint, color: C.blue }}>Salvar local</button>
+                    </div>
+                    <div className="flex items-center gap-4 flex-wrap pt-1">
+                      <label className="font-body text-xs font-semibold flex items-center gap-1.5 cursor-pointer" style={{ color: f.possui_mei ? "#1E8E5A" : "#5C7186" }}>
+                        <input type="checkbox" checked={!!f.possui_mei} onChange={(e) => alternarMeiFeirante(f.id, e.target.checked)} />
+                        Possui MEI
+                      </label>
+                      <label className="font-body text-xs font-semibold flex items-center gap-1.5 cursor-pointer" style={{ color: f.compareceu ? "#1E8E5A" : "#5C7186" }}>
+                        <input type="checkbox" checked={!!f.compareceu} onChange={(e) => marcarCompareceuFeirante(f.id, e.target.checked)} />
+                        Compareceu na feira
+                      </label>
                     </div>
                     {f.status === "aprovado" && (
                       <div className="flex items-center gap-2 flex-wrap pt-1">
@@ -4749,8 +4920,11 @@ function AdminPanel() {
                   <div className="mt-3 pt-3 border-t flex flex-col gap-1.5" style={{ borderColor: C.line }}>
                     {(participantesPorEvento[ev.id] ?? []).map((p) => (
                       <div key={p.id} className="flex items-center justify-between font-body text-[11px]" style={{ color: "#425A70" }}>
-                        <span>{p.nome}</span>
-                        {p.telefone && <span style={{ color: "#8896A6" }}>{p.telefone}</span>}
+                        <span>{p.nome}{p.telefone && <span style={{ color: "#8896A6" }}> · {p.telefone}</span>}</span>
+                        <label className="flex items-center gap-1 cursor-pointer shrink-0" style={{ color: p.compareceu ? "#1E8E5A" : "#8896A6" }}>
+                          <input type="checkbox" checked={!!p.compareceu} onChange={(e) => marcarCompareceuEvento(ev.id, p.id, e.target.checked)} />
+                          Compareceu
+                        </label>
                       </div>
                     ))}
                     {(participantesPorEvento[ev.id] ?? []).length === 0 && (
@@ -7114,6 +7288,7 @@ function ModalCadastroFeirante({ onFechar }) {
         categoria: form.get("categoria"),
         descricao: form.get("descricao"),
         fotos_urls: urls,
+        possui_mei: form.get("possui_mei") === "on",
         status: "pendente",
       });
       if (error) throw error;
@@ -7198,6 +7373,11 @@ function ModalCadastroFeirante({ onFechar }) {
               <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                 Descrição breve (opcional)
                 <textarea name="descricao" rows={2} placeholder="Conte um pouco sobre o que você vende" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none resize-none" style={{ borderColor: C.line }} />
+              </label>
+
+              <label className="font-body text-xs font-semibold flex items-center gap-2 cursor-pointer" style={{ color: "#425A70" }}>
+                <input type="checkbox" name="possui_mei" />
+                Já tenho MEI (Microempreendedor Individual)
               </label>
 
               <div>
