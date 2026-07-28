@@ -6693,6 +6693,18 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
 
   const [empresaAberta, setEmpresaAberta] = useState(null);
 
+  // Abrir/fechar o perfil de uma empresa também atualiza o endereço (URL) da
+  // página, pra virar um link de verdade — copiável, compartilhável no
+  // WhatsApp e que o Google consegue indexar como página própria da empresa.
+  const abrirEmpresa = (e) => {
+    setEmpresaAberta(e);
+    if (e?.id) window.history.pushState(null, "", `#/loja-${e.id}`);
+  };
+  const fecharEmpresa = () => {
+    setEmpresaAberta(null);
+    if (window.location.hash.startsWith("#/loja-")) window.history.pushState(null, "", "#/");
+  };
+
   // Aviso (sino) de promoção nova em empresa favoritada — compara as
   // promoções recentes com a lista de favoritos salva no navegador.
   const [notifAberta, setNotifAberta] = useState(false);
@@ -6970,6 +6982,33 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   // aberta), a home passa a mostrar só dados reais — nada de exemplo fica
   // exibido para sempre.
   const listaBase = empresasReais ?? []; // usa dados reais assim que existirem
+
+  // Link direto pra uma empresa (ex: alguém compartilhou "#/loja-<id>" no
+  // WhatsApp): assim que a lista de empresas carrega, abre o perfil dela
+  // automaticamente, sem precisar buscar/clicar de novo.
+  useEffect(() => {
+    if (!empresasReais || empresasReais.length === 0) return;
+    if (!window.location.hash.startsWith("#/loja-")) return;
+    const id = window.location.hash.replace("#/loja-", "");
+    const achada = empresasReais.find((e) => String(e.id) === id);
+    if (achada) setEmpresaAberta(achada);
+  }, [empresasReais]);
+
+  // Título e descrição da aba do navegador acompanham o que está sendo
+  // visto — ajuda o Google a entender do que se trata cada link e deixa o
+  // compartilhamento (WhatsApp/Instagram) com nome e descrição certos.
+  useEffect(() => {
+    const tituloBase = "Conecta Comércio · Ivatuba - PR";
+    const descBase = "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (empresaAberta) {
+      document.title = `${empresaAberta.nome} — Conecta Comércio`;
+      if (metaDesc) metaDesc.setAttribute("content", `${empresaAberta.nome}${empresaAberta.cat ? " · " + empresaAberta.cat : ""} em Ivatuba - PR. Veja contato, produtos e avaliações no Conecta Comércio.`);
+    } else {
+      document.title = tituloBase;
+      if (metaDesc) metaDesc.setAttribute("content", descBase);
+    }
+  }, [empresaAberta]);
 
   const [ordenacaoEmpresas, setOrdenacaoEmpresas] = useState("recentes");
   const empresasFiltradas = useMemo(() => {
@@ -7509,7 +7548,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {novasDaSemana.slice(0, 6).map((e, i) => (
                 <Reveal key={e.nome} delay={i * 70}>
-                  <EmpresaCard e={e} fav={!!favs[e.id || e.nome]} onFav={() => setFavs((f) => ({ ...f, [e.id || e.nome]: !f[e.id || e.nome] }))} onAbrir={() => setEmpresaAberta(e)} />
+                  <EmpresaCard e={e} fav={!!favs[e.id || e.nome]} onFav={() => setFavs((f) => ({ ...f, [e.id || e.nome]: !f[e.id || e.nome] }))} onAbrir={() => abrirEmpresa(e)} />
                 </Reveal>
               ))}
             </div>
@@ -7532,7 +7571,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {empresasFiltradas.slice(0, qtdEmpresasVisiveis).map((e, i) => (
               <Reveal key={e.nome} delay={i * 70}>
-                <EmpresaCard e={e} fav={!!favs[e.id || e.nome]} onFav={() => setFavs((f) => ({ ...f, [e.id || e.nome]: !f[e.id || e.nome] }))} onAbrir={() => setEmpresaAberta(e)} />
+                <EmpresaCard e={e} fav={!!favs[e.id || e.nome]} onFav={() => setFavs((f) => ({ ...f, [e.id || e.nome]: !f[e.id || e.nome] }))} onAbrir={() => abrirEmpresa(e)} />
               </Reveal>
             ))}
             {empresasFiltradas.length === 0 && (
@@ -7961,7 +8000,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         </div>
       </footer>
 
-      {empresaAberta && <ModalPerfilEmpresa empresa={empresaAberta} onFechar={() => setEmpresaAberta(null)} />}
+      {empresaAberta && <ModalPerfilEmpresa empresa={empresaAberta} onFechar={fecharEmpresa} />}
 
       {/* Carrinho de compras — ícone fixo com contador, finalização por WhatsApp */}
       {totalItensCarrinho > 0 && (
@@ -8698,15 +8737,117 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
   if (h.startsWith("#/admin")) return "admin";
+  if (h.startsWith("#/estatisticas") || h.startsWith("#/numeros")) return "estatisticas";
   if (h.startsWith("#/empresa") || h.startsWith("#/vendedor")) return "empresario";
   if (h.startsWith("#/cadastro")) return "cadastro-conta";
   if (h.startsWith("#/entrar") || h.startsWith("#/conta")) return "conta";
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Página pública de estatísticas — números reais da plataforma, sem precisar
+// de login. Serve tanto pra transparência com a comunidade quanto pra dar ao
+// Google uma página com conteúdo textual rico (bom pra indexação/SEO).
+// ---------------------------------------------------------------------------
+function EstatisticasPublicas() {
+  const [stats, setStats] = useState(null); // null = carregando
+  const [categorias, setCategorias] = useState(null);
+
+  useEffect(() => {
+    document.title = "Números da plataforma — Conecta Comércio";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute("content", "Veja em números o comércio local de Ivatuba - PR: empresas, produtos, vagas, cursos e eventos cadastrados no Conecta Comércio.");
+    return () => {
+      document.title = "Conecta Comércio · Ivatuba - PR";
+      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    const contar = (tabela, filtro) => {
+      let q = supabase.from(tabela).select("*", { count: "exact", head: true });
+      if (filtro) q = filtro(q);
+      return q.then(({ count }) => count ?? 0);
+    };
+    Promise.all([
+      contar("empresas", (q) => q.eq("status", "aprovada")),
+      contar("produtos", (q) => q.eq("ativo", true)),
+      contar("vagas", (q) => q.eq("status", "aberta")),
+      contar("prestadores", (q) => q.eq("status", "aprovado")),
+      contar("eventos_calendario"),
+      contar("cursos"),
+      contar("avaliacoes"),
+      contar("cupons", (q) => q.eq("ativo", true)),
+    ]).then(([empresas, produtos, vagas, prestadores, eventos, cursos, avaliacoes, cupons]) => {
+      setStats({ empresas, produtos, vagas, prestadores, eventos, cursos, avaliacoes, cupons });
+    });
+
+    supabase.from("empresas").select("categoria").eq("status", "aprovada").then(({ data, error }) => {
+      if (error || !data) return;
+      const contagem = {};
+      data.forEach((e) => { const c = e.categoria || "Outros"; contagem[c] = (contagem[c] || 0) + 1; });
+      setCategorias(Object.entries(contagem).sort((a, b) => b[1] - a[1]).slice(0, 8));
+    });
+  }, []);
+
+  const cartoes = stats ? [
+    { label: "Empresas ativas", valor: stats.empresas, icon: Building2 },
+    { label: "Produtos à venda", valor: stats.produtos, icon: ShoppingBag },
+    { label: "Vagas abertas", valor: stats.vagas, icon: Briefcase },
+    { label: "Prestadores de serviço", valor: stats.prestadores, icon: Wrench },
+    { label: "Eventos na agenda", valor: stats.eventos, icon: Calendar },
+    { label: "Cursos disponíveis", valor: stats.cursos, icon: GraduationCap },
+    { label: "Avaliações da comunidade", valor: stats.avaliacoes, icon: Star },
+    { label: "Cupons de desconto ativos", valor: stats.cupons, icon: Tag },
+  ] : [];
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 md:px-6 py-10">
+      <SectionHeader eyebrow="Transparência" title="Números da plataforma" sub="Dados reais e atualizados do comércio local de Ivatuba - PR" />
+      {!stats ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+      ) : (
+        <>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+            {cartoes.map((c) => {
+              const Icon = c.icon;
+              return (
+                <div key={c.label} className="rounded-xl border p-5 bg-white" style={{ borderColor: C.line }}>
+                  <Icon size={18} style={{ color: C.blue }} />
+                  <p className="font-display text-3xl font-extrabold mt-2" style={{ color: C.ink }}>{c.valor}</p>
+                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{c.label}</p>
+                </div>
+              );
+            })}
+          </div>
+          {categorias && categorias.length > 0 && (
+            <div className="mt-10">
+              <h3 className="font-display text-lg font-bold" style={{ color: C.ink }}>Empresas por categoria</h3>
+              <div className="mt-4 space-y-2">
+                {categorias.map(([cat, n]) => (
+                  <div key={cat} className="flex items-center gap-3">
+                    <span className="font-body text-xs w-40 shrink-0 truncate" style={{ color: "#425A70" }}>{cat}</span>
+                    <div className="flex-1 h-2.5 rounded-full bg-gray-100 overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${Math.max(6, (n / categorias[0][1]) * 100)}%`, background: C.blue }} />
+                    </div>
+                    <span className="font-body text-xs font-bold w-6 text-right" style={{ color: C.ink }}>{n}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -8897,6 +9038,7 @@ export default function ConectaComercio() {
 
   const modos = [
     { id: "site", label: "Site", icon: Store },
+    { id: "estatisticas", label: "Números", icon: TrendingUp },
     { id: "conta", label: "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
     { id: "empresario", label: "Painel Empresário", icon: Briefcase, restrito: "empresario" },
@@ -9003,6 +9145,7 @@ export default function ConectaComercio() {
       </div>
 
       {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} siteConfig={siteConfig} sessao={sessao} perfil={perfil} />}
+      {modo === "estatisticas" && <EstatisticasPublicas />}
       {modo === "conta" && <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />}
 
       {modo === "admin" && (
