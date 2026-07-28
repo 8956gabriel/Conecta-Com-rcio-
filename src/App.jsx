@@ -8,7 +8,7 @@ import {
   Pencil, Trash2, Tag, UserCircle2, ChevronLeft, ShieldCheck, BarChart3, Vote, Sparkles,
   FileText, Receipt, ClipboardList, HandCoins, ExternalLink,
   Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
-  Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode
+  Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
@@ -11065,6 +11065,47 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
 // Assistente virtual — botão flutuante com IA (fala com /api/chat, que por
 // sua vez fala com a Anthropic usando a chave guardada no servidor).
 // ---------------------------------------------------------------------------
+// Botão flutuante de compartilhar — aparece em todas as abas do site.
+// Em celular, abre o menu nativo de compartilhamento (WhatsApp, etc.) com o
+// link da página atual; no computador (sem esse menu), copia o link.
+function BotaoCompartilhar() {
+  const [copiado, setCopiado] = useState(false);
+
+  const compartilhar = async () => {
+    const url = window.location.href;
+    const titulo = document.title || "Conecta Comércio";
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: titulo, url });
+      } catch (e) {
+        // usuário cancelou o compartilhamento — não faz nada
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch (e) {
+      const campo = document.createElement("textarea");
+      campo.value = url;
+      document.body.appendChild(campo);
+      campo.select();
+      document.execCommand("copy");
+      document.body.removeChild(campo);
+    }
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  };
+
+  return (
+    <button onClick={compartilhar} aria-label="Compartilhar essa página"
+      className="fixed top-20 right-3 z-40 flex items-center gap-1.5 pl-3 pr-3.5 h-10 rounded-full shadow-lg bg-white border font-body text-xs font-bold"
+      style={{ borderColor: C.line, color: C.blue }}>
+      {copiado ? <CheckCircle2 size={15} /> : <Share2 size={15} />}
+      {copiado ? "Link copiado!" : "Compartilhar"}
+    </button>
+  );
+}
+
 function ChatWidget() {
   const [aberto, setAberto] = useState(false);
   const [mensagens, setMensagens] = useState([
@@ -12276,6 +12317,7 @@ export default function ConectaComercio() {
         )
       )}
 
+      <BotaoCompartilhar />
       <ChatWidget />
     </div>
   );
