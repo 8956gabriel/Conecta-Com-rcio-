@@ -514,19 +514,19 @@ function CategoryCard({ cat }) {
   );
 }
 
-function EmpresaCard({ e, fav, onFav }) {
+function EmpresaCard({ e, fav, onFav, onAbrir }) {
   const linkWhats = e.whatsapp ? `https://wa.me/55${String(e.whatsapp).replace(/\D/g, "")}` : null;
   return (
     <div className="glow-card rounded-2xl border overflow-hidden bg-white flex flex-col" style={{ borderColor: C.line }}>
-      <div className="h-24 relative flex items-center justify-center overflow-hidden" style={{ background: e.banner_url ? undefined : `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
+      <button type="button" onClick={onAbrir} className="h-24 relative flex items-center justify-center overflow-hidden w-full text-left" style={{ background: e.banner_url ? undefined : `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
         {e.banner_url ? (
           <img loading="lazy" decoding="async" src={e.banner_url} alt="" className="w-full h-full object-cover" />
         ) : (
           <Building2 className="text-white/90" size={30} />
         )}
-        <button onClick={onFav} className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center" aria-label={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"} aria-pressed={fav}>
+        <span onClick={(ev) => { ev.stopPropagation(); onFav(); }} className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center" role="button" tabIndex={0} aria-label={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"} aria-pressed={fav}>
           <Heart size={15} fill={fav ? C.amber : "none"} color={fav ? C.amber : C.blueDark} />
-        </button>
+        </span>
         <span className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-white/95 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ color: C.amberDark }}>
           <Star size={11} fill={C.amber} color={C.amber} /> {e.rating}
         </span>
@@ -535,18 +535,30 @@ function EmpresaCard({ e, fav, onFav }) {
             Destaque
           </span>
         )}
-      </div>
+      </button>
       <div className="p-4 flex flex-col gap-1.5 flex-1">
-        <p className="font-display font-bold text-sm leading-snug" style={{ color: C.ink }}>{e.nome}</p>
+        <button type="button" onClick={onAbrir} className="text-left">
+          <p className="font-display font-bold text-sm leading-snug flex items-center gap-1" style={{ color: C.ink }}>
+            {e.nome}
+            {e.verificada && <BadgeCheck size={14} color={C.blue} aria-label="Comerciante verificado" />}
+          </p>
+        </button>
         <p className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}>
           <MapPin size={11} /> {e.bairro}, {e.cidade}
         </p>
         <p className="font-body text-xs" style={{ color: "#5C7186" }}>{e.itens} {e.itens === 1 ? "item ativo" : "itens ativos"}</p>
-        {(e.cartaoServidor || e.aceita_cartao_servidor) && (
-          <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5" style={{ background: C.blueTint, color: C.blue }}>
-            <BadgeCheck size={11} /> Aceita Cartão do Servidor
-          </span>
-        )}
+        <div className="flex flex-wrap gap-1.5">
+          {e.verificada && (
+            <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>
+              <BadgeCheck size={11} /> Comerciante verificado
+            </span>
+          )}
+          {(e.cartaoServidor || e.aceita_cartao_servidor) && (
+            <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5" style={{ background: C.blueTint, color: C.blue }}>
+              <BadgeCheck size={11} /> Aceita Cartão do Servidor
+            </span>
+          )}
+        </div>
         {(e.facebook || e.site) && (
           <div className="flex gap-2 mt-0.5">
             {e.facebook && <a href={e.facebook} target="_blank" rel="noreferrer" className="font-body text-[11px] font-semibold" style={{ color: C.blue }}>Facebook</a>}
@@ -558,10 +570,179 @@ function EmpresaCard({ e, fav, onFav }) {
             style={{ background: "#25A85B" }}>
             <MessageCircle size={14} /> WhatsApp
           </a>
-          <button className="flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-xs font-bold font-body border"
-            style={{ borderColor: C.line, color: C.blue }}>
+          <a href={e.google_maps_url || "#"} target={e.google_maps_url ? "_blank" : undefined} rel="noreferrer"
+            className="flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-xs font-bold font-body border"
+            style={{ borderColor: C.line, color: C.blue, opacity: e.google_maps_url ? 1 : 0.5 }}>
             <MapPin size={14} /> Ver Mapa
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Ficha completa da empresa — galeria, redes, e avaliações/comentários do
+// público (nota em estrelas + comentário, com resposta do comerciante).
+function ModalPerfilEmpresa({ empresa, onFechar }) {
+  const [avaliacoes, setAvaliacoes] = useState(null);
+  const [nomeAvaliador, setNomeAvaliador] = useState("");
+  const [notaAvaliacao, setNotaAvaliacao] = useState(5);
+  const [comentarioAvaliacao, setComentarioAvaliacao] = useState("");
+  const [enviandoAvaliacao, setEnviandoAvaliacao] = useState(false);
+  const [avaliacaoEnviada, setAvaliacaoEnviada] = useState(false);
+  const [erroAvaliacao, setErroAvaliacao] = useState("");
+
+  useEffect(() => {
+    if (!supabaseConfigurado || !empresa?.id) { setAvaliacoes([]); return; }
+    supabase.from("avaliacoes").select("*").eq("empresa_id", empresa.id).eq("status", "aprovado")
+      .order("criado_em", { ascending: false }).then(({ data, error }) => {
+        setAvaliacoes(error ? [] : data || []);
+      });
+  }, [empresa?.id]);
+
+  const mediaAvaliacoes = avaliacoes && avaliacoes.length > 0
+    ? (avaliacoes.reduce((s, a) => s + (a.nota || 0), 0) / avaliacoes.length).toFixed(1)
+    : null;
+
+  const enviarAvaliacao = async (e) => {
+    e.preventDefault();
+    setErroAvaliacao("");
+    if (!nomeAvaliador.trim() || !comentarioAvaliacao.trim()) { setErroAvaliacao("Preencha seu nome e o comentário."); return; }
+    if (!supabaseConfigurado) { setAvaliacaoEnviada(true); return; }
+    setEnviandoAvaliacao(true);
+    try {
+      const { data, error } = await supabase.from("avaliacoes").insert({
+        empresa_id: empresa.id, nome: nomeAvaliador, nota: notaAvaliacao, comentario: comentarioAvaliacao, status: "aprovado",
+      }).select().single();
+      if (error) throw error;
+      setAvaliacoes((atual) => [data, ...(atual || [])]);
+      setAvaliacaoEnviada(true);
+      setNomeAvaliador("");
+      setComentarioAvaliacao("");
+    } catch (err) {
+      setErroAvaliacao(err.message || "Não consegui enviar agora. Tente de novo.");
+    } finally {
+      setEnviandoAvaliacao(false);
+    }
+  };
+
+  const linkWhats = empresa.whatsapp ? `https://wa.me/55${String(empresa.whatsapp).replace(/\D/g, "")}` : null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.55)" }} onClick={onFechar}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl max-h-[92vh] overflow-y-auto">
+        <div className="h-32 relative overflow-hidden" style={{ background: empresa.banner_url ? undefined : `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
+          {empresa.banner_url ? <img loading="lazy" decoding="async" src={empresa.banner_url} alt="" className="w-full h-full object-cover" /> : <Building2 className="text-white/90 mx-auto mt-10" size={30} />}
+          <button onClick={onFechar} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center" aria-label="Fechar">
+            <X size={16} color="#425A70" />
           </button>
+        </div>
+        <div className="p-5 flex flex-col gap-4">
+          <div>
+            <p className="font-display font-extrabold text-lg flex items-center gap-1.5" style={{ color: C.ink }}>
+              {empresa.nome}
+              {empresa.verificada && <BadgeCheck size={16} color={C.blue} />}
+            </p>
+            <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{empresa.cat} · {empresa.bairro}, {empresa.cidade}</p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {empresa.verificada && (
+                <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>
+                  <BadgeCheck size={11} /> Comerciante verificado
+                </span>
+              )}
+              {(empresa.cartaoServidor || empresa.aceita_cartao_servidor) && (
+                <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ background: C.blueTint, color: C.blue }}>
+                  <BadgeCheck size={11} /> Aceita Cartão do Servidor
+                </span>
+              )}
+              {mediaAvaliacoes && (
+                <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
+                  <Star size={11} fill="#E8A23D" color="#E8A23D" /> {mediaAvaliacoes} ({avaliacoes.length})
+                </span>
+              )}
+            </div>
+          </div>
+
+          {empresa.fotos_urls?.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {empresa.fotos_urls.map((url, i) => (
+                <img key={i} loading="lazy" decoding="async" src={url} alt="" className="w-20 h-20 rounded-lg object-cover shrink-0 border" style={{ borderColor: C.line }} />
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2 flex-wrap">
+            {linkWhats && (
+              <a href={linkWhats} target="_blank" rel="noreferrer" className="glow-btn flex items-center justify-center gap-1.5 rounded-lg py-2 px-4 text-xs font-bold font-body text-white" style={{ background: "#25A85B" }}>
+                <MessageCircle size={13} /> WhatsApp
+              </a>
+            )}
+            {empresa.google_maps_url && (
+              <a href={empresa.google_maps_url} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 rounded-lg py-2 px-4 text-xs font-bold font-body border" style={{ borderColor: C.line, color: C.blue }}>
+                <MapPin size={13} /> Ver mapa
+              </a>
+            )}
+            {empresa.instagram && (
+              <a href={`https://instagram.com/${String(empresa.instagram).replace(/^@/, "")}`} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 rounded-lg py-2 px-4 text-xs font-bold font-body border" style={{ borderColor: C.line, color: C.blue }}>
+                <Instagram size={13} /> Instagram
+              </a>
+            )}
+          </div>
+
+          <div className="pt-3 border-t" style={{ borderColor: C.line }}>
+            <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Avaliações {avaliacoes ? `(${avaliacoes.length})` : ""}</p>
+
+            {avaliacoes === null && <Skeleton className="w-full h-16" />}
+
+            {avaliacoes && avaliacoes.length === 0 && (
+              <p className="font-body text-xs mb-3" style={{ color: "#5C7186" }}>Ainda não tem avaliações — seja o primeiro a comentar.</p>
+            )}
+
+            <div className="flex flex-col gap-3 mb-4">
+              {(avaliacoes || []).map((a) => (
+                <div key={a.id} className="rounded-xl border p-3" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-body text-xs font-bold" style={{ color: C.ink }}>{a.nome}</p>
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={11} fill={n <= a.nota ? "#E8A23D" : "none"} color="#E8A23D" />)}
+                    </div>
+                  </div>
+                  {a.comentario && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{a.comentario}</p>}
+                  {a.resposta_comerciante && (
+                    <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: C.blueTint2 }}>
+                      <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>Resposta do comerciante</p>
+                      <p className="font-body text-[11px]" style={{ color: "#425A70" }}>{a.resposta_comerciante}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {avaliacaoEnviada ? (
+              <p className="font-body text-xs font-semibold flex items-center gap-1.5" style={{ color: "#1E8E5A" }}>
+                <CheckCircle2 size={14} /> Obrigado pela avaliação!
+              </p>
+            ) : (
+              <form onSubmit={enviarAvaliacao} className="rounded-xl border p-3 flex flex-col gap-2" style={{ borderColor: C.line }}>
+                <p className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>Deixe sua avaliação</p>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} type="button" onClick={() => setNotaAvaliacao(n)} aria-label={`${n} estrelas`}>
+                      <Star size={18} fill={n <= notaAvaliacao ? "#E8A23D" : "none"} color="#E8A23D" />
+                    </button>
+                  ))}
+                </div>
+                <input value={nomeAvaliador} onChange={(e) => setNomeAvaliador(e.target.value)} placeholder="Seu nome"
+                  className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                <textarea value={comentarioAvaliacao} onChange={(e) => setComentarioAvaliacao(e.target.value)} rows={2} placeholder="Conte como foi sua experiência..."
+                  className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                {erroAvaliacao && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{erroAvaliacao}</p>}
+                <button type="submit" disabled={enviandoAvaliacao} className="font-body text-xs font-bold rounded-lg py-2.5 text-white disabled:opacity-60" style={{ background: C.blue }}>
+                  {enviandoAvaliacao ? "Enviando..." : "Enviar avaliação"}
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -606,7 +787,7 @@ function PrestadorCard({ p }) {
   );
 }
 
-function ProdutoCard({ p, onAdicionarCarrinho }) {
+function ProdutoCard({ p, onAdicionarCarrinho, fav, onFav }) {
   const esgotado = p.estoque != null && Number(p.estoque) <= 0;
   const poucoEstoque = p.estoque != null && Number(p.estoque) > 0 && Number(p.estoque) <= 3;
   const linkWhats = p.whatsapp ? `https://wa.me/55${(p.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vi o produto "${p.nome}" no Conecta Comércio e queria saber mais.`)}` : null;
@@ -616,6 +797,11 @@ function ProdutoCard({ p, onAdicionarCarrinho }) {
     <div className="glow-card rounded-2xl border bg-white overflow-hidden flex flex-col" style={{ borderColor: C.line }}>
       <div className="h-28 flex items-center justify-center relative overflow-hidden" style={{ background: C.blueTint }}>
         {p.foto_url ? <img loading="lazy" decoding="async" src={p.foto_url} alt={p.nome} className="w-full h-full object-cover" /> : <ShoppingBag size={26} color={C.blue} />}
+        {onFav && (
+          <button type="button" onClick={onFav} className="absolute top-2 left-2 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center" aria-label={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"} aria-pressed={fav}>
+            <Heart size={13} fill={fav ? C.amber : "none"} color={fav ? C.amber : C.blueDark} />
+          </button>
+        )}
         {esgotado && (
           <span className="absolute top-2 right-2 font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#FBEAE5", color: "#B4462F" }}>Esgotado</span>
         )}
@@ -2187,6 +2373,23 @@ function AdminPanel() {
   };
 
   // -------------------------------------------------------------------------
+  // Avaliações de empresas — o público comenta, o admin só modera (apaga
+  // comentário abusivo/spam). FASE 34.
+  // -------------------------------------------------------------------------
+  const [avaliacoesAdmin, setAvaliacoesAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("avaliacoes").select("*, empresas(nome)").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setAvaliacoesAdmin(data || []);
+    });
+  }, []);
+  const removerAvaliacaoAdmin = async (id) => {
+    const { error } = await supabase.from("avaliacoes").delete().eq("id", id);
+    if (!error) { setAvaliacoesAdmin((atual) => atual.filter((a) => a.id !== id)); notificar("Avaliação excluída."); }
+    else notificar("Não consegui excluir: " + error.message, "erro");
+  };
+
+  // -------------------------------------------------------------------------
   // Depoimentos — CRUD completo com avaliação em estrelas, só o admin cadastra.
   // -------------------------------------------------------------------------
   const [depoimentosAdmin, setDepoimentosAdmin] = useState(null);
@@ -2687,6 +2890,7 @@ function AdminPanel() {
     { id: "cursos", label: "Cursos", icon: GraduationCap },
     { id: "servicos", label: "Serviços do Empreendedor", icon: Landmark },
     { id: "enquetes", label: "Enquetes", icon: Vote },
+    { id: "avaliacoes", label: "Avaliações", icon: MessageCircle },
     { id: "depoimentos", label: "Depoimentos", icon: Star },
     { id: "faq", label: "FAQ", icon: FileText },
     { id: "noticias", label: "Notícias", icon: Newspaper },
@@ -4182,6 +4386,35 @@ function AdminPanel() {
           </div>
         )}
 
+        {tab === "avaliacoes" && (
+          <div>
+            <SectionHeader eyebrow="Moderação" title="Avaliações das empresas" sub="O público avalia direto no site — apague comentário abusivo ou spam" />
+            <div className="flex flex-col gap-3 max-w-2xl">
+              {(avaliacoesAdmin ?? []).map((a) => (
+                <div key={a.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{a.nome} <span className="font-body text-xs font-normal" style={{ color: "#5C7186" }}>· {a.empresas?.nome || "empresa removida"}</span></p>
+                      <div className="flex gap-0.5 mt-1">
+                        {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={12} fill={n <= a.nota ? "#E8A23D" : "none"} color="#E8A23D" />)}
+                      </div>
+                    </div>
+                    <button onClick={() => { if (confirmarExclusao("Excluir essa avaliação?")) removerAvaliacaoAdmin(a.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                  </div>
+                  {a.comentario && <p className="font-body text-xs mt-2" style={{ color: "#425A70" }}>{a.comentario}</p>}
+                  {a.resposta_comerciante && (
+                    <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: C.blueTint2 }}>
+                      <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>Resposta do comerciante</p>
+                      <p className="font-body text-[11px]" style={{ color: "#425A70" }}>{a.resposta_comerciante}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(avaliacoesAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma avaliação ainda.</p>}
+            </div>
+          </div>
+        )}
+
         {tab === "depoimentos" && (
           <div>
             <SectionHeader eyebrow="Prova social" title="Depoimentos" sub="Cadastre — os aprovados aparecem no carrossel da home" />
@@ -5165,9 +5398,31 @@ function EmpresarioPanel() {
         setVisualizacoesEmpresa(data.visualizacoes ?? 0);
         carregarMeusProdutos(data.id);
         carregarMinhasVagas(data.id);
+        carregarMinhasAvaliacoes(data.id);
       }
     })();
   }, []);
+
+  // Avaliações recebidas pela empresa — o dono pode responder.
+  const [minhasAvaliacoes, setMinhasAvaliacoes] = useState(null);
+  const [respostaAvaliacao, setRespostaAvaliacao] = useState({}); // { [id]: texto }
+  const [enviandoRespostaId, setEnviandoRespostaId] = useState(null);
+
+  const carregarMinhasAvaliacoes = (idEmpresa) => {
+    if (!supabaseConfigurado || !idEmpresa) return;
+    supabase.from("avaliacoes").select("*").eq("empresa_id", idEmpresa).order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMinhasAvaliacoes(data || []);
+    });
+  };
+
+  const enviarRespostaAvaliacao = async (id) => {
+    const texto = (respostaAvaliacao[id] || "").trim();
+    if (!texto) return;
+    setEnviandoRespostaId(id);
+    const { error } = await supabase.from("avaliacoes").update({ resposta_comerciante: texto }).eq("id", id);
+    if (!error) setMinhasAvaliacoes((atual) => atual.map((a) => (a.id === id ? { ...a, resposta_comerciante: texto } : a)));
+    setEnviandoRespostaId(null);
+  };
 
   const atualizarPerfilForm = (campo, valor) => setPerfilForm((f) => ({ ...f, [campo]: valor }));
 
@@ -5195,6 +5450,7 @@ function EmpresarioPanel() {
     { id: "produtos", label: "Produtos", icon: ShoppingBag },
     { id: "promocoes", label: "Promoções", icon: Tag },
     { id: "vagas", label: "Publicar vaga", icon: Briefcase },
+    { id: "avaliacoes", label: "Avaliações", icon: Star },
     { id: "visualizacoes", label: "Visualizações", icon: Eye },
   ];
 
@@ -5367,6 +5623,41 @@ function EmpresarioPanel() {
                 </div>
               ))}
               {(minhasVagasReais ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Você ainda não publicou nenhuma vaga.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "avaliacoes" && (
+          <div>
+            <SectionHeader eyebrow="Reputação" title="Avaliações" sub="O que os clientes estão dizendo — responda pra mostrar que você se importa" />
+            <div className="flex flex-col gap-3 max-w-xl">
+              {(minhasAvaliacoes ?? []).map((a) => (
+                <div key={a.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{a.nome}</p>
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={12} fill={n <= a.nota ? "#E8A23D" : "none"} color="#E8A23D" />)}
+                    </div>
+                  </div>
+                  {a.comentario && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{a.comentario}</p>}
+                  {a.resposta_comerciante ? (
+                    <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: C.blueTint2 }}>
+                      <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>Sua resposta</p>
+                      <p className="font-body text-[11px]" style={{ color: "#425A70" }}>{a.resposta_comerciante}</p>
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex gap-2">
+                      <input value={respostaAvaliacao[a.id] || ""} onChange={(e) => setRespostaAvaliacao((r) => ({ ...r, [a.id]: e.target.value }))}
+                        placeholder="Responder este cliente..." className="flex-1 font-body text-xs border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <button onClick={() => enviarRespostaAvaliacao(a.id)} disabled={enviandoRespostaId === a.id}
+                        className="font-body text-xs font-bold rounded-lg px-3 py-2 text-white disabled:opacity-60" style={{ background: C.blue }}>
+                        Responder
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(minhasAvaliacoes ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Ainda não recebeu nenhuma avaliação.</p>}
             </div>
           </div>
         )}
@@ -5768,6 +6059,34 @@ function BannerPromocoes() {
 // Calendário de eventos — só leitura no site público. As datas são geradas
 // e mantidas só pelo administrador (aba "Calendário de eventos" no painel).
 // ---------------------------------------------------------------------------
+// Gera e baixa um arquivo .ics (lembrete de evento) — abre direto no
+// Google Agenda, Outlook, Apple Calendar etc, sem precisar de servidor.
+function baixarLembreteEvento(ev) {
+  if (!ev?.data_inicio) return;
+  const dataBase = ev.data_inicio.replace(/-/g, "");
+  const horaBase = ev.hora ? ev.hora.replace(":", "") + "00" : "090000";
+  const dtStart = `${dataBase}T${horaBase}`;
+  const conteudo = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Conecta Comercio//PT-BR", "BEGIN:VEVENT",
+    `UID:${ev.id}@conectacomercio`,
+    `DTSTAMP:${dtStart}Z`,
+    `DTSTART:${dtStart}`,
+    `SUMMARY:${(ev.titulo || "Evento").replace(/\n/g, " ")}`,
+    `LOCATION:${(ev.local || "").replace(/\n/g, " ")}`,
+    `DESCRIPTION:Evento do Conecta Comercio${ev.link_inscricao ? " - " + ev.link_inscricao : ""}`,
+    "END:VEVENT", "END:VCALENDAR",
+  ].join("\r\n");
+  const blob = new Blob([conteudo], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${(ev.titulo || "evento").replace(/[^a-z0-9]+/gi, "-")}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function CalendarioEventos() {
   const [eventos, setEventos] = useState(null); // null = carregando/indisponível
 
@@ -5890,20 +6209,23 @@ function CalendarioEventos() {
                 <p className="font-body text-[10px]" style={{ color: "#5C7186" }}>
                   {formatarData(ev.data_inicio)}{ev.hora ? ` · ${ev.hora}` : ""}{ev.local ? ` · ${ev.local}` : ""} · {rotuloTipo[ev.tipo] || "Evento"}
                 </p>
-                {(ev.link_inscricao || ev.google_maps_url) && (
-                  <div className="flex items-center gap-3 mt-1">
-                    {ev.link_inscricao && (
-                      <a href={ev.link_inscricao} target="_blank" rel="noopener noreferrer" className="font-body text-[10px] font-bold flex items-center gap-1" style={{ color: C.blue }}>
-                        <ExternalLink size={10} /> Inscreva-se
-                      </a>
-                    )}
-                    {ev.google_maps_url && (
-                      <a href={ev.google_maps_url} target="_blank" rel="noopener noreferrer" className="font-body text-[10px] font-bold flex items-center gap-1" style={{ color: C.blue }}>
-                        <MapPin size={10} /> Ver no mapa
-                      </a>
-                    )}
-                  </div>
-                )}
+                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                  {ev.link_inscricao && (
+                    <a href={ev.link_inscricao} target="_blank" rel="noopener noreferrer" className="font-body text-[10px] font-bold flex items-center gap-1" style={{ color: C.blue }}>
+                      <ExternalLink size={10} /> Inscreva-se
+                    </a>
+                  )}
+                  {ev.google_maps_url && (
+                    <a href={ev.google_maps_url} target="_blank" rel="noopener noreferrer" className="font-body text-[10px] font-bold flex items-center gap-1" style={{ color: C.blue }}>
+                      <MapPin size={10} /> Ver no mapa
+                    </a>
+                  )}
+                  {ev.status !== "cancelado" && (
+                    <button onClick={() => baixarLembreteEvento(ev)} className="font-body text-[10px] font-bold flex items-center gap-1" style={{ color: "#425A70" }}>
+                      <CalendarDays size={10} /> Lembrete
+                    </button>
+                  )}
+                </div>
                 {ev.link_inscricao && (
                   <img loading="lazy" decoding="async"
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=64x64&data=${encodeURIComponent(ev.link_inscricao)}`}
@@ -6112,7 +6434,49 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   };
   const [modalFeiranteAberto, setModalFeiranteAberto] = useState(false);
   const [query, setQuery] = useState("");
-  const [favs, setFavs] = useState({});
+  // Favoritos de empresas e produtos — salvos no navegador (sem precisar de
+  // login), pra habilitar o aviso de promoção em empresa favoritada.
+  const [favs, setFavs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("cc_favoritos_empresas") || "{}"); } catch { return {}; }
+  });
+  useEffect(() => { try { localStorage.setItem("cc_favoritos_empresas", JSON.stringify(favs)); } catch {} }, [favs]);
+
+  const [favsProdutos, setFavsProdutos] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("cc_favoritos_produtos") || "{}"); } catch { return {}; }
+  });
+  useEffect(() => { try { localStorage.setItem("cc_favoritos_produtos", JSON.stringify(favsProdutos)); } catch {} }, [favsProdutos]);
+
+  const [empresaAberta, setEmpresaAberta] = useState(null);
+
+  // Aviso (sino) de promoção nova em empresa favoritada — compara as
+  // promoções recentes com a lista de favoritos salva no navegador.
+  const [notifAberta, setNotifAberta] = useState(false);
+  const [promocoesParaAviso, setPromocoesParaAviso] = useState([]);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    const catorzeDiasAtras = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    supabase.from("promocoes").select("id, nome, desconto_percentual, criado_em, produtos(empresa_id, nome, empresas(id, nome))")
+      .eq("ativa", true).gte("criado_em", catorzeDiasAtras).order("criado_em", { ascending: false })
+      .then(({ data, error }) => { if (!error) setPromocoesParaAviso(data || []); });
+  }, []);
+  const notificacoesFavoritas = useMemo(() => {
+    const idsFavoritos = Object.keys(favs).filter((k) => favs[k]);
+    const ultimaVista = Number(localStorage.getItem("cc_notif_vista_em") || 0);
+    const lista = promocoesParaAviso
+      .filter((p) => {
+        const emp = p.produtos?.empresas;
+        return emp && idsFavoritos.includes(String(emp.id));
+      })
+      .map((p) => ({
+        id: p.id, empresaNome: p.produtos?.empresas?.nome || "", criado_em: p.criado_em,
+        titulo: `${p.desconto_percentual ? `${p.desconto_percentual}% OFF` : "Promoção"} em ${p.produtos?.nome || p.nome || "um produto"}`,
+      }));
+    const naoVistas = lista.filter((n) => new Date(n.criado_em).getTime() > ultimaVista).length;
+    return { lista, naoVistas };
+  }, [promocoesParaAviso, favs]);
+  const marcarNotificacoesVistas = () => {
+    try { localStorage.setItem("cc_notif_vista_em", String(Date.now())); } catch {}
+  };
   const [empresasReais, setEmpresasReais] = useState(null); // null = ainda carregando / indisponível
   const [produtosReais, setProdutosReais] = useState(null);
   const [vagasReais, setVagasReais] = useState(null);
@@ -6272,7 +6636,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (!supabaseConfigurado) return;
     supabase
       .from("empresas")
-      .select("nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, facebook, site, destaque, whatsapp")
+      .select("id, nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, logo_url, facebook, site, destaque, whatsapp, instagram, endereco, google_maps_url, email, criado_em, fotos_urls")
       .eq("status", "aprovada")
       .order("destaque", { ascending: false })
       .order("visualizacoes", { ascending: false })
@@ -6280,9 +6644,12 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       .then(({ data, error }) => {
         if (!error && data && data.length > 0) {
           setEmpresasReais(data.map((d) => ({
-            nome: d.nome, cat: d.categoria, bairro: d.bairro, cidade: d.cidade,
+            id: d.id, nome: d.nome, cat: d.categoria, bairro: d.bairro, cidade: d.cidade,
             rating: d.rating ?? "—", cartaoServidor: !!d.cartao_servidor, itens: d.itens ?? 0,
-            banner_url: d.banner_url, facebook: d.facebook, site: d.site, destaque: d.destaque, whatsapp: d.whatsapp,
+            banner_url: d.banner_url, logo_url: d.logo_url, facebook: d.facebook, site: d.site, destaque: d.destaque, whatsapp: d.whatsapp,
+            instagram: d.instagram, endereco: d.endereco, google_maps_url: d.google_maps_url, email: d.email, criado_em: d.criado_em,
+            fotos_urls: d.fotos_urls || [],
+            verificada: !!(d.logo_url && d.whatsapp && d.endereco && (d.instagram || d.site)),
           })));
         }
       });
@@ -6445,18 +6812,48 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             ))}
           </nav>
 
-          <div className="ml-auto hidden md:flex items-center gap-3">
-            <button onClick={() => onAuth?.("entrar")} className="font-body text-sm font-semibold px-4 py-2 rounded-lg border" style={{ borderColor: C.blue, color: C.blue }}>
-              Entrar
-            </button>
-            <button onClick={() => onAuth?.("cadastro")} className="glow-btn font-body text-sm font-bold px-4 py-2 rounded-lg text-white" style={{ background: C.blue }}>
-              Cadastrar empresa
+          <div className="ml-auto flex items-center gap-2">
+            <div className="relative">
+              <button onClick={() => { setNotifAberta((v) => !v); marcarNotificacoesVistas(); }} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#425A70" }} aria-label="Notificações">
+                <Bell size={18} />
+                {notificacoesFavoritas.naoVistas > 0 && (
+                  <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center font-body text-[9px] font-bold text-white" style={{ background: "#B4462F" }}>
+                    {notificacoesFavoritas.naoVistas}
+                  </span>
+                )}
+              </button>
+              {notifAberta && (
+                <div className="absolute right-0 mt-2 w-72 rounded-2xl border bg-white shadow-2xl p-3 z-40" style={{ borderColor: C.line }}>
+                  <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Promoções das suas empresas favoritas</p>
+                  {notificacoesFavoritas.lista.length === 0 ? (
+                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nada por aqui ainda. Favorite empresas (❤) pra ver as promoções delas.</p>
+                  ) : (
+                    <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+                      {notificacoesFavoritas.lista.map((n) => (
+                        <div key={n.id} className="rounded-lg px-2.5 py-2" style={{ background: C.blueTint2 }}>
+                          <p className="font-body text-[11px] font-bold" style={{ color: C.ink }}>{n.empresaNome}</p>
+                          <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{n.titulo}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="hidden md:flex items-center gap-3">
+              <button onClick={() => onAuth?.("entrar")} className="font-body text-sm font-semibold px-4 py-2 rounded-lg border" style={{ borderColor: C.blue, color: C.blue }}>
+                Entrar
+              </button>
+              <button onClick={() => onAuth?.("cadastro")} className="glow-btn font-body text-sm font-bold px-4 py-2 rounded-lg text-white" style={{ background: C.blue }}>
+                Cadastrar empresa
+              </button>
+            </div>
+
+            <button className="md:hidden" onClick={() => setMenuOpen((v) => !v)} aria-label={menuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={menuOpen}>
+              {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </div>
-
-          <button className="md:hidden ml-auto" onClick={() => setMenuOpen((v) => !v)} aria-label={menuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={menuOpen}>
-            {menuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
         </div>
 
         {menuOpen && (
@@ -6852,6 +7249,25 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         </div>
       </section>
 
+      {/* O que abriu essa semana — empresas cadastradas nos últimos 7 dias */}
+      {(() => {
+        const seteDiasAtras = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const novasDaSemana = (empresasReais ?? []).filter((e) => e.criado_em && new Date(e.criado_em).getTime() >= seteDiasAtras);
+        if (novasDaSemana.length === 0) return null;
+        return (
+          <section className="max-w-6xl mx-auto px-4 md:px-6 py-10">
+            <Reveal><SectionHeader eyebrow="Novidades" title="O que abriu essa semana" sub="Comércios recém-chegados na plataforma" /></Reveal>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {novasDaSemana.slice(0, 6).map((e, i) => (
+                <Reveal key={e.nome} delay={i * 70}>
+                  <EmpresaCard e={e} fav={!!favs[e.id || e.nome]} onFav={() => setFavs((f) => ({ ...f, [e.id || e.nome]: !f[e.id || e.nome] }))} onAbrir={() => setEmpresaAberta(e)} />
+                </Reveal>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
       {/* Empresas em destaque */}
       <section ref={empresasSecaoRef} className="py-12" style={{ background: C.blueTint2 }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6">
@@ -6867,7 +7283,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {empresasFiltradas.slice(0, qtdEmpresasVisiveis).map((e, i) => (
               <Reveal key={e.nome} delay={i * 70}>
-                <EmpresaCard e={e} fav={!!favs[e.nome]} onFav={() => setFavs((f) => ({ ...f, [e.nome]: !f[e.nome] }))} />
+                <EmpresaCard e={e} fav={!!favs[e.id || e.nome]} onFav={() => setFavs((f) => ({ ...f, [e.id || e.nome]: !f[e.id || e.nome] }))} onAbrir={() => setEmpresaAberta(e)} />
               </Reveal>
             ))}
             {empresasFiltradas.length === 0 && (
@@ -6906,7 +7322,12 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           )}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {produtosFiltrados.slice(0, qtdProdutosVisiveis).map((p, i) => <Reveal key={`${p.nome}-${i}`} delay={i * 70}><ProdutoCard p={p} onAdicionarCarrinho={adicionarAoCarrinho} /></Reveal>)}
+          {produtosFiltrados.slice(0, qtdProdutosVisiveis).map((p, i) => (
+            <Reveal key={`${p.nome}-${i}`} delay={i * 70}>
+              <ProdutoCard p={p} onAdicionarCarrinho={adicionarAoCarrinho}
+                fav={!!favsProdutos[p.id]} onFav={() => setFavsProdutos((f) => ({ ...f, [p.id]: !f[p.id] }))} />
+            </Reveal>
+          ))}
           {(produtosReais ?? []).length === 0 && (
             <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhum produto cadastrado ainda. Assim que um empresário publicar, aparece aqui.</p>
           )}
@@ -7290,6 +7711,8 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           <p className="font-body text-white/40 text-xs">Feito para fortalecer quem move a economia local</p>
         </div>
       </footer>
+
+      {empresaAberta && <ModalPerfilEmpresa empresa={empresaAberta} onFechar={() => setEmpresaAberta(null)} />}
 
       {/* Carrinho de compras — ícone fixo com contador, finalização por WhatsApp */}
       {totalItensCarrinho > 0 && (
