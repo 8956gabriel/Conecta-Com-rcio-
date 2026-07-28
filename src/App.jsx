@@ -2020,6 +2020,55 @@ function AdminPanel() {
   const [cadastrandoProdutoAdmin, setCadastrandoProdutoAdmin] = useState(false);
   const [statusProdutoAdmin, setStatusProdutoAdmin] = useState("");
 
+  // IA no cadastro de produto do admin — gera descrição e foto ilustrativa
+  // só com base no nome do produto (FASE 26). Reaproveita os mesmos
+  // endpoints já usados no cadastro de produto do empresário.
+  const [gerandoDescricaoProdutoAdmin, setGerandoDescricaoProdutoAdmin] = useState(false);
+  const [erroDescricaoProdutoAdmin, setErroDescricaoProdutoAdmin] = useState("");
+  const [imagemIAProdutoAdmin, setImagemIAProdutoAdmin] = useState(null); // base64
+  const [gerandoImagemProdutoAdmin, setGerandoImagemProdutoAdmin] = useState(false);
+  const [erroImagemProdutoAdmin, setErroImagemProdutoAdmin] = useState("");
+
+  const gerarDescricaoProdutoAdmin = async () => {
+    if (!novoProdutoAdmin.nome.trim()) { setErroDescricaoProdutoAdmin("Preencha ao menos o nome do produto primeiro."); return; }
+    setErroDescricaoProdutoAdmin("");
+    setGerandoDescricaoProdutoAdmin(true);
+    try {
+      const resp = await fetch("/api/gerar-descricao", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ nome: novoProdutoAdmin.nome, categoria: novoProdutoAdmin.categoria, palavrasChave: "" }),
+      });
+      const dados = await resp.json();
+      if (!resp.ok) throw new Error(dados.error || "Não consegui gerar agora.");
+      setNovoProdutoAdmin((v) => ({ ...v, descricao: dados.descricao }));
+    } catch (err) {
+      setErroDescricaoProdutoAdmin(err.message || "Não consegui gerar agora. Tente de novo.");
+    } finally {
+      setGerandoDescricaoProdutoAdmin(false);
+    }
+  };
+
+  const gerarImagemProdutoAdmin = async () => {
+    if (!novoProdutoAdmin.nome.trim()) { setErroImagemProdutoAdmin("Preencha ao menos o nome do produto primeiro."); return; }
+    setErroImagemProdutoAdmin("");
+    setGerandoImagemProdutoAdmin(true);
+    try {
+      const resp = await fetch("/api/gerar-imagem-ilustrativa", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ nome: novoProdutoAdmin.nome, categoria: novoProdutoAdmin.categoria, descricao: novoProdutoAdmin.descricao }),
+      });
+      const dados = await resp.json();
+      if (!resp.ok) throw new Error(dados.error || "Não consegui gerar a imagem agora.");
+      setImagemIAProdutoAdmin(dados.imagemBase64);
+    } catch (err) {
+      setErroImagemProdutoAdmin(err.message || "Não consegui gerar a imagem agora. Tente de novo.");
+    } finally {
+      setGerandoImagemProdutoAdmin(false);
+    }
+  };
+
   const cadastrarProdutoAdmin = async (e) => {
     e.preventDefault();
     setStatusProdutoAdmin("");
@@ -2028,6 +2077,7 @@ function AdminPanel() {
       setProdutosAdmin((atual) => [{ id: `demo-${Date.now()}`, ...novoProdutoAdmin, ativo: true }, ...(atual ?? listaProdutos)]);
       setNovoProdutoAdmin(produtoAdminVazio);
       setFotoProdutoAdmin(null);
+      setImagemIAProdutoAdmin(null);
       setStatusProdutoAdmin("ok");
       return;
     }
@@ -2035,12 +2085,26 @@ function AdminPanel() {
     setCadastrandoProdutoAdmin(true);
     try {
       let fotoUrl = null;
+      let usandoImagemIlustrativa = false;
       if (fotoProdutoAdmin) {
         const caminho = `produtos/${Date.now()}-${fotoProdutoAdmin.name}`;
         const { error: erroUpload } = await supabase.storage.from("fotos-produtos").upload(caminho, fotoProdutoAdmin);
         if (!erroUpload) {
           const { data: pub } = supabase.storage.from("fotos-produtos").getPublicUrl(caminho);
           fotoUrl = pub.publicUrl;
+        }
+      } else if (imagemIAProdutoAdmin) {
+        // Só usa a imagem gerada por IA se não houver foto real enviada.
+        const bytes = atob(imagemIAProdutoAdmin);
+        const arr = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        const blob = new Blob([arr], { type: "image/png" });
+        const caminho = `produtos/${Date.now()}-ilustrativa.png`;
+        const { error: erroUpload } = await supabase.storage.from("fotos-produtos").upload(caminho, blob);
+        if (!erroUpload) {
+          const { data: pub } = supabase.storage.from("fotos-produtos").getPublicUrl(caminho);
+          fotoUrl = pub.publicUrl;
+          usandoImagemIlustrativa = true;
         }
       }
       const registro = {
@@ -2052,6 +2116,7 @@ function AdminPanel() {
         estoque: novoProdutoAdmin.estoque !== "" ? Number(novoProdutoAdmin.estoque) : null,
         categoria: novoProdutoAdmin.categoria,
         foto_url: fotoUrl,
+        imagem_ilustrativa: usandoImagemIlustrativa,
         ativo: true,
       };
       const { data, error } = await supabase.from("produtos").insert(registro).select("*, empresas(nome)").single();
@@ -2059,6 +2124,7 @@ function AdminPanel() {
       setProdutosAdmin((atual) => [data, ...(atual ?? [])]);
       setNovoProdutoAdmin(produtoAdminVazio);
       setFotoProdutoAdmin(null);
+      setImagemIAProdutoAdmin(null);
       setStatusProdutoAdmin("ok");
     } catch (err) {
       setStatusProdutoAdmin(err.message || "Erro ao cadastrar produto");
@@ -3376,8 +3442,38 @@ function AdminPanel() {
               <input value={novoProdutoAdmin.estoque} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, estoque: e.target.value }))} type="number" min="0" placeholder="Estoque (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               <input value={novoProdutoAdmin.categoria} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, categoria: e.target.value }))} placeholder="Categoria" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               <textarea value={novoProdutoAdmin.descricao} onChange={(e) => setNovoProdutoAdmin((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+
+              {/* IA: gera descrição e foto ilustrativa só com o nome do produto */}
+              <div className="sm:col-span-2 rounded-2xl border p-3.5 flex flex-col gap-2.5" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                <p className="font-body text-xs font-semibold flex items-center gap-1.5" style={{ color: "#425A70" }}>
+                  <Sparkles size={13} color={C.blue} /> Gerar com IA (usa só o nome do produto)
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={gerarDescricaoProdutoAdmin} disabled={gerandoDescricaoProdutoAdmin}
+                    className="font-body text-xs font-bold rounded-lg px-3 py-2 border disabled:opacity-60" style={{ borderColor: C.line, color: C.blue, background: "#fff" }}>
+                    {gerandoDescricaoProdutoAdmin ? "Gerando descrição..." : "Gerar descrição"}
+                  </button>
+                  <button type="button" onClick={gerarImagemProdutoAdmin} disabled={gerandoImagemProdutoAdmin}
+                    className="font-body text-xs font-bold rounded-lg px-3 py-2 border disabled:opacity-60" style={{ borderColor: C.line, color: C.blue, background: "#fff" }}>
+                    {gerandoImagemProdutoAdmin ? "Gerando foto..." : "Gerar foto ilustrativa"}
+                  </button>
+                </div>
+                {erroDescricaoProdutoAdmin && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{erroDescricaoProdutoAdmin}</p>}
+                {erroImagemProdutoAdmin && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{erroImagemProdutoAdmin}</p>}
+                {imagemIAProdutoAdmin && !fotoProdutoAdmin && (
+                  <div className="flex items-center gap-2.5">
+                    <img src={`data:image/png;base64,${imagemIAProdutoAdmin}`} alt="Imagem gerada por IA" className="w-16 h-16 rounded-lg object-cover border" style={{ borderColor: C.line }} />
+                    <div>
+                      <p className="font-body text-[11px] font-semibold" style={{ color: "#1E8E5A" }}>Foto ilustrativa gerada!</p>
+                      <button type="button" onClick={() => setImagemIAProdutoAdmin(null)} className="font-body text-[11px] font-bold" style={{ color: "#B4462F" }}>Remover</button>
+                    </div>
+                  </div>
+                )}
+                <p className="font-body text-[10px]" style={{ color: "#5C7186" }}>Se você anexar uma foto de verdade abaixo, ela tem prioridade sobre a foto gerada por IA.</p>
+              </div>
+
               <label className="font-body text-xs font-bold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: C.blue }}>
-                <Camera size={14} /> {fotoProdutoAdmin ? `Foto: ${fotoProdutoAdmin.name}` : "Anexar foto (opcional)"}
+                <Camera size={14} /> {fotoProdutoAdmin ? `Foto: ${fotoProdutoAdmin.name}` : "Anexar foto real (opcional)"}
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => setFotoProdutoAdmin(e.target.files?.[0] || null)} />
               </label>
               {statusProdutoAdmin && statusProdutoAdmin !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusProdutoAdmin}</p>}
