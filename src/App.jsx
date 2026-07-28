@@ -535,6 +535,11 @@ function EmpresaCard({ e, fav, onFav, onAbrir }) {
             Destaque
           </span>
         )}
+        {e.patrocinado && (
+          <span className="absolute bottom-2.5 right-2.5 flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ background: "rgba(255,255,255,0.95)", color: "#425A70" }}>
+            <Sparkles size={10} /> Patrocinado
+          </span>
+        )}
       </button>
       <div className="p-4 flex flex-col gap-1.5 flex-1">
         <button type="button" onClick={onAbrir} className="text-left">
@@ -585,6 +590,14 @@ function EmpresaCard({ e, fav, onFav, onAbrir }) {
 // público (nota em estrelas + comentário, com resposta do comerciante).
 function ModalPerfilEmpresa({ empresa, onFechar }) {
   const [avaliacoes, setAvaliacoes] = useState(null);
+  const [cupons, setCupons] = useState(null);
+  const [cupomRevelado, setCupomRevelado] = useState({});
+
+  useEffect(() => {
+    if (!supabaseConfigurado || !empresa?.id) { setCupons([]); return; }
+    supabase.from("cupons").select("*").eq("empresa_id", empresa.id).eq("ativo", true)
+      .order("criado_em", { ascending: false }).then(({ data, error }) => setCupons(error ? [] : data || []));
+  }, [empresa?.id]);
   const [nomeAvaliador, setNomeAvaliador] = useState("");
   const [notaAvaliacao, setNotaAvaliacao] = useState(5);
   const [comentarioAvaliacao, setComentarioAvaliacao] = useState("");
@@ -688,6 +701,34 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
               </a>
             )}
           </div>
+
+          {cupons && cupons.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Cupons de desconto</p>
+              {cupons.map((c) => (
+                <div key={c.id} className="rounded-xl border p-3" style={{ borderColor: C.amber, background: "#FFF9EE" }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="font-body text-xs font-bold" style={{ color: "#8A5A12" }}>{c.titulo}</p>
+                      {c.descricao && <p className="font-body text-[11px] mt-0.5" style={{ color: "#8A5A12" }}>{c.descricao}</p>}
+                    </div>
+                    {!cupomRevelado[c.id] ? (
+                      <button onClick={() => setCupomRevelado((r) => ({ ...r, [c.id]: true }))} className="font-body text-[11px] font-bold rounded-lg px-3 py-1.5 shrink-0" style={{ background: C.amber, color: C.blueDeep }}>
+                        Ver cupom
+                      </button>
+                    ) : (
+                      <span className="font-body text-xs font-extrabold px-2.5 py-1.5 rounded-lg shrink-0" style={{ background: "#fff", color: "#8A5A12", border: "1px dashed #E8A23D" }}>
+                        {c.codigo}
+                      </span>
+                    )}
+                  </div>
+                  {cupomRevelado[c.id] && (
+                    <p className="font-body text-[10px] mt-1.5" style={{ color: "#8A5A12" }}>Mostre esse código na loja pra resgatar.{c.validade && ` Válido até ${c.validade.split("-").reverse().join("/")}.`}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="pt-3 border-t" style={{ borderColor: C.line }}>
             <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Avaliações {avaliacoes ? `(${avaliacoes.length})` : ""}</p>
@@ -1247,7 +1288,7 @@ function AdminPanel() {
   const [empresasPend, setEmpresasPend] = useState(null); // null = carregando/indisponível
   const [statusEmpresa, setStatusEmpresa] = useState({});
   const [editandoEmpresa, setEditandoEmpresa] = useState(null);
-  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false });
+  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false });
   const [enviandoLogoEmpresa, setEnviandoLogoEmpresa] = useState(false);
   const [enviandoBannerEmpresa, setEnviandoBannerEmpresa] = useState(false);
   const [enviandoFotoGaleria, setEnviandoFotoGaleria] = useState(false);
@@ -1301,7 +1342,7 @@ function AdminPanel() {
       banner_url: e.banner_url || "", facebook: e.facebook || "", site: e.site || "",
       destaque: !!e.destaque, fotos_urls: e.fotos_urls || [],
       email: e.email || "", whatsapp: e.whatsapp || "", instagram: e.instagram || "",
-      cpf: e.cpf || "", cnpj: e.cnpj || "", aceita_cartao_servidor: !!e.aceita_cartao_servidor,
+      cpf: e.cpf || "", cnpj: e.cnpj || "", aceita_cartao_servidor: !!e.aceita_cartao_servidor, patrocinado: !!e.patrocinado,
     });
   };
 
@@ -1366,7 +1407,7 @@ function AdminPanel() {
       destaque: formEmpresa.destaque, fotos_urls: formEmpresa.fotos_urls,
       email: formEmpresa.email || null, whatsapp: formEmpresa.whatsapp || null, instagram: formEmpresa.instagram || null,
       cpf: formEmpresa.cpf || null, cnpj: formEmpresa.cnpj || null,
-      aceita_cartao_servidor: formEmpresa.aceita_cartao_servidor,
+      aceita_cartao_servidor: formEmpresa.aceita_cartao_servidor, patrocinado: formEmpresa.patrocinado,
     }).eq("id", id);
     if (!error) setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, ...formEmpresa } : e)));
     setEditandoEmpresa(null);
@@ -2373,6 +2414,59 @@ function AdminPanel() {
   };
 
   // -------------------------------------------------------------------------
+  // Cupons de desconto — o admin também pode cadastrar pra qualquer empresa.
+  // FASE 35.
+  // -------------------------------------------------------------------------
+  const [cuponsAdmin, setCuponsAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("cupons").select("*, empresas(nome)").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setCuponsAdmin(data || []);
+    });
+  }, []);
+  const cupomAdminVazio = { empresa_id: "", titulo: "", descricao: "", desconto_percentual: "", validade: "" };
+  const [novoCupomAdmin, setNovoCupomAdmin] = useState(cupomAdminVazio);
+  const [criandoCupomAdmin, setCriandoCupomAdmin] = useState(false);
+  const [statusCupomAdmin, setStatusCupomAdmin] = useState("");
+
+  const criarCupomAdmin = async (e) => {
+    e.preventDefault();
+    setStatusCupomAdmin("");
+    if (!novoCupomAdmin.empresa_id || !novoCupomAdmin.titulo.trim()) { setStatusCupomAdmin("Escolha a empresa e informe o título."); return; }
+    setCriandoCupomAdmin(true);
+    try {
+      const codigo = `${novoCupomAdmin.titulo.slice(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, "")}${Math.floor(1000 + Math.random() * 9000)}`;
+      const { data, error } = await supabase.from("cupons").insert({
+        empresa_id: novoCupomAdmin.empresa_id,
+        titulo: novoCupomAdmin.titulo,
+        descricao: novoCupomAdmin.descricao || null,
+        desconto_percentual: novoCupomAdmin.desconto_percentual ? Number(novoCupomAdmin.desconto_percentual) : null,
+        validade: novoCupomAdmin.validade || null,
+        codigo,
+      }).select("*, empresas(nome)").single();
+      if (error) throw error;
+      setCuponsAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovoCupomAdmin(cupomAdminVazio);
+      setStatusCupomAdmin("ok");
+      notificar("Cupom criado.");
+    } catch (err) {
+      setStatusCupomAdmin(err.message || "Erro ao criar cupom.");
+    } finally {
+      setCriandoCupomAdmin(false);
+    }
+  };
+
+  const alternarAtivoCupomAdmin = async (id, ativo) => {
+    const { error } = await supabase.from("cupons").update({ ativo }).eq("id", id);
+    if (!error) { setCuponsAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ativo } : c))); notificar(ativo ? "Cupom ativado." : "Cupom desativado."); }
+  };
+
+  const apagarCupomAdmin = async (id) => {
+    const { error } = await supabase.from("cupons").delete().eq("id", id);
+    if (!error) { setCuponsAdmin((atual) => atual.filter((c) => c.id !== id)); notificar("Cupom excluído."); }
+  };
+
+  // -------------------------------------------------------------------------
   // Avaliações de empresas — o público comenta, o admin só modera (apaga
   // comentário abusivo/spam). FASE 34.
   // -------------------------------------------------------------------------
@@ -2890,6 +2984,7 @@ function AdminPanel() {
     { id: "cursos", label: "Cursos", icon: GraduationCap },
     { id: "servicos", label: "Serviços do Empreendedor", icon: Landmark },
     { id: "enquetes", label: "Enquetes", icon: Vote },
+    { id: "cupons", label: "Cupons de desconto", icon: Tag },
     { id: "avaliacoes", label: "Avaliações", icon: MessageCircle },
     { id: "depoimentos", label: "Depoimentos", icon: Star },
     { id: "faq", label: "FAQ", icon: FileText },
@@ -3583,6 +3678,10 @@ function AdminPanel() {
                       <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
                         <input type="checkbox" checked={formEmpresa.aceita_cartao_servidor} onChange={(e) => setFormEmpresa((f) => ({ ...f, aceita_cartao_servidor: e.target.checked }))} />
                         Aceita Cartão do Servidor
+                      </label>
+                      <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                        <input type="checkbox" checked={formEmpresa.patrocinado} onChange={(e) => setFormEmpresa((f) => ({ ...f, patrocinado: e.target.checked }))} />
+                        Anúncio patrocinado (aparece primeiro nas buscas)
                       </label>
                       <div>
                         <p className="font-body text-xs font-bold mb-1.5" style={{ color: "#425A70" }}>Galeria de fotos</p>
@@ -4382,6 +4481,48 @@ function AdminPanel() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {tab === "cupons" && (
+          <div>
+            <SectionHeader eyebrow="Fidelização" title="Cupons de desconto" sub="Cadastre pra qualquer empresa — os donos também podem criar os deles" />
+            <form onSubmit={criarCupomAdmin} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <select value={novoCupomAdmin.empresa_id} onChange={(e) => setNovoCupomAdmin((v) => ({ ...v, empresa_id: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }}>
+                <option value="">Selecione a empresa</option>
+                {listaEmpresas.map((emp) => <option key={emp.id} value={emp.id}>{emp.nome}</option>)}
+              </select>
+              <input value={novoCupomAdmin.titulo} onChange={(e) => setNovoCupomAdmin((v) => ({ ...v, titulo: e.target.value }))} placeholder="Título (ex: 10% na primeira compra)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <input value={novoCupomAdmin.desconto_percentual} onChange={(e) => setNovoCupomAdmin((v) => ({ ...v, desconto_percentual: e.target.value }))} type="number" placeholder="Desconto (%)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novoCupomAdmin.validade} onChange={(e) => setNovoCupomAdmin((v) => ({ ...v, validade: e.target.value }))} type="date" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novoCupomAdmin.descricao} onChange={(e) => setNovoCupomAdmin((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição (opcional)" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              {statusCupomAdmin && statusCupomAdmin !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusCupomAdmin}</p>}
+              {statusCupomAdmin === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Cupom criado!</p>}
+              <button type="submit" disabled={criandoCupomAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                {criandoCupomAdmin ? "Criando..." : "Criar cupom"}
+              </button>
+            </form>
+            <div className="flex flex-col gap-3 max-w-lg">
+              {(cuponsAdmin ?? []).map((c) => (
+                <div key={c.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.titulo} <span className="font-body text-xs font-normal" style={{ color: "#5C7186" }}>· {c.empresas?.nome}</span></p>
+                    <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: c.ativo ? "#E7F6EE" : "#FBEAE5", color: c.ativo ? "#1E8E5A" : "#B4462F" }}>
+                      {c.ativo ? "Ativo" : "Inativo"}
+                    </span>
+                  </div>
+                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
+                    Código: <span className="font-bold" style={{ color: C.blue }}>{c.codigo}</span> · Resgatado {c.usos_atuais}x
+                    {c.validade && ` · válido até ${c.validade.split("-").reverse().join("/")}`}
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => alternarAtivoCupomAdmin(c.id, !c.ativo)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>{c.ativo ? "Desativar" : "Ativar"}</button>
+                    <button onClick={() => { if (confirmarExclusao("Excluir esse cupom?")) apagarCupomAdmin(c.id); }} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ color: "#B4462F" }}>Excluir</button>
+                  </div>
+                </div>
+              ))}
+              {(cuponsAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum cupom cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -5399,9 +5540,65 @@ function EmpresarioPanel() {
         carregarMeusProdutos(data.id);
         carregarMinhasVagas(data.id);
         carregarMinhasAvaliacoes(data.id);
+        carregarMeusCupons(data.id);
       }
     })();
   }, []);
+
+  // Cupons de desconto digitais — resgatados na loja física.
+  const [meusCupons, setMeusCupons] = useState(null);
+  const cupomVazio = { titulo: "", descricao: "", desconto_percentual: "", validade: "" };
+  const [novoCupom, setNovoCupom] = useState(cupomVazio);
+  const [criandoCupom, setCriandoCupom] = useState(false);
+  const [statusCupom, setStatusCupom] = useState("");
+
+  const carregarMeusCupons = (idEmpresa) => {
+    if (!supabaseConfigurado || !idEmpresa) return;
+    supabase.from("cupons").select("*").eq("empresa_id", idEmpresa).order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMeusCupons(data || []);
+    });
+  };
+
+  const criarCupom = async (e, idEmpresaAtual) => {
+    e.preventDefault();
+    setStatusCupom("");
+    if (!novoCupom.titulo.trim()) { setStatusCupom("Informe o título do cupom."); return; }
+    setCriandoCupom(true);
+    try {
+      const codigo = `${novoCupom.titulo.slice(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, "")}${Math.floor(1000 + Math.random() * 9000)}`;
+      const { data, error } = await supabase.from("cupons").insert({
+        empresa_id: idEmpresaAtual,
+        titulo: novoCupom.titulo,
+        descricao: novoCupom.descricao || null,
+        desconto_percentual: novoCupom.desconto_percentual ? Number(novoCupom.desconto_percentual) : null,
+        validade: novoCupom.validade || null,
+        codigo,
+      }).select().single();
+      if (error) throw error;
+      setMeusCupons((atual) => [data, ...(atual ?? [])]);
+      setNovoCupom(cupomVazio);
+      setStatusCupom("ok");
+    } catch (err) {
+      setStatusCupom(err.message || "Erro ao criar cupom.");
+    } finally {
+      setCriandoCupom(false);
+    }
+  };
+
+  const alternarAtivoCupom = async (id, ativo) => {
+    const { error } = await supabase.from("cupons").update({ ativo }).eq("id", id);
+    if (!error) setMeusCupons((atual) => atual.map((c) => (c.id === id ? { ...c, ativo } : c)));
+  };
+
+  const registrarResgateCupom = async (id, usosAtuais) => {
+    const { error } = await supabase.from("cupons").update({ usos_atuais: usosAtuais + 1 }).eq("id", id);
+    if (!error) setMeusCupons((atual) => atual.map((c) => (c.id === id ? { ...c, usos_atuais: usosAtuais + 1 } : c)));
+  };
+
+  const apagarCupom = async (id) => {
+    const { error } = await supabase.from("cupons").delete().eq("id", id);
+    if (!error) setMeusCupons((atual) => atual.filter((c) => c.id !== id));
+  };
 
   // Avaliações recebidas pela empresa — o dono pode responder.
   const [minhasAvaliacoes, setMinhasAvaliacoes] = useState(null);
@@ -5450,6 +5647,7 @@ function EmpresarioPanel() {
     { id: "produtos", label: "Produtos", icon: ShoppingBag },
     { id: "promocoes", label: "Promoções", icon: Tag },
     { id: "vagas", label: "Publicar vaga", icon: Briefcase },
+    { id: "cupons", label: "Cupons de desconto", icon: Tag },
     { id: "avaliacoes", label: "Avaliações", icon: Star },
     { id: "visualizacoes", label: "Visualizações", icon: Eye },
   ];
@@ -5623,6 +5821,53 @@ function EmpresarioPanel() {
                 </div>
               ))}
               {(minhasVagasReais ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Você ainda não publicou nenhuma vaga.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "cupons" && (
+          <div>
+            <SectionHeader eyebrow="Fidelização" title="Cupons de desconto" sub="Cliente mostra o código na loja — você confere e clica em '+1 resgate'" />
+            <form onSubmit={(e) => criarCupom(e, empresaId)} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-md mb-6" style={{ borderColor: C.line }}>
+              <input value={novoCupom.titulo} onChange={(e) => setNovoCupom((v) => ({ ...v, titulo: e.target.value }))} placeholder="Título (ex: 10% na primeira compra)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novoCupom.descricao} onChange={(e) => setNovoCupom((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição (opcional)" rows={2}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <div className="grid sm:grid-cols-2 gap-3">
+                <input value={novoCupom.desconto_percentual} onChange={(e) => setNovoCupom((v) => ({ ...v, desconto_percentual: e.target.value }))} type="number" placeholder="Desconto (%)"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={novoCupom.validade} onChange={(e) => setNovoCupom((v) => ({ ...v, validade: e.target.value }))} type="date"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </div>
+              {statusCupom && statusCupom !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusCupom}</p>}
+              {statusCupom === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Cupom criado!</p>}
+              <button type="submit" disabled={criandoCupom} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+                {criandoCupom ? "Criando..." : "Criar cupom"}
+              </button>
+            </form>
+            <div className="flex flex-col gap-3 max-w-md">
+              {(meusCupons ?? []).map((c) => (
+                <div key={c.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.titulo}</p>
+                    <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: c.ativo ? "#E7F6EE" : "#FBEAE5", color: c.ativo ? "#1E8E5A" : "#B4462F" }}>
+                      {c.ativo ? "Ativo" : "Inativo"}
+                    </span>
+                  </div>
+                  {c.descricao && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{c.descricao}</p>}
+                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
+                    Código: <span className="font-bold" style={{ color: C.blue }}>{c.codigo}</span>
+                    {c.validade && ` · válido até ${c.validade.split("-").reverse().join("/")}`}
+                  </p>
+                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Resgatado {c.usos_atuais}x</p>
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => registrarResgateCupom(c.id, c.usos_atuais)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 text-white" style={{ background: "#25A85B" }}>+1 resgate</button>
+                    <button onClick={() => alternarAtivoCupom(c.id, !c.ativo)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>{c.ativo ? "Desativar" : "Ativar"}</button>
+                    <button onClick={() => apagarCupom(c.id)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ color: "#B4462F" }}>Excluir</button>
+                  </div>
+                </div>
+              ))}
+              {(meusCupons ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum cupom criado ainda.</p>}
             </div>
           </div>
         )}
@@ -6636,7 +6881,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (!supabaseConfigurado) return;
     supabase
       .from("empresas")
-      .select("id, nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, logo_url, facebook, site, destaque, whatsapp, instagram, endereco, google_maps_url, email, criado_em, fotos_urls")
+      .select("id, nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, logo_url, facebook, site, destaque, patrocinado, whatsapp, instagram, endereco, google_maps_url, email, criado_em, fotos_urls")
       .eq("status", "aprovada")
       .order("destaque", { ascending: false })
       .order("visualizacoes", { ascending: false })
@@ -6646,7 +6891,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           setEmpresasReais(data.map((d) => ({
             id: d.id, nome: d.nome, cat: d.categoria, bairro: d.bairro, cidade: d.cidade,
             rating: d.rating ?? "—", cartaoServidor: !!d.cartao_servidor, itens: d.itens ?? 0,
-            banner_url: d.banner_url, logo_url: d.logo_url, facebook: d.facebook, site: d.site, destaque: d.destaque, whatsapp: d.whatsapp,
+            banner_url: d.banner_url, logo_url: d.logo_url, facebook: d.facebook, site: d.site, destaque: d.destaque, patrocinado: !!d.patrocinado, whatsapp: d.whatsapp,
             instagram: d.instagram, endereco: d.endereco, google_maps_url: d.google_maps_url, email: d.email, criado_em: d.criado_em,
             fotos_urls: d.fotos_urls || [],
             verificada: !!(d.logo_url && d.whatsapp && d.endereco && (d.instagram || d.site)),
@@ -6728,10 +6973,14 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
 
   const [ordenacaoEmpresas, setOrdenacaoEmpresas] = useState("recentes");
   const empresasFiltradas = useMemo(() => {
-    let lista = !query.trim() ? listaBase : listaBase.filter((e) => e.nome.toLowerCase().includes(query.toLowerCase()) || e.cat.toLowerCase().includes(query.toLowerCase()));
+    const temBusca = !!query.trim();
+    let lista = !temBusca ? listaBase : listaBase.filter((e) => e.nome.toLowerCase().includes(query.toLowerCase()) || e.cat.toLowerCase().includes(query.toLowerCase()));
     lista = [...lista];
     if (ordenacaoEmpresas === "az") lista.sort((a, b) => a.nome.localeCompare(b.nome));
     if (ordenacaoEmpresas === "avaliacao") lista.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
+    // Anúncio patrocinado — empresas marcadas pelo admin aparecem primeiro
+    // nos resultados de busca por nome/categoria.
+    if (temBusca) lista.sort((a, b) => (b.patrocinado ? 1 : 0) - (a.patrocinado ? 1 : 0));
     return lista;
   }, [query, listaBase, ordenacaoEmpresas]);
 
