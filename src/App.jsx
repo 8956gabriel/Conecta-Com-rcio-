@@ -89,6 +89,15 @@ const fontImport = `
 @keyframes ring-pulse { 0% { box-shadow: 0 0 0 0 rgba(232,162,61,0.55); } 100% { box-shadow: 0 0 0 14px rgba(232,162,61,0); } }
 .ring-pulse { animation: ring-pulse 2.2s ease-out infinite; }
 
+/* Foco visível pra quem navega pelo teclado (Tab) — sem mudar nada pra
+   quem usa o mouse, já que :focus-visible só ativa no teclado. */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 2.5px solid #0A5AA8;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 @keyframes skeleton-shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
 .skeleton-pulse {
   background-image: linear-gradient(90deg, #EAF0F7 0px, #F6F9FC 40px, #EAF0F7 80px);
@@ -496,7 +505,7 @@ function CategoryCard({ cat }) {
       </span>
       <div>
         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{cat.nome}</p>
-        {cat.count !== undefined && <p className="font-body text-xs mt-0.5" style={{ color: "#7E93A7" }}>{cat.count} empresas</p>}
+        {cat.count !== undefined && <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{cat.count} empresas</p>}
       </div>
     </button>
   );
@@ -512,7 +521,7 @@ function EmpresaCard({ e, fav, onFav }) {
         ) : (
           <Building2 className="text-white/90" size={30} />
         )}
-        <button onClick={onFav} className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
+        <button onClick={onFav} className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center" aria-label={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"} aria-pressed={fav}>
           <Heart size={15} fill={fav ? C.amber : "none"} color={fav ? C.amber : C.blueDark} />
         </button>
         <span className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-white/95 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ color: C.amberDark }}>
@@ -526,10 +535,10 @@ function EmpresaCard({ e, fav, onFav }) {
       </div>
       <div className="p-4 flex flex-col gap-1.5 flex-1">
         <p className="font-display font-bold text-sm leading-snug" style={{ color: C.ink }}>{e.nome}</p>
-        <p className="font-body text-xs flex items-center gap-1" style={{ color: "#7E93A7" }}>
+        <p className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}>
           <MapPin size={11} /> {e.bairro}, {e.cidade}
         </p>
-        <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{e.itens} {e.itens === 1 ? "item ativo" : "itens ativos"}</p>
+        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{e.itens} {e.itens === 1 ? "item ativo" : "itens ativos"}</p>
         {e.cartaoServidor && (
           <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5" style={{ background: C.blueTint, color: C.blue }}>
             <BadgeCheck size={11} /> Aceita Cartão Servidor
@@ -573,7 +582,7 @@ function PrestadorCard({ p }) {
         <p className="font-display font-bold text-sm leading-snug" style={{ color: C.ink }}>{p.nome}</p>
         <p className="font-body text-xs font-semibold" style={{ color: C.blue }}>{p.servico}</p>
         {p.endereco && (
-          <p className="font-body text-xs flex items-center gap-1" style={{ color: "#7E93A7" }}>
+          <p className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}>
             <MapPin size={11} /> {p.endereco}
           </p>
         )}
@@ -611,7 +620,7 @@ function ProdutoCard({ p }) {
       </div>
       <div className="p-3.5 flex flex-col gap-1">
         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
-        <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{p.empresa}</p>
+        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.empresa}</p>
         {p.precoPromocional ? (
           <div className="flex items-center gap-2 mt-1">
             <p className="font-display font-extrabold text-base" style={{ color: "#B4462F" }}>{p.precoPromocional}</p>
@@ -651,9 +660,9 @@ function VagaCard({ v }) {
         )}
       </div>
       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
-      <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{v.empresa} · {v.cidade}</p>
+      <p className="font-body text-xs" style={{ color: "#5C7186" }}>{v.empresa} · {v.cidade}</p>
       <p className="font-body text-xs font-semibold" style={{ color: C.amberDark }}>{v.salario}</p>
-      {v.beneficios && <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{v.beneficios}</p>}
+      {v.beneficios && <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{v.beneficios}</p>}
       {prazoFormatado && <p className="font-body text-[11px] font-semibold" style={{ color: "#B4462F" }}>Inscrições até {prazoFormatado}</p>}
       {linkWhats ? (
         <a href={linkWhats} target="_blank" rel="noopener noreferrer" className="mt-1 w-full text-center rounded-lg py-2 text-xs font-bold font-body text-white" style={{ background: C.blue }}>
@@ -686,7 +695,7 @@ function CursoCard({ c }) {
       )}
       <div className="min-w-0 flex-1">
         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.titulo}</p>
-        <p className="font-body text-xs mt-1 flex items-center gap-1" style={{ color: "#7E93A7" }}>
+        <p className="font-body text-xs mt-1 flex items-center gap-1" style={{ color: "#5C7186" }}>
           <MapPin size={11} /> {local}{c.professor ? ` · ${c.professor}` : ""}{c.carga_horaria ? ` · ${c.carga_horaria}` : ""}
         </p>
         {c.certificado && (
@@ -2397,7 +2406,7 @@ function AdminPanel() {
       <html><head><title>Usuários — Conecta Comércio</title>
       <style>
         body{font-family:Arial,sans-serif;padding:24px;color:#0E2233}
-        h2{margin-bottom:4px} p{color:#7E93A7;margin-top:0;font-size:12px}
+        h2{margin-bottom:4px} p{color:#5C7186;margin-top:0;font-size:12px}
         table{width:100%;border-collapse:collapse;margin-top:16px}
         th,td{border:1px solid #DCE7F2;padding:8px 10px;text-align:left;font-size:13px}
         th{background:#EAF2FB;color:#0A5AA8}
@@ -2489,7 +2498,7 @@ function AdminPanel() {
 
       <div className="grid md:grid-cols-[220px_1fr] gap-6">
       <aside className="rounded-2xl border p-3 h-fit" style={{ borderColor: C.line }}>
-        <p className="font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2" style={{ color: "#7E93A7" }}>Painel do administrador</p>
+        <p className="font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2" style={{ color: "#5C7186" }}>Painel do administrador</p>
         {items.map((it) => {
           const Icon = it.icon;
           const active = tab === it.id;
@@ -2538,7 +2547,7 @@ function AdminPanel() {
                       <Icon size={16} />
                     </span>
                     <p className="font-display font-extrabold text-xl mt-2.5" style={{ color: C.ink }}>{n}</p>
-                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{l}</p>
+                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>{l}</p>
                   </div>
                 );
               })}
@@ -2550,15 +2559,15 @@ function AdminPanel() {
                 <div style={{ width: "100%", height: 200 }}>
                   <ResponsiveContainer>
                     <LineChart data={acessosSemanaReais ?? []}>
-                      <XAxis dataKey="dia" tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
+                      <XAxis dataKey="dia" tick={{ fontSize: 12, fill: "#5C7186" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: "#5C7186" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
                       <Tooltip />
                       <Line type="monotone" dataKey="views" stroke={C.blue} strokeWidth={2.5} dot={{ r: 3 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
                 {acessosSemanaReais && acessosSemanaReais.every((d) => d.views === 0) && (
-                  <p className="font-body text-[11px] mt-2" style={{ color: "#7E93A7" }}>Sem visitas registradas ainda nos últimos 7 dias.</p>
+                  <p className="font-body text-[11px] mt-2" style={{ color: "#5C7186" }}>Sem visitas registradas ainda nos últimos 7 dias.</p>
                 )}
               </div>
 
@@ -2567,8 +2576,8 @@ function AdminPanel() {
                 <div style={{ width: "100%", height: 200 }}>
                   <ResponsiveContainer>
                     <LineChart data={crescimentoMensal ?? []}>
-                      <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#5C7186" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: "#5C7186" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
                       <Tooltip />
                       <Line type="monotone" dataKey="empresas" stroke={C.amberDark} strokeWidth={2.5} dot={{ r: 3 }} />
                     </LineChart>
@@ -2583,8 +2592,8 @@ function AdminPanel() {
                 <div style={{ width: "100%", height: 200 }}>
                   <ResponsiveContainer>
                     <BarChart data={resumoBarrasAdmin}>
-                      <XAxis dataKey="nome" tick={{ fontSize: 10, fill: "#7E93A7" }} axisLine={false} tickLine={false} interval={0} angle={-20} textAnchor="end" height={40} />
-                      <YAxis tick={{ fontSize: 12, fill: "#7E93A7" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
+                      <XAxis dataKey="nome" tick={{ fontSize: 10, fill: "#5C7186" }} axisLine={false} tickLine={false} interval={0} angle={-20} textAnchor="end" height={40} />
+                      <YAxis tick={{ fontSize: 12, fill: "#5C7186" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
                       <Tooltip />
                       <Bar dataKey="valor" radius={[6, 6, 0, 0]}>
                         {resumoBarrasAdmin.map((_, i) => <Cell key={i} fill={PALETA_GRAFICOS[i % PALETA_GRAFICOS.length]} />)}
@@ -2609,7 +2618,7 @@ function AdminPanel() {
                     </ResponsiveContainer>
                   </div>
                 ) : (
-                  <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Sem empresas aprovadas o suficiente ainda.</p>
+                  <p className="font-body text-sm" style={{ color: "#5C7186" }}>Sem empresas aprovadas o suficiente ainda.</p>
                 )}
               </div>
             </div>
@@ -2621,23 +2630,23 @@ function AdminPanel() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${C.line}` }}>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#7E93A7" }}>Empresa</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#7E93A7" }}>Categoria</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2 text-right" style={{ color: "#7E93A7" }}>Views</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#5C7186" }}>Empresa</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#5C7186" }}>Categoria</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2 text-right" style={{ color: "#5C7186" }}>Views</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(empresasDestaqueReais ?? []).map((e, i) => (
                         <tr key={e.nome + i} style={{ borderBottom: i < empresasDestaqueReais.length - 1 ? `1px solid ${C.line}` : "none" }}>
                           <td className="font-body text-sm font-semibold py-2 truncate max-w-[140px]" style={{ color: C.ink }}>{e.nome}</td>
-                          <td className="font-body text-xs py-2" style={{ color: "#7E93A7" }}>{e.categoria}</td>
+                          <td className="font-body text-xs py-2" style={{ color: "#5C7186" }}>{e.categoria}</td>
                           <td className="font-body text-xs font-bold py-2 text-right" style={{ color: C.blue }}>{e.visualizacoes ?? 0}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 ) : (
-                  <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma empresa aprovada ainda.</p>
+                  <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma empresa aprovada ainda.</p>
                 )}
               </div>
 
@@ -2647,8 +2656,8 @@ function AdminPanel() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${C.line}` }}>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#7E93A7" }}>Nome</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2 text-right" style={{ color: "#7E93A7" }}>Tipo</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#5C7186" }}>Nome</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2 text-right" style={{ color: "#5C7186" }}>Tipo</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2663,7 +2672,7 @@ function AdminPanel() {
                     </tbody>
                   </table>
                 ) : (
-                  <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum cadastro ainda.</p>
+                  <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum cadastro ainda.</p>
                 )}
               </div>
             </div>
@@ -2865,10 +2874,10 @@ function AdminPanel() {
               <table className="w-full text-left border-collapse min-w-[560px]">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Nome</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>E-mail</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Perfil</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Cadastro</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Nome</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>E-mail</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Perfil</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Cadastro</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2883,29 +2892,29 @@ function AdminPanel() {
                   {usuariosPaginaAtualAdmin.map((u) => (
                     <tr key={u.id} style={{ borderBottom: `1px solid ${C.line}` }}>
                       <td className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{u.nome || "—"}</td>
-                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#7E93A7" }}>{u.email || "—"}</td>
+                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.email || "—"}</td>
                       <td className="px-3 py-2.5">
                         <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
                       </td>
-                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#7E93A7" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {todosUsuariosAdmin && usuariosPaginaAtualAdmin.length === 0 && (
-                <p className="font-body text-sm p-4" style={{ color: "#7E93A7" }}>Nenhum usuário encontrado.</p>
+                <p className="font-body text-sm p-4" style={{ color: "#5C7186" }}>Nenhum usuário encontrado.</p>
               )}
             </div>
 
             {totalPaginasUsuariosAdmin > 1 && (
               <div className="flex items-center justify-center gap-3 mt-4">
                 <button onClick={() => setPaginaTodosUsuariosAdmin((p) => Math.max(1, p - 1))} disabled={paginaTodosUsuariosAdmin === 1}
-                  className="font-body text-xs font-bold px-3 py-2 rounded-lg border disabled:opacity-40" style={{ borderColor: C.line, color: "#425A70" }}>
+                  className="font-body text-xs font-bold px-3 py-2 rounded-lg border disabled:opacity-40" style={{ borderColor: C.line, color: "#425A70" }} aria-label="Página anterior">
                   <ChevronLeft size={13} />
                 </button>
-                <p className="font-body text-xs font-semibold" style={{ color: "#7E93A7" }}>Página {paginaTodosUsuariosAdmin} de {totalPaginasUsuariosAdmin}</p>
+                <p className="font-body text-xs font-semibold" style={{ color: "#5C7186" }}>Página {paginaTodosUsuariosAdmin} de {totalPaginasUsuariosAdmin}</p>
                 <button onClick={() => setPaginaTodosUsuariosAdmin((p) => Math.min(totalPaginasUsuariosAdmin, p + 1))} disabled={paginaTodosUsuariosAdmin === totalPaginasUsuariosAdmin}
-                  className="font-body text-xs font-bold px-3 py-2 rounded-lg border disabled:opacity-40" style={{ borderColor: C.line, color: "#425A70" }}>
+                  className="font-body text-xs font-bold px-3 py-2 rounded-lg border disabled:opacity-40" style={{ borderColor: C.line, color: "#425A70" }} aria-label="Próxima página">
                   <ChevronRight size={13} />
                 </button>
               </div>
@@ -2970,7 +2979,7 @@ function AdminPanel() {
                     ) : (
                       <div className="flex-1 min-w-0">
                         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.nome}</p>
-                        <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{c.ativa ? "Ativa" : "Desativada"} · ordem {c.ordem}</p>
+                        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{c.ativa ? "Ativa" : "Desativada"} · ordem {c.ordem}</p>
                       </div>
                     )}
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -2990,7 +2999,7 @@ function AdminPanel() {
                 );
               })}
               {categoriasAdmin && categoriasAdmin.length === 0 && (
-                <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma categoria cadastrada ainda — as categorias de exemplo estão sendo usadas nos formulários por enquanto.</p>
+                <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma categoria cadastrada ainda — as categorias de exemplo estão sendo usadas nos formulários por enquanto.</p>
               )}
             </div>
           </div>
@@ -3057,7 +3066,7 @@ function AdminPanel() {
                               <button onClick={() => removerFotoGaleriaEmpresa(i)} type="button" className="absolute top-0 right-0 w-5 h-5 bg-black/60 text-white flex items-center justify-center"><X size={11} /></button>
                             </div>
                           ))}
-                          <label className="w-14 h-14 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, color: "#7E93A7" }}>
+                          <label className="w-14 h-14 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, color: "#5C7186" }}>
                             {enviandoFotoGaleria ? "..." : <PlusCircle size={16} />}
                             <input type="file" accept="image/*" className="hidden" onChange={enviarFotoGaleriaEmpresa} />
                           </label>
@@ -3070,7 +3079,7 @@ function AdminPanel() {
                         {p.nome}
                         {p.destaque && <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: C.amber, color: C.blueDeep }}>DESTAQUE</span>}
                       </p>
-                      <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{p.categoria} · status: {p.status}</p>
+                      <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.categoria} · status: {p.status}</p>
                       {statusEmpresa[p.id] && statusEmpresa[p.id] !== "ok" && <p className="font-body text-[11px] mt-1" style={{ color: "#B4462F" }}>{statusEmpresa[p.id]}</p>}
                     </div>
                   )}
@@ -3089,8 +3098,8 @@ function AdminPanel() {
                   )}
                 </div>
               ))}
-              {listaEmpresas.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma empresa cadastrada ainda.</p>}
-              {listaEmpresas.length > 0 && listaEmpresasFiltradaAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma empresa encontrada.</p>}
+              {listaEmpresas.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma empresa cadastrada ainda.</p>}
+              {listaEmpresas.length > 0 && listaEmpresasFiltradaAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma empresa encontrada.</p>}
             </div>
             {listaEmpresasFiltradaAdmin.length > qtdEmpresasAdminVisiveis && (
               <button onClick={() => setQtdEmpresasAdminVisiveis((n) => n + 15)} className="font-body text-xs font-bold px-4 py-2.5 rounded-lg border mt-3" style={{ borderColor: C.line, color: "#425A70" }}>
@@ -3129,8 +3138,8 @@ function AdminPanel() {
                   ) : (
                     <div className="flex-1 min-w-0">
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
-                      <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{p.servico} · status: {p.status}</p>
-                      <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{p.whatsapp}{p.instagram ? ` · ${p.instagram}` : ""}{p.endereco ? ` · ${p.endereco}` : ""}</p>
+                      <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.servico} · status: {p.status}</p>
+                      <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{p.whatsapp}{p.instagram ? ` · ${p.instagram}` : ""}{p.endereco ? ` · ${p.endereco}` : ""}</p>
                       {statusPrestador[p.id] && <p className="font-body text-[11px] mt-1" style={{ color: "#B4462F" }}>{statusPrestador[p.id]}</p>}
                     </div>
                   )}
@@ -3149,7 +3158,7 @@ function AdminPanel() {
                   )}
                 </div>
               ))}
-              {listaPrestadores.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum prestador cadastrado ainda.</p>}
+              {listaPrestadores.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum prestador cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -3190,14 +3199,14 @@ function AdminPanel() {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
-                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{p.empresas?.nome || "—"}</p>
+                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.empresas?.nome || "—"}</p>
                   </div>
                   {p._denunciado ? (
                     <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: "#FBEAE5", color: "#B4462F" }}>Denunciado</span>
                   ) : p.ativo ? (
                     <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>Publicado</span>
                   ) : (
-                    <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: C.blueTint, color: "#7E93A7" }}>Inativo</span>
+                    <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: C.blueTint, color: "#5C7186" }}>Inativo</span>
                   )}
                   <button onClick={() => alternarAtivoProduto(p.id, !p.ativo)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
                     {p.ativo ? "Despublicar" : "Publicar"}
@@ -3205,7 +3214,7 @@ function AdminPanel() {
                   <button onClick={() => { if (confirmarExclusao()) { removerProduto(p.id); notificar("Produto removido."); } }} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
                 </div>
               ))}
-              {listaProdutosFiltradaAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>{listaProdutos.length === 0 ? "Nenhum produto publicado ainda." : "Nenhum produto encontrado."}</p>}
+              {listaProdutosFiltradaAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>{listaProdutos.length === 0 ? "Nenhum produto publicado ainda." : "Nenhum produto encontrado."}</p>}
             </div>
             {listaProdutosFiltradaAdmin.length > qtdProdutosAdminVisiveis && (
               <button onClick={() => setQtdProdutosAdminVisiveis((n) => n + 15)} className="font-body text-xs font-bold px-4 py-2.5 rounded-lg border mt-3" style={{ borderColor: C.line, color: "#425A70" }}>
@@ -3254,11 +3263,11 @@ function AdminPanel() {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome || p.produtos?.nome || "Promoção"}</p>
-                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>
+                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>
                       {p.produtos?.empresas?.nome || "—"} · -{p.desconto_percentual}% · até {p.valida_ate ? new Date(p.valida_ate + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
                     </p>
                   </div>
-                  <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: p.ativa ? "#E7F6EE" : C.blueTint, color: p.ativa ? "#1E8E5A" : "#7E93A7" }}>
+                  <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: p.ativa ? "#E7F6EE" : C.blueTint, color: p.ativa ? "#1E8E5A" : "#5C7186" }}>
                     {p.ativa ? "Ativa" : "Inativa"}
                   </span>
                   <button onClick={() => alternarAtivaPromocao(p.id, !p.ativa)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
@@ -3267,7 +3276,7 @@ function AdminPanel() {
                   <button onClick={() => { if (confirmarExclusao()) { removerPromocao(p.id); notificar("Promoção removida."); } }} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
                 </div>
               ))}
-              {promocoesAdmin && promocoesAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhuma promoção cadastrada ainda.</p>}
+              {promocoesAdmin && promocoesAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma promoção cadastrada ainda.</p>}
             </div>
           </div>
         )}
@@ -3322,12 +3331,12 @@ function AdminPanel() {
                     {f.imagem_url && <img loading="lazy" decoding="async" src={f.imagem_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{f.titulo}</p>
-                      <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{f.data_inicio} · {f.local}</p>
+                      <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{f.data_inicio} · {f.local}</p>
                     </div>
                     <button onClick={() => { if (confirmarExclusao()) { removerFeiraEspecial(f.id); notificar("Feira removida."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                   </div>
                 ))}
-                {listaFeirasEspeciais.length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhuma feira especial cadastrada.</p>}
+                {listaFeirasEspeciais.length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma feira especial cadastrada.</p>}
               </div>
             </div>
 
@@ -3377,13 +3386,13 @@ function AdminPanel() {
                     <div className="flex items-center gap-4 flex-wrap">
                       <div className="flex-1 min-w-0">
                         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.nome}{f.categoria ? ` · ${f.categoria}` : ""}</p>
-                        <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{f.produto} · {f.whatsapp}{f.instagram ? ` · ${f.instagram}` : ""}{empresaVinculada ? ` · Empresa: ${empresaVinculada.nome}` : ""}</p>
-                        {f.descricao && <p className="font-body text-xs mt-0.5" style={{ color: "#7E93A7" }}>{f.descricao}</p>}
+                        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{f.produto} · {f.whatsapp}{f.instagram ? ` · ${f.instagram}` : ""}{empresaVinculada ? ` · Empresa: ${empresaVinculada.nome}` : ""}</p>
+                        {f.descricao && <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{f.descricao}</p>}
                       </div>
                       <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
                         style={{
                           background: f.status === "aprovado" ? "#E7F6EE" : f.status === "recusado" ? "#FBEAE5" : C.blueTint,
-                          color: f.status === "aprovado" ? "#1E8E5A" : f.status === "recusado" ? "#B4462F" : "#7E93A7",
+                          color: f.status === "aprovado" ? "#1E8E5A" : f.status === "recusado" ? "#B4462F" : "#5C7186",
                         }}>
                         {f.status}
                       </span>
@@ -3404,7 +3413,7 @@ function AdminPanel() {
                   </div>
                   );
                 })}
-                {(feirantes ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum cadastro de feirante ainda.</p>}
+                {(feirantes ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum cadastro de feirante ainda.</p>}
               </div>
             </div>
           </div>
@@ -3474,7 +3483,7 @@ function AdminPanel() {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{ev.titulo}</p>
-                    <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>
+                    <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>
                       {ev.data_inicio}{ev.data_fim ? ` a ${ev.data_fim}` : ""}{ev.hora ? ` · ${ev.hora}` : ""}{ev.local ? ` · ${ev.local}` : ""} · {ev.tipo}
                     </p>
                   </div>
@@ -3491,7 +3500,7 @@ function AdminPanel() {
                   <button onClick={() => { if (confirmarExclusao()) { removerEvento(ev.id); notificar("Evento removido."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
-              {listaEventos.length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum evento cadastrado ainda.</p>}
+              {listaEventos.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum evento cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -3507,7 +3516,7 @@ function AdminPanel() {
             </select>
 
             {!eventoCredenciaisSelecionado ? (
-              <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Escolha um evento do calendário acima pra ver e cadastrar as credenciais dele.</p>
+              <p className="font-body text-sm" style={{ color: "#5C7186" }}>Escolha um evento do calendário acima pra ver e cadastrar as credenciais dele.</p>
             ) : (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
@@ -3525,7 +3534,7 @@ function AdminPanel() {
                           <Icon size={14} />
                         </span>
                         <p className="font-display font-extrabold text-lg mt-2" style={{ color: C.ink }}>{n}</p>
-                        <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{l}</p>
+                        <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{l}</p>
                       </div>
                     );
                   })}
@@ -3560,13 +3569,13 @@ function AdminPanel() {
                   <table className="w-full text-left border-collapse min-w-[640px]">
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Foto</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Nome</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Telefone</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Tipo</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Status</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Check-in</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#7E93A7" }}>Ações</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Foto</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Nome</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Telefone</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Tipo</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Status</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Check-in</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3599,8 +3608,8 @@ function AdminPanel() {
                           ) : (
                             <>
                               <td className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{c.nome}</td>
-                              <td className="font-body text-xs px-3 py-2.5" style={{ color: "#7E93A7" }}>{c.telefone || "—"}</td>
-                              <td className="font-body text-xs px-3 py-2.5" style={{ color: "#7E93A7" }}>{c.tipo}</td>
+                              <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{c.telefone || "—"}</td>
+                              <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{c.tipo}</td>
                             </>
                           )}
                           <td className="px-3 py-2.5">
@@ -3635,7 +3644,7 @@ function AdminPanel() {
                     </tbody>
                   </table>
                   {credenciaisAdmin && credenciaisFiltradasAdmin.length === 0 && (
-                    <p className="font-body text-sm p-4" style={{ color: "#7E93A7" }}>Nenhuma credencial encontrada.</p>
+                    <p className="font-body text-sm p-4" style={{ color: "#5C7186" }}>Nenhuma credencial encontrada.</p>
                   )}
                 </div>
               </>
@@ -3652,7 +3661,7 @@ function AdminPanel() {
                     <img loading="lazy" decoding="async"
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(String(credencialDigitalAberta.codigo))}`}
                       alt="QR Code" className="w-44 h-44" />
-                    <p className="font-body text-xs text-center" style={{ color: "#7E93A7" }}>
+                    <p className="font-body text-xs text-center" style={{ color: "#5C7186" }}>
                       Link pra enviar por WhatsApp:<br />
                       <span className="font-semibold break-all" style={{ color: C.blue }}>{`${window.location.origin}/#/credencial-${credencialDigitalAberta.codigo}`}</span>
                     </p>
@@ -3737,7 +3746,7 @@ function AdminPanel() {
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{eq.pergunta}</p>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
-                          style={{ background: eq.ativa ? "#E7F6EE" : C.blueTint, color: eq.ativa ? "#1E8E5A" : "#7E93A7" }}>
+                          style={{ background: eq.ativa ? "#E7F6EE" : C.blueTint, color: eq.ativa ? "#1E8E5A" : "#5C7186" }}>
                           {eq.ativa ? "Ativa" : "Encerrada"}
                         </span>
                         <button onClick={() => alternarAtivaEnquete(eq.id, !eq.ativa)} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
@@ -3762,7 +3771,7 @@ function AdminPanel() {
                         );
                       })}
                     </div>
-                    <p className="font-body text-[11px] mt-2" style={{ color: "#7E93A7" }}>{total} votos no total</p>
+                    <p className="font-body text-[11px] mt-2" style={{ color: "#5C7186" }}>{total} votos no total</p>
                   </div>
                 );
               })}
@@ -3808,18 +3817,18 @@ function AdminPanel() {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{d.nome}</p>
-                    <p className="font-body text-xs truncate" style={{ color: "#7E93A7" }}>{d.cargo}{d.empresa ? ` · ${d.empresa}` : ""} · {"★".repeat(d.avaliacao || 0)}</p>
+                    <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{d.cargo}{d.empresa ? ` · ${d.empresa}` : ""} · {"★".repeat(d.avaliacao || 0)}</p>
                   </div>
                   <select value={d.status} onChange={(e) => mudarStatusDepoimento(d.id, e.target.value)}
                     className="font-body text-[11px] font-bold border rounded-lg px-2 py-1.5 outline-none shrink-0"
-                    style={{ borderColor: C.line, color: d.status === "aprovado" ? "#1E8E5A" : "#7E93A7" }}>
+                    style={{ borderColor: C.line, color: d.status === "aprovado" ? "#1E8E5A" : "#5C7186" }}>
                     <option value="aprovado">Aprovado</option>
                     <option value="pendente">Pendente</option>
                   </select>
                   <button onClick={() => { if (confirmarExclusao()) { removerDepoimento(d.id); notificar("Depoimento excluído."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
-              {(depoimentosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhum depoimento cadastrado ainda.</p>}
+              {(depoimentosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum depoimento cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -3854,13 +3863,13 @@ function AdminPanel() {
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.pergunta}</p>
-                        <p className="font-body text-xs mt-1" style={{ color: "#7E93A7" }}>{f.resposta}</p>
+                        <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{f.resposta}</p>
                         <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 inline-block" style={{ background: C.blueTint, color: C.blue }}>{f.categoria || "Geral"}</span>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button onClick={() => moverFaq(i, -1)} disabled={i === 0} className="w-8 h-8 rounded-lg border flex items-center justify-center disabled:opacity-30" style={{ borderColor: C.line, color: "#425A70" }}><ArrowUp size={14} /></button>
                         <button onClick={() => moverFaq(i, 1)} disabled={i === (faqAdmin ?? []).length - 1} className="w-8 h-8 rounded-lg border flex items-center justify-center disabled:opacity-30" style={{ borderColor: C.line, color: "#425A70" }}><ArrowDown size={14} /></button>
-                        <button onClick={() => alternarAtivaFaq(f.id, !f.ativa)} className="font-body text-[10px] font-bold px-2 py-2 rounded-lg border" style={{ borderColor: C.line, color: f.ativa ? "#1E8E5A" : "#7E93A7" }}>{f.ativa ? "Ativa" : "Oculta"}</button>
+                        <button onClick={() => alternarAtivaFaq(f.id, !f.ativa)} className="font-body text-[10px] font-bold px-2 py-2 rounded-lg border" style={{ borderColor: C.line, color: f.ativa ? "#1E8E5A" : "#5C7186" }}>{f.ativa ? "Ativa" : "Oculta"}</button>
                         <button onClick={() => iniciarEdicaoFaq(f)} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#425A70" }}><Pencil size={14} /></button>
                         <button onClick={() => { if (confirmarExclusao()) { removerFaq(f.id); notificar("Pergunta excluída."); } }} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#B4462F" }}><Trash2 size={14} /></button>
                       </div>
@@ -3868,7 +3877,7 @@ function AdminPanel() {
                   )}
                 </div>
               ))}
-              {(faqAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhuma pergunta cadastrada ainda.</p>}
+              {(faqAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma pergunta cadastrada ainda.</p>}
             </div>
           </div>
         )}
@@ -3938,12 +3947,12 @@ function AdminPanel() {
                   {n.imagem_url && <img loading="lazy" decoding="async" src={n.imagem_url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{n.titulo}{n.destaque ? " ⭐" : ""}</p>
-                    <p className="font-body text-xs truncate" style={{ color: "#7E93A7" }}>{n.resumo || n.conteudo}{n.categoria ? ` · ${n.categoria}` : ""}</p>
+                    <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{n.resumo || n.conteudo}{n.categoria ? ` · ${n.categoria}` : ""}</p>
                   </div>
                   <button onClick={() => { if (confirmarExclusao()) { removerNoticia(n.id); notificar("Notícia excluída."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
-              {(noticiasAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhuma notícia publicada ainda.</p>}
+              {(noticiasAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma notícia publicada ainda.</p>}
             </div>
           </div>
         )}
@@ -3986,12 +3995,12 @@ function AdminPanel() {
                   {c.banner_url && <img loading="lazy" decoding="async" src={c.banner_url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{c.titulo}</p>
-                    <p className="font-body text-xs truncate" style={{ color: "#7E93A7" }}>{c.instituicao}{c.data_inicio ? ` · ${c.data_inicio}` : ""}{c.certificado ? " · Com certificado" : ""}</p>
+                    <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{c.instituicao}{c.data_inicio ? ` · ${c.data_inicio}` : ""}{c.certificado ? " · Com certificado" : ""}</p>
                   </div>
                   <button onClick={() => { if (confirmarExclusao()) { removerCurso(c.id); notificar("Curso excluído."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
-              {(cursosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#7E93A7" }}>Nenhum curso cadastrado ainda.</p>}
+              {(cursosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum curso cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -4031,7 +4040,7 @@ function AdminPanel() {
                 <div key={v.id} className="rounded-2xl border p-4 flex items-center gap-4" style={{ borderColor: C.line }}>
                   <div className="flex-1">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
-                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>
+                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>
                       {v.empresas?.nome} · {v.salario}{v.tipo ? ` · ${v.tipo}` : ""}{v.prazo ? ` · até ${v.prazo}` : ""}
                     </p>
                   </div>
@@ -4156,7 +4165,7 @@ function AdminPanel() {
                   {n.imagem_url && <img loading="lazy" decoding="async" src={n.imagem_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{n.titulo}</p>
-                    <p className="font-body text-[11px] truncate" style={{ color: "#7E93A7" }}>{n.mensagem}</p>
+                    <p className="font-body text-[11px] truncate" style={{ color: "#5C7186" }}>{n.mensagem}</p>
                   </div>
                 </div>
               ))}
@@ -4370,7 +4379,7 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
             </span>
             <p className="font-display font-bold text-base" style={{ color: C.ink }}>Novo produto</p>
           </div>
-          <button onClick={onFechar} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: C.blueTint2 }}>
+          <button onClick={onFechar} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: C.blueTint2 }} aria-label="Fechar">
             <X size={16} color="#425A70" />
           </button>
         </div>
@@ -4390,7 +4399,7 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
                 <CheckCircle2 size={26} color={C.blue} />
               </span>
               <p className="font-display font-bold text-lg" style={{ color: C.ink }}>Produto salvo!</p>
-              <p className="font-body text-sm mt-1" style={{ color: "#7E93A7" }}>Ele já aparece na sua lista de produtos.</p>
+              <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>Ele já aparece na sua lista de produtos.</p>
               <button onClick={onFechar} className="glow-btn font-body text-sm font-bold text-white rounded-xl py-2.5 px-5 mt-5" style={{ background: C.blue }}>Fechar</button>
             </div>
           ) : (
@@ -4462,7 +4471,7 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
                 ) : (
                   <label className="flex items-center gap-2 justify-center rounded-lg border-2 border-dashed py-5 cursor-pointer" style={{ borderColor: C.line }}>
                     <Upload size={16} color="#B7C6D6" />
-                    <span className="font-body text-xs" style={{ color: "#7E93A7" }}>Enviar foto real do produto</span>
+                    <span className="font-body text-xs" style={{ color: "#5C7186" }}>Enviar foto real do produto</span>
                     <input type="file" accept="image/*" className="hidden" onChange={escolherFoto} />
                   </label>
                 )}
@@ -4704,7 +4713,7 @@ function EmpresarioPanel() {
   return (
     <div className="grid md:grid-cols-[220px_1fr] gap-6">
       <aside className="rounded-2xl border p-3 h-fit" style={{ borderColor: C.line }}>
-        <p className="font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2 truncate" style={{ color: "#7E93A7" }}>{perfilForm.nome || "Minha empresa"}</p>
+        <p className="font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2 truncate" style={{ color: "#5C7186" }}>{perfilForm.nome || "Minha empresa"}</p>
         {items.map((it) => {
           const Icon = it.icon;
           const active = tab === it.id;
@@ -4780,7 +4789,7 @@ function EmpresarioPanel() {
                     )}
                     <div className="flex-1">
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
-                      <p className="font-body text-xs" style={{ color: "#7E93A7" }}>
+                      <p className="font-body text-xs" style={{ color: "#5C7186" }}>
                         {p.preco_exibicao ?? (p.preco != null ? `R$ ${Number(p.preco).toFixed(2)}` : "Sem preço")}
                         {p.preco_promocional != null ? ` · Promo: R$ ${Number(p.preco_promocional).toFixed(2)}` : ""}
                         {p.estoque != null ? ` · Estoque: ${p.estoque}` : ""} · {p.ativo ? "Ativo" : "Inativo"}
@@ -4804,7 +4813,7 @@ function EmpresarioPanel() {
                 );
               })}
               {(meusProdutosReais ?? []).length === 0 && meusProdutosReais !== null && (
-                <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Você ainda não cadastrou nenhum produto.</p>
+                <p className="font-body text-sm" style={{ color: "#5C7186" }}>Você ainda não cadastrou nenhum produto.</p>
               )}
             </div>
           </div>
@@ -4829,7 +4838,7 @@ function EmpresarioPanel() {
               {statusPromocaoEmpresario === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Promoção publicada!</p>}
               {statusPromocaoEmpresario && statusPromocaoEmpresario !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusPromocaoEmpresario}</p>}
               {(meusProdutosReais ?? []).length === 0 && (
-                <p className="sm:col-span-2 font-body text-xs" style={{ color: "#7E93A7" }}>Cadastre um produto primeiro na aba "Produtos" pra poder criar uma promoção.</p>
+                <p className="sm:col-span-2 font-body text-xs" style={{ color: "#5C7186" }}>Cadastre um produto primeiro na aba "Produtos" pra poder criar uma promoção.</p>
               )}
             </form>
           </div>
@@ -4862,14 +4871,14 @@ function EmpresarioPanel() {
                 <div key={v.id} className="rounded-2xl border p-4 flex items-center gap-4" style={{ borderColor: C.line }}>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
-                    <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{v.salario} · {v.tipo}{v.status === "encerrada" ? " · Encerrada" : ""}</p>
+                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>{v.salario} · {v.tipo}{v.status === "encerrada" ? " · Encerrada" : ""}</p>
                   </div>
                   {v.status !== "encerrada" && (
                     <button onClick={() => encerrarVagaEmpresario(v.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Encerrar</button>
                   )}
                 </div>
               ))}
-              {(minhasVagasReais ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Você ainda não publicou nenhuma vaga.</p>}
+              {(minhasVagasReais ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Você ainda não publicou nenhuma vaga.</p>}
             </div>
           </div>
         )}
@@ -4879,7 +4888,7 @@ function EmpresarioPanel() {
             <SectionHeader eyebrow="Desempenho" title="Visualizações do meu perfil" sub="Contagem real de acessos à ficha da sua empresa" />
             <div className="rounded-2xl border p-5 max-w-xs" style={{ borderColor: C.line }}>
               <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{visualizacoesEmpresa ?? "—"}</p>
-              <p className="font-body text-xs mt-1" style={{ color: "#7E93A7" }}>Total de visualizações desde o cadastro</p>
+              <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Total de visualizações desde o cadastro</p>
             </div>
           </div>
         )}
@@ -4963,7 +4972,7 @@ function ModalCadastroFeirante({ onFechar }) {
             </span>
             <p className="font-display font-bold text-base" style={{ color: C.ink }}>Cadastro de feirante</p>
           </div>
-          <button onClick={onFechar} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: C.blueTint2 }}>
+          <button onClick={onFechar} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: C.blueTint2 }} aria-label="Fechar">
             <X size={16} color="#425A70" />
           </button>
         </div>
@@ -4985,7 +4994,7 @@ function ModalCadastroFeirante({ onFechar }) {
                 <CheckCircle2 size={26} color={C.blue} />
               </span>
               <p className="font-display font-bold text-lg" style={{ color: C.ink }}>Cadastro enviado!</p>
-              <p className="font-body text-sm mt-1" style={{ color: "#7E93A7" }}>
+              <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>
                 A organização da feira vai analisar e entrar em contato pelo WhatsApp.
               </p>
               <button onClick={onFechar} className="glow-btn font-body text-sm font-bold text-white rounded-xl py-2.5 px-5 mt-5" style={{ background: C.blue }}>
@@ -5323,7 +5332,7 @@ function CalendarioEventos() {
     .slice(0, 5);
 
   const rotuloTipo = { feira: "Feira", curso: "Curso", institucional: "Institucional", outro: "Evento" };
-  const corTipo = { feira: C.amberDark, curso: C.blue, institucional: C.blueDeep, outro: "#7E93A7" };
+  const corTipo = { feira: C.amberDark, curso: C.blue, institucional: C.blueDeep, outro: "#5C7186" };
   const formatarData = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
 
   return (
@@ -5370,7 +5379,7 @@ function CalendarioEventos() {
       </div>
 
       <div className="mt-4 pt-4 border-t" style={{ borderColor: C.line }}>
-        <p className="font-body text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#7E93A7" }}>
+        <p className="font-body text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#5C7186" }}>
           {eventosDoDia ? `Eventos do dia ${diaSelecionado}` : "Próximos eventos"}
         </p>
         <div className="flex flex-col gap-2.5">
@@ -5382,7 +5391,7 @@ function CalendarioEventos() {
               {ev.banner_url ? (
                 <img loading="lazy" decoding="async" src={ev.banner_url} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
               ) : (
-                <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: corTipo[ev.tipo] || "#7E93A7" }} />
+                <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: corTipo[ev.tipo] || "#5C7186" }} />
               )}
               <div className="min-w-0 flex-1">
                 <p className="font-body text-xs font-semibold truncate flex items-center gap-1.5" style={{ color: C.ink }}>
@@ -5390,7 +5399,7 @@ function CalendarioEventos() {
                   {ev.status === "cancelado" && <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FBEAE5", color: "#B4462F" }}>Cancelado</span>}
                   {ev.status === "adiado" && <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FFF6E9", color: "#8A5A12" }}>Adiado</span>}
                 </p>
-                <p className="font-body text-[10px]" style={{ color: "#7E93A7" }}>
+                <p className="font-body text-[10px]" style={{ color: "#5C7186" }}>
                   {formatarData(ev.data_inicio)}{ev.hora ? ` · ${ev.hora}` : ""}{ev.local ? ` · ${ev.local}` : ""} · {rotuloTipo[ev.tipo] || "Evento"}
                 </p>
                 {(ev.link_inscricao || ev.google_maps_url) && (
@@ -5784,7 +5793,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
             </button>
           </div>
 
-          <button className="md:hidden ml-auto" onClick={() => setMenuOpen((v) => !v)}>
+          <button className="md:hidden ml-auto" onClick={() => setMenuOpen((v) => !v)} aria-label={menuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={menuOpen}>
             {menuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
@@ -5827,11 +5836,12 @@ function SiteHome({ onAuth, logoUrl, frase }) {
             </p>
 
             <div className="mt-7 bg-white rounded-2xl p-2 flex items-center gap-2 shadow-2xl max-w-lg glow-card" style={{ borderColor: "transparent" }}>
-              <Search size={18} className="ml-2 shrink-0" color="#7E93A7" />
+              <Search size={18} className="ml-2 shrink-0" color="#5C7186" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar empresas, produtos ou serviços..."
+                aria-label="Buscar empresas, produtos ou serviços"
                 className="font-body flex-1 min-w-0 text-sm outline-none py-2"
               />
               <button type="button" onClick={() => empresasSecaoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
@@ -5926,7 +5936,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
                   </span>
                   <div>
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{etapa.titulo}</p>
-                    <p className="font-body text-xs mt-1" style={{ color: "#7E93A7" }}>{etapa.desc}</p>
+                    <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{etapa.desc}</p>
                   </div>
                 </div>
               </Reveal>
@@ -5987,7 +5997,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
                     </div>
                     <div>
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{s.titulo}</p>
-                      <p className="font-body text-xs mt-1 leading-snug" style={{ color: "#7E93A7" }}>{s.descricao}</p>
+                      <p className="font-body text-xs mt-1 leading-snug" style={{ color: "#5C7186" }}>{s.descricao}</p>
                     </div>
                   </a>
                 </Reveal>
@@ -6045,7 +6055,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
                     </span>
                     <div className="min-w-0">
                       <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{f.titulo}</p>
-                      <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>{f.data_inicio} · {f.local}</p>
+                      <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{f.data_inicio} · {f.local}</p>
                     </div>
                   </div>
                 ))}
@@ -6070,12 +6080,12 @@ function SiteHome({ onAuth, logoUrl, frase }) {
                     </div>
                     <div className="p-3.5 flex-1 flex flex-col">
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.nome}</p>
-                      <p className="font-body text-xs mt-0.5" style={{ color: "#7E93A7" }}>{f.produto}</p>
+                      <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{f.produto}</p>
                       {f.categoria && (
                         <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 w-fit" style={{ background: C.blueTint, color: C.blue }}>{f.categoria}</span>
                       )}
                       {(f.local || f.numero_estande) && (
-                        <p className="font-body text-[11px] mt-1.5 flex items-center gap-1" style={{ color: "#7E93A7" }}>
+                        <p className="font-body text-[11px] mt-1.5 flex items-center gap-1" style={{ color: "#5C7186" }}>
                           <MapPin size={11} /> {[f.local, f.numero_estande ? `Barraca ${f.numero_estande}` : null].filter(Boolean).join(" · ")}
                         </p>
                       )}
@@ -6123,7 +6133,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
               </Reveal>
             ))}
             {empresasFiltradas.length === 0 && (
-              <p className="font-body text-sm col-span-full" style={{ color: "#7E93A7" }}>
+              <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>
                 {query.trim() ? `Nenhuma empresa encontrada para "${query}".` : "Nenhuma empresa cadastrada ainda. Assim que a primeira for aprovada, aparece aqui."}
               </p>
             )}
@@ -6160,10 +6170,10 @@ function SiteHome({ onAuth, logoUrl, frase }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {produtosFiltrados.slice(0, qtdProdutosVisiveis).map((p, i) => <Reveal key={`${p.nome}-${i}`} delay={i * 70}><ProdutoCard p={p} /></Reveal>)}
           {(produtosReais ?? []).length === 0 && (
-            <p className="font-body text-sm col-span-full" style={{ color: "#7E93A7" }}>Nenhum produto cadastrado ainda. Assim que um empresário publicar, aparece aqui.</p>
+            <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhum produto cadastrado ainda. Assim que um empresário publicar, aparece aqui.</p>
           )}
           {(produtosReais ?? []).length > 0 && produtosFiltrados.length === 0 && (
-            <p className="font-body text-sm col-span-full" style={{ color: "#7E93A7" }}>Nenhum produto encontrado para "{queryProdutos}".</p>
+            <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhum produto encontrado para "{queryProdutos}".</p>
           )}
         </div>
         {produtosFiltrados.length > qtdProdutosVisiveis && (
@@ -6200,10 +6210,10 @@ function SiteHome({ onAuth, logoUrl, frase }) {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {vagasFiltradas.slice(0, qtdVagasVisiveis).map((v, i) => <Reveal key={`${v.cargo}-${i}`} delay={i * 70}><VagaCard v={v} /></Reveal>)}
             {(vagasReais ?? []).length === 0 && (
-              <p className="font-body text-sm col-span-full" style={{ color: "#7E93A7" }}>Nenhuma vaga publicada ainda.</p>
+              <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhuma vaga publicada ainda.</p>
             )}
             {(vagasReais ?? []).length > 0 && vagasFiltradas.length === 0 && (
-              <p className="font-body text-sm col-span-full" style={{ color: "#7E93A7" }}>Nenhuma vaga encontrada com esse filtro.</p>
+              <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhuma vaga encontrada com esse filtro.</p>
             )}
           </div>
           {vagasFiltradas.length > qtdVagasVisiveis && (
@@ -6246,7 +6256,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
                       {n.titulo}
                       {n.destaque && <Sparkles size={12} color={C.amberDark} />}
                     </p>
-                    <p className="font-body text-xs flex items-center gap-1 mt-0.5" style={{ color: "#7E93A7" }}><Clock size={10} /> {dataExibida}{n.categoria ? ` · ${n.categoria}` : ""}</p>
+                    <p className="font-body text-xs flex items-center gap-1 mt-0.5" style={{ color: "#5C7186" }}><Clock size={10} /> {dataExibida}{n.categoria ? ` · ${n.categoria}` : ""}</p>
                   </div>
                   <ChevronRight size={16} color="#B7C6D6" />
                 </button>
@@ -6263,11 +6273,11 @@ function SiteHome({ onAuth, logoUrl, frase }) {
             <div className="p-5">
               <div className="flex items-start justify-between gap-3 mb-2">
                 <p className="font-display font-bold text-lg" style={{ color: C.ink }}>{noticiaAberta.titulo}</p>
-                <button onClick={() => setNoticiaAberta(null)} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: C.blueTint2 }}>
+                <button onClick={() => setNoticiaAberta(null)} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: C.blueTint2 }} aria-label="Fechar">
                   <X size={16} color="#425A70" />
                 </button>
               </div>
-              <p className="font-body text-xs mb-3" style={{ color: "#7E93A7" }}>
+              <p className="font-body text-xs mb-3" style={{ color: "#5C7186" }}>
                 {noticiaAberta.publicada_em ? new Date(noticiaAberta.publicada_em).toLocaleDateString("pt-BR") : ""}
                 {noticiaAberta.autor ? ` · ${noticiaAberta.autor}` : ""}{noticiaAberta.categoria ? ` · ${noticiaAberta.categoria}` : ""}
               </p>
@@ -6344,7 +6354,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
                     )}
                     <div>
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{nomeExibido}</p>
-                      <p className="font-body text-xs" style={{ color: "#7E93A7" }}>{papelExibido}</p>
+                      <p className="font-body text-xs" style={{ color: "#5C7186" }}>{papelExibido}</p>
                     </div>
                   </div>
                 </div>
@@ -6370,7 +6380,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
           {categoriasFaq.map((cat) => (
             <div key={cat}>
               {categoriasFaq.length > 1 && (
-                <p className="font-display font-bold text-xs uppercase tracking-wide mb-2" style={{ color: "#7E93A7" }}>{cat}</p>
+                <p className="font-display font-bold text-xs uppercase tracking-wide mb-2" style={{ color: "#5C7186" }}>{cat}</p>
               )}
               <div className="flex flex-col gap-3">
                 {faqPorCategoria[cat].map((item, i) => {
@@ -6384,7 +6394,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
                           <ChevronRight size={18} color={C.blue} style={{ transform: aberta ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .3s ease", flexShrink: 0 }} />
                         </button>
                         <div style={{ maxHeight: aberta ? 300 : 0, overflow: "hidden", transition: "max-height .35s ease" }}>
-                          <p className="font-body text-sm px-5 pb-4" style={{ color: "#7E93A7" }}>{item.resposta}</p>
+                          <p className="font-body text-sm px-5 pb-4" style={{ color: "#5C7186" }}>{item.resposta}</p>
                         </div>
                       </div>
                     </Reveal>
@@ -6703,7 +6713,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               <p className="font-display font-bold text-lg" style={{ color: C.ink }}>
                 {tela === "entrar" ? "Login realizado!" : "Conta criada com sucesso!"}
               </p>
-              <p className="font-body text-sm mt-1" style={{ color: "#7E93A7" }}>
+              <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>
                 {tela === "cadastro-empresario"
                   ? "Sua empresa entrará em análise para aprovação."
                   : "Você já pode explorar a plataforma."}
@@ -6718,7 +6728,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 </span>
                 <div>
                   <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Sou Cliente</p>
-                  <p className="font-body text-xs mt-1" style={{ color: "#7E93A7" }}>
+                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
                     Quero explorar empresas, favoritar produtos, me candidatar a vagas e acompanhar promoções.
                   </p>
                 </div>
@@ -6731,7 +6741,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 </span>
                 <div>
                   <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Tenho uma Empresa</p>
-                  <p className="font-body text-xs mt-1" style={{ color: "#7E93A7" }}>
+                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
                     Quero cadastrar meu negócio, publicar produtos, promoções e vagas de emprego.
                   </p>
                 </div>
@@ -6744,7 +6754,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 </span>
                 <div>
                   <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Sou Prestador de Serviço</p>
-                  <p className="font-body text-xs mt-1" style={{ color: "#7E93A7" }}>
+                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
                     Quero divulgar meu serviço (autônomo ou informal) no site oficial, com contato e endereço.
                   </p>
                 </div>
@@ -6778,7 +6788,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               </div>
               <label className="flex items-start gap-2 mt-1">
                 <input required type="checkbox" className="mt-0.5" />
-                <span className="font-body text-xs" style={{ color: "#7E93A7" }}>
+                <span className="font-body text-xs" style={{ color: "#5C7186" }}>
                   Li e aceito os termos de uso da plataforma e a política de privacidade.
                 </span>
               </label>
@@ -6843,7 +6853,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               </div>
               <label className="flex items-start gap-2 mt-1">
                 <input required type="checkbox" className="mt-0.5" />
-                <span className="font-body text-xs" style={{ color: "#7E93A7" }}>
+                <span className="font-body text-xs" style={{ color: "#5C7186" }}>
                   Li e aceito os termos de uso da plataforma e a política de privacidade.
                 </span>
               </label>
@@ -6904,7 +6914,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               </div>
               <label className="flex items-start gap-2 mt-1">
                 <input required type="checkbox" className="mt-0.5" />
-                <span className="font-body text-xs" style={{ color: "#7E93A7" }}>
+                <span className="font-body text-xs" style={{ color: "#5C7186" }}>
                   Li e aceito os termos de uso da plataforma e a política de privacidade.
                 </span>
               </label>
@@ -6929,7 +6939,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               <button type="submit" disabled={carregando} className="glow-btn font-body font-bold text-sm text-white rounded-xl py-3 mt-1 disabled:opacity-60" style={{ background: C.blue }}>
                 {carregando ? "Entrando..." : "Entrar"}
               </button>
-              <p className="font-body text-xs text-center mt-1" style={{ color: "#7E93A7" }}>
+              <p className="font-body text-xs text-center mt-1" style={{ color: "#5C7186" }}>
                 Não tem uma conta?{" "}
                 <button type="button" onClick={() => irPara("escolha")} className="font-bold" style={{ color: C.blue }}>Cadastre-se aqui</button>
               </p>
@@ -6994,7 +7004,8 @@ function ChatWidget() {
         onClick={() => setAberto((v) => !v)}
         className="glow-btn fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl"
         style={{ background: aberto ? C.blueDeep : C.blue }}
-        aria-label="Abrir assistente virtual"
+        aria-label={aberto ? "Fechar assistente virtual" : "Abrir assistente virtual"}
+        aria-expanded={aberto}
       >
         {aberto ? <X size={22} color="#fff" /> : <Sparkles size={22} color="#fff" />}
       </button>
@@ -7020,7 +7031,7 @@ function ChatWidget() {
               </div>
             ))}
             {carregando && (
-              <div className="self-start font-body text-xs px-3.5 py-2.5 rounded-2xl" style={{ background: C.blueTint, color: "#7E93A7" }}>
+              <div className="self-start font-body text-xs px-3.5 py-2.5 rounded-2xl" style={{ background: C.blueTint, color: "#5C7186" }}>
                 digitando...
               </div>
             )}
@@ -7063,7 +7074,7 @@ function LoadingBrand({ texto = "Carregando..." }) {
         <span className="absolute inset-0 rounded-full border-4 animate-spin" style={{ borderColor: C.blueTint, borderTopColor: C.blue }} />
         <LogoMark size={34} />
       </span>
-      <p className="font-body text-sm font-semibold" style={{ color: "#7E93A7" }}>{texto}</p>
+      <p className="font-body text-sm font-semibold" style={{ color: "#5C7186" }}>{texto}</p>
     </div>
   );
 }
@@ -7080,7 +7091,7 @@ function AcessoRestrito({ tipo, onEntrar }) {
         <ShieldCheck size={24} color="#B4462F" />
       </span>
       <p className="font-display font-bold text-lg" style={{ color: C.ink }}>Você não tem acesso a esse painel</p>
-      <p className="font-body text-sm mt-2" style={{ color: "#7E93A7" }}>
+      <p className="font-body text-sm mt-2" style={{ color: "#5C7186" }}>
         {tipo === "admin"
           ? "Essa área é exclusiva para administradores da plataforma."
           : "Essa área é exclusiva para empresários com uma empresa cadastrada."}
@@ -7135,7 +7146,7 @@ function CredencialDigital({ codigo }) {
   if (!credencial) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: C.blueTint2 }}>
-        <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Credencial não encontrada.</p>
+        <p className="font-body text-sm" style={{ color: "#5C7186" }}>Credencial não encontrada.</p>
       </div>
     );
   }
@@ -7158,7 +7169,7 @@ function CredencialDigital({ codigo }) {
           )}
           <div className="text-center">
             <p className="font-display font-bold text-lg" style={{ color: C.ink }}>{credencial.nome}</p>
-            <p className="font-body text-xs mt-0.5" style={{ color: "#7E93A7" }}>{credencial.tipo}</p>
+            <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{credencial.tipo}</p>
           </div>
           <img loading="lazy" decoding="async"
             src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(String(credencial.codigo))}`}
@@ -7168,7 +7179,7 @@ function CredencialDigital({ codigo }) {
             {credencial.status === "ativa" ? "Credencial ativa" : "Credencial inativa"}
           </span>
           {credencial.checkin_feito && (
-            <p className="font-body text-[11px]" style={{ color: "#7E93A7" }}>
+            <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>
               Check-in feito{credencial.checkin_em ? ` em ${new Date(credencial.checkin_em).toLocaleString("pt-BR")}` : ""}
             </p>
           )}
