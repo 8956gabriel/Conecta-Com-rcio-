@@ -1049,14 +1049,14 @@ function AdminPanel() {
   const [empresasPend, setEmpresasPend] = useState(null); // null = carregando/indisponível
   const [statusEmpresa, setStatusEmpresa] = useState({});
   const [editandoEmpresa, setEditandoEmpresa] = useState(null);
-  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, fotos_urls: [] });
+  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "" });
   const [enviandoLogoEmpresa, setEnviandoLogoEmpresa] = useState(false);
   const [enviandoBannerEmpresa, setEnviandoBannerEmpresa] = useState(false);
   const [enviandoFotoGaleria, setEnviandoFotoGaleria] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em").order("criado_em", { ascending: false })
+    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em, email, whatsapp, instagram, cpf, cnpj").order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setEmpresasPend(data || []); });
   }, []);
 
@@ -1086,6 +1086,8 @@ function AdminPanel() {
       nome: e.nome, categoria: e.categoria, logo_url: e.logo_url || "",
       banner_url: e.banner_url || "", facebook: e.facebook || "", site: e.site || "",
       destaque: !!e.destaque, fotos_urls: e.fotos_urls || [],
+      email: e.email || "", whatsapp: e.whatsapp || "", instagram: e.instagram || "",
+      cpf: e.cpf || "", cnpj: e.cnpj || "",
     });
   };
 
@@ -1148,6 +1150,8 @@ function AdminPanel() {
       nome: formEmpresa.nome, categoria: formEmpresa.categoria, logo_url: formEmpresa.logo_url,
       banner_url: formEmpresa.banner_url, facebook: formEmpresa.facebook, site: formEmpresa.site,
       destaque: formEmpresa.destaque, fotos_urls: formEmpresa.fotos_urls,
+      email: formEmpresa.email || null, whatsapp: formEmpresa.whatsapp || null, instagram: formEmpresa.instagram || null,
+      cpf: formEmpresa.cpf || null, cnpj: formEmpresa.cnpj || null,
     }).eq("id", id);
     if (!error) setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, ...formEmpresa } : e)));
     setEditandoEmpresa(null);
@@ -1555,7 +1559,7 @@ function AdminPanel() {
   // serviço, porque criar conta de outra pessoa exige privilégio de admin
   // que não pode ficar no navegador.
   // -------------------------------------------------------------------------
-  const [novoUsuarioAdmin, setNovoUsuarioAdmin] = useState({ nome: "", email: "", senha: "", tipo: "cliente", empresaNome: "", empresaCategoria: "", empresaWhatsapp: "", empresaInstagram: "", empresaEndereco: "", empresaGoogleMaps: "", prestadorServico: "", prestadorWhatsapp: "", prestadorInstagram: "", prestadorEndereco: "", prestadorGoogleMaps: "" });
+  const [novoUsuarioAdmin, setNovoUsuarioAdmin] = useState({ nome: "", email: "", senha: "", tipo: "cliente", cpf: "", cnpj: "", empresaNome: "", empresaCategoria: "", empresaWhatsapp: "", empresaInstagram: "", empresaEndereco: "", empresaGoogleMaps: "", prestadorServico: "", prestadorWhatsapp: "", prestadorInstagram: "", prestadorEndereco: "", prestadorGoogleMaps: "" });
   const [criandoUsuarioAdmin, setCriandoUsuarioAdmin] = useState(false);
   const [statusUsuarioAdmin, setStatusUsuarioAdmin] = useState("");
 
@@ -1918,7 +1922,7 @@ function AdminPanel() {
   // -------------------------------------------------------------------------
   // Feirantes — admin cadastra direto (com foto), já aprovado, aparece no site.
   // -------------------------------------------------------------------------
-  const feiranteVazio = { nome: "", produto: "", whatsapp: "", instagram: "", categoria: "", descricao: "", local: "", numero_estande: "", empresa_id: "" };
+  const feiranteVazio = { nome: "", produto: "", whatsapp: "", instagram: "", categoria: "", descricao: "", local: "", numero_estande: "", empresa_id: "", email: "", cpf: "", cnpj: "" };
   const [novoFeiranteAdmin, setNovoFeiranteAdmin] = useState(feiranteVazio);
   const [fotoFeiranteAdmin, setFotoFeiranteAdmin] = useState(null);
   const [enviandoFeiranteAdmin, setEnviandoFeiranteAdmin] = useState(false);
@@ -2172,7 +2176,7 @@ function AdminPanel() {
   const [prestadoresAdmin, setPrestadoresAdmin] = useState(null);
   const [statusPrestador, setStatusPrestador] = useState({});
   const [editandoPrestador, setEditandoPrestador] = useState(null);
-  const [formPrestador, setFormPrestador] = useState({ nome: "", servico: "", endereco: "", whatsapp: "", instagram: "" });
+  const [formPrestador, setFormPrestador] = useState({ nome: "", servico: "", endereco: "", whatsapp: "", instagram: "", email: "", cpf: "", cnpj: "" });
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
@@ -2195,7 +2199,7 @@ function AdminPanel() {
 
   const iniciarEdicaoPrestador = (p) => {
     setEditandoPrestador(p.id);
-    setFormPrestador({ nome: p.nome, servico: p.servico, endereco: p.endereco || "", whatsapp: p.whatsapp || "", instagram: p.instagram || "" });
+    setFormPrestador({ nome: p.nome, servico: p.servico, endereco: p.endereco || "", whatsapp: p.whatsapp || "", instagram: p.instagram || "", email: p.email || "", cpf: p.cpf || "", cnpj: p.cnpj || "" });
   };
 
   const salvarEdicaoPrestador = async (id) => {
@@ -2713,6 +2717,22 @@ function AdminPanel() {
                 className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
                 style={{ borderColor: C.line }}
               />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={novoUsuarioAdmin.cpf}
+                  onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, cpf: e.target.value }))}
+                  placeholder="CPF"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                  style={{ borderColor: C.line }}
+                />
+                <input
+                  value={novoUsuarioAdmin.cnpj}
+                  onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, cnpj: e.target.value }))}
+                  placeholder="CNPJ (opcional)"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                  style={{ borderColor: C.line }}
+                />
+              </div>
               <select
                 value={novoUsuarioAdmin.tipo}
                 onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, tipo: e.target.value }))}
@@ -3056,6 +3076,20 @@ function AdminPanel() {
                         <input value={formEmpresa.site} onChange={(e) => setFormEmpresa((f) => ({ ...f, site: e.target.value }))}
                           placeholder="Site (https://...)" className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
                       </div>
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        <input value={formEmpresa.email} onChange={(e) => setFormEmpresa((f) => ({ ...f, email: e.target.value }))}
+                          placeholder="E-mail" className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                        <input value={formEmpresa.whatsapp} onChange={(e) => setFormEmpresa((f) => ({ ...f, whatsapp: e.target.value }))}
+                          placeholder="WhatsApp" className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      </div>
+                      <div className="grid sm:grid-cols-3 gap-2">
+                        <input value={formEmpresa.instagram} onChange={(e) => setFormEmpresa((f) => ({ ...f, instagram: e.target.value }))}
+                          placeholder="Instagram" className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                        <input value={formEmpresa.cpf} onChange={(e) => setFormEmpresa((f) => ({ ...f, cpf: e.target.value }))}
+                          placeholder="CPF" className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                        <input value={formEmpresa.cnpj} onChange={(e) => setFormEmpresa((f) => ({ ...f, cnpj: e.target.value }))}
+                          placeholder="CNPJ" className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      </div>
                       <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
                         <input type="checkbox" checked={formEmpresa.destaque} onChange={(e) => setFormEmpresa((f) => ({ ...f, destaque: e.target.checked }))} />
                         Mostrar em destaque na Vitrine Local
@@ -3136,7 +3170,13 @@ function AdminPanel() {
                       <input value={formPrestador.whatsapp} onChange={(e) => setFormPrestador((f) => ({ ...f, whatsapp: e.target.value }))} placeholder="WhatsApp"
                         className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
                       <input value={formPrestador.instagram} onChange={(e) => setFormPrestador((f) => ({ ...f, instagram: e.target.value }))} placeholder="Instagram"
-                        className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                        className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formPrestador.email} onChange={(e) => setFormPrestador((f) => ({ ...f, email: e.target.value }))} placeholder="E-mail"
+                        className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formPrestador.cpf} onChange={(e) => setFormPrestador((f) => ({ ...f, cpf: e.target.value }))} placeholder="CPF"
+                        className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formPrestador.cnpj} onChange={(e) => setFormPrestador((f) => ({ ...f, cnpj: e.target.value }))} placeholder="CNPJ (opcional)"
+                        className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
                     </div>
                   ) : (
                     <div className="flex-1 min-w-0">
@@ -3353,6 +3393,12 @@ function AdminPanel() {
                 <input value={novoFeiranteAdmin.whatsapp} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, whatsapp: e.target.value }))} placeholder="WhatsApp"
                   className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 <input value={novoFeiranteAdmin.instagram} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, instagram: e.target.value }))} placeholder="Instagram (opcional)"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                <input value={novoFeiranteAdmin.email} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, email: e.target.value }))} placeholder="E-mail (opcional)"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={novoFeiranteAdmin.cpf} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, cpf: e.target.value }))} placeholder="CPF (opcional)"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={novoFeiranteAdmin.cnpj} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, cnpj: e.target.value }))} placeholder="CNPJ (opcional)"
                   className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
                 <select value={novoFeiranteAdmin.categoria} onChange={(e) => setNovoFeiranteAdmin((f) => ({ ...f, categoria: e.target.value }))}
                   className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }}>
@@ -6592,6 +6638,9 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
             instagram: form.get("instagram") || null,
             endereco: form.get("endereco") || null,
             google_maps_url: form.get("googleMaps") || null,
+            email: form.get("email") || null,
+            cpf: form.get("cpf") || null,
+            cnpj: form.get("cnpj") || null,
             logo_url: logoUrl,
             // Cadastro de empresa aprovado automaticamente — já aparece no
             // site assim que o empresário termina o cadastro.
@@ -6617,6 +6666,9 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
             whatsapp: form.get("whatsapp"),
             instagram: form.get("instagram"),
             google_maps_url: form.get("googleMaps") || null,
+            email: form.get("email") || null,
+            cpf: form.get("cpf") || null,
+            cnpj: form.get("cnpj") || null,
             foto_url: fotoUrl,
             // Cadastro de prestador aprovado automaticamente — igual já
             // acontece com empresa, aparece no site assim que termina.
@@ -6878,6 +6930,16 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  CPF (do responsável)
+                  <input name="cpf" required placeholder="000.000.000-00" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  CNPJ (opcional)
+                  <input name="cnpj" placeholder="00.000.000/0000-00" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                   Senha
                   <input name="senha" required type="password" minLength={8} placeholder="Mínimo 8 caracteres" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 </label>
@@ -6935,6 +6997,16 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                   Link do Google Maps (opcional)
                   <input name="googleMaps" type="url" placeholder="https://maps.google.com/..." className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  CPF
+                  <input name="cpf" required placeholder="000.000.000-00" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  CNPJ (opcional)
+                  <input name="cnpj" placeholder="00.000.000/0000-00" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 </label>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
