@@ -11994,8 +11994,14 @@ function EstatisticasPublicas() {
       contar("cursos"),
       contar("avaliacoes"),
       contar("cupons", (q) => q.eq("ativo", true)),
-    ]).then(([empresas, produtos, vagas, prestadores, eventos, cursos, avaliacoes, cupons]) => {
-      setStats({ empresas, produtos, vagas, prestadores, eventos, cursos, avaliacoes, cupons });
+      // Fases mais novas — só as métricas que fazem sentido mostrar pro
+      // público (não inclui ouvidoria, agendamentos ou Premium aqui, que
+      // são números internos, não de "vitrine" pro visitante).
+      contar("mural_comunidade", (q) => q.eq("status", "aprovado")),
+      contar("classificados", (q) => q.eq("status", "aprovado")),
+      contar("combos", (q) => q.eq("ativo", true)),
+    ]).then(([empresas, produtos, vagas, prestadores, eventos, cursos, avaliacoes, cupons, mural, classificados, combos]) => {
+      setStats({ empresas, produtos, vagas, prestadores, eventos, cursos, avaliacoes, cupons, mural, classificados, combos });
     });
 
     supabase.from("empresas").select("categoria").eq("status", "aprovada").then(({ data, error }) => {
@@ -12015,6 +12021,9 @@ function EstatisticasPublicas() {
     { label: "Cursos disponíveis", valor: stats.cursos, icon: GraduationCap },
     { label: "Avaliações da comunidade", valor: stats.avaliacoes, icon: Star },
     { label: "Cupons de desconto ativos", valor: stats.cupons, icon: Tag },
+    { label: "Posts no mural", valor: stats.mural, icon: Users },
+    { label: "Classificados publicados", valor: stats.classificados, icon: Repeat },
+    { label: "Combos e promoções ativos", valor: stats.combos, icon: HandCoins },
   ] : [];
 
   return (
@@ -12022,7 +12031,7 @@ function EstatisticasPublicas() {
       <SectionHeader eyebrow="Transparência" title="Números da plataforma" sub="Dados reais e atualizados do comércio local de Ivatuba - PR" />
       {!stats ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+          {Array.from({ length: 11 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
       ) : (
         <>
