@@ -1034,6 +1034,67 @@ function CursoCard({ c }) {
   // professor, carga horária, link de inscrição, certificado, banner).
   const [diaData, mesData] = c.data ? c.data.split(" ") : (c.data_inicio ? c.data_inicio.split("-").reverse() : ["--", ""]);
   const local = c.local || c.instituicao || "";
+
+  // Inscrição direta pela plataforma (além do link externo, se houver) e,
+  // pra cursos com certificado, consulta se a presença já foi confirmada
+  // pra poder baixar o certificado pronto pra imprimir. FASE 38.
+  const [formAberto, setFormAberto] = useState(null); // "inscrever" | "certificado" | null
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [mensagem, setMensagem] = useState("");
+  const [certificadoLiberado, setCertificadoLiberado] = useState(null); // { nome } quando pronto
+
+  const inscrever = async () => {
+    if (!nome.trim() || !telefone.trim()) { setMensagem("Preencha nome e telefone."); return; }
+    setEnviando(true);
+    setMensagem("");
+    const { error } = await supabase.from("curso_inscricoes").upsert(
+      { curso_id: c.id, nome, telefone: telefone.replace(/\D/g, ""), email: null },
+      { onConflict: "curso_id,telefone", ignoreDuplicates: true }
+    );
+    setEnviando(false);
+    if (error) { setMensagem(error.message || "Não foi possível inscrever agora."); return; }
+    setMensagem("ok");
+  };
+
+  const consultarCertificado = async () => {
+    if (!telefone.trim()) { setMensagem("Informe o telefone usado na inscrição."); return; }
+    setEnviando(true);
+    setMensagem("");
+    const { data, error } = await supabase.rpc("verificar_certificado", { p_curso_id: c.id, p_telefone: telefone.replace(/\D/g, "") });
+    setEnviando(false);
+    if (error) { setMensagem("Não foi possível consultar agora."); return; }
+    const registro = data?.[0];
+    if (!registro) { setMensagem("Não encontramos inscrição com esse telefone."); return; }
+    if (!registro.confirmado) { setMensagem("Sua presença ainda não foi confirmada pela organização."); return; }
+    setCertificadoLiberado({ nome: registro.nome });
+  };
+
+  const baixarCertificado = () => {
+    const janela = window.open("", "_blank");
+    const dataFormatada = c.data_inicio ? c.data_inicio.split("-").reverse().join("/") : "";
+    janela.document.write(`
+      <html><head><title>Certificado — ${certificadoLiberado.nome}</title>
+      <style>
+        body{font-family:Georgia,serif;padding:60px;color:#0E2233;text-align:center;border:10px solid #0A5AA8;margin:20px}
+        h1{font-size:14px;letter-spacing:3px;text-transform:uppercase;color:#5C7186;margin-bottom:30px}
+        .nome{font-size:30px;font-weight:bold;margin:20px 0;color:#0A5AA8}
+        p{font-size:15px;line-height:1.6}
+        .rodape{margin-top:50px;font-size:11px;color:#5C7186}
+      </style></head>
+      <body>
+        <h1>Certificado de conclusão</h1>
+        <p>Certificamos que</p>
+        <p class="nome">${certificadoLiberado.nome}</p>
+        <p>concluiu o curso <b>${c.titulo}</b>${c.instituicao ? ` promovido por ${c.instituicao}` : ""}${c.carga_horaria ? `, com carga horária de ${c.carga_horaria}` : ""}${dataFormatada ? `, em ${dataFormatada}` : ""}.</p>
+        <p class="rodape">Emitido pelo Conecta Comércio — Ivatuba - PR</p>
+        <script>window.onload = () => window.print();</script>
+      </body></html>
+    `);
+    janela.document.close();
+  };
+
   return (
     <div className="rounded-2xl border bg-white p-4 flex gap-3 items-start overflow-hidden" style={{ borderColor: C.line }}>
       {c.banner_url ? (
@@ -1052,10 +1113,58 @@ function CursoCard({ c }) {
         {c.certificado && (
           <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 inline-block" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>Com certificado</span>
         )}
-        {c.link_inscricao && (
-          <a href={c.link_inscricao} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold mt-1.5 flex items-center gap-1 w-fit" style={{ color: C.blue }}>
-            <ExternalLink size={11} /> Inscreva-se
-          </a>
+        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          {c.link_inscricao && (
+            <a href={c.link_inscricao} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold flex items-center gap-1 w-fit" style={{ color: C.blue }}>
+              <ExternalLink size={11} /> Inscreva-se
+            </a>
+          )}
+          {c.id && supabaseConfigurado && (
+            <button onClick={() => { setFormAberto(formAberto === "inscrever" ? null : "inscrever"); setMensagem(""); setCertificadoLiberado(null); }} className="font-body text-xs font-bold flex items-center gap-1" style={{ color: C.blue }}>
+              <Users size={11} /> Inscrever-se pelo site
+            </button>
+          )}
+          {c.id && c.certificado && supabaseConfigurado && (
+            <button onClick={() => { setFormAberto(formAberto === "certificado" ? null : "certificado"); setMensagem(""); setCertificadoLiberado(null); }} className="font-body text-xs font-bold flex items-center gap-1" style={{ color: "#1E8E5A" }}>
+              <BadgeCheck size={11} /> Baixar certificado
+            </button>
+          )}
+        </div>
+
+        {formAberto === "inscrever" && (
+          <div className="flex flex-col gap-1.5 mt-2 p-2.5 rounded-lg" style={{ background: C.blueTint2 }}>
+            {mensagem === "ok" ? (
+              <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Inscrição confirmada!</p>
+            ) : (
+              <>
+                <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Telefone / WhatsApp" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                {mensagem && <p className="font-body text-[11px]" style={{ color: "#B4462F" }}>{mensagem}</p>}
+                <button onClick={inscrever} disabled={enviando} className="font-body text-xs font-bold rounded-lg py-1.5 text-white disabled:opacity-60" style={{ background: C.blue }}>
+                  {enviando ? "Enviando..." : "Confirmar inscrição"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {formAberto === "certificado" && (
+          <div className="flex flex-col gap-1.5 mt-2 p-2.5 rounded-lg" style={{ background: "#E7F6EE" }}>
+            {certificadoLiberado ? (
+              <>
+                <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Certificado liberado, {certificadoLiberado.nome}!</p>
+                <button onClick={baixarCertificado} className="font-body text-xs font-bold rounded-lg py-1.5 text-white" style={{ background: "#1E8E5A" }}>Baixar certificado</button>
+              </>
+            ) : (
+              <>
+                <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Telefone usado na inscrição" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                {mensagem && <p className="font-body text-[11px]" style={{ color: "#8A5A12" }}>{mensagem}</p>}
+                <button onClick={consultarCertificado} disabled={enviando} className="font-body text-xs font-bold rounded-lg py-1.5 text-white disabled:opacity-60" style={{ background: "#1E8E5A" }}>
+                  {enviando ? "Consultando..." : "Consultar"}
+                </button>
+              </>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -1819,6 +1928,20 @@ function AdminPanel() {
     if (!error) setEventosAdmin((atual) => atual.map((ev) => (ev.id === id ? { ...ev, status } : ev)));
   };
 
+  // Quem confirmou presença em cada evento — carregado só quando o admin
+  // clica em "Ver participantes" (evita buscar tudo de uma vez).
+  const [participantesAbertos, setParticipantesAbertos] = useState(null); // id do evento aberto
+  const [participantesPorEvento, setParticipantesPorEvento] = useState({}); // { [eventoId]: [...] }
+  const verParticipantes = (eventoId) => {
+    if (participantesAbertos === eventoId) { setParticipantesAbertos(null); return; }
+    setParticipantesAbertos(eventoId);
+    if (!participantesPorEvento[eventoId]) {
+      supabase.from("evento_participantes").select("*").eq("evento_id", eventoId).order("criado_em", { ascending: false }).then(({ data, error }) => {
+        if (!error) setParticipantesPorEvento((atual) => ({ ...atual, [eventoId]: data || [] }));
+      });
+    }
+  };
+
   const atualizarServico = (indice, campo, valor) => {
     setServicos((atual) => atual.map((s, i) => (i === indice ? { ...s, [campo]: valor } : s)));
   };
@@ -2235,6 +2358,29 @@ function AdminPanel() {
     }
     const { error } = await supabase.from("cursos").delete().eq("id", id);
     if (!error) setCursosAdmin((atual) => atual.filter((c) => c.id !== id));
+  };
+
+  // Inscritos de cada curso — o admin confirma a presença de quem realmente
+  // participou, o que libera o certificado pra essa pessoa baixar. FASE 38.
+  const [inscritosAbertos, setInscritosAbertos] = useState(null);
+  const [inscritosPorCurso, setInscritosPorCurso] = useState({});
+  const verInscritos = (cursoId) => {
+    if (inscritosAbertos === cursoId) { setInscritosAbertos(null); return; }
+    setInscritosAbertos(cursoId);
+    if (!inscritosPorCurso[cursoId]) {
+      supabase.from("curso_inscricoes").select("*").eq("curso_id", cursoId).order("criado_em", { ascending: false }).then(({ data, error }) => {
+        if (!error) setInscritosPorCurso((atual) => ({ ...atual, [cursoId]: data || [] }));
+      });
+    }
+  };
+  const confirmarPresencaCurso = async (inscricaoId, cursoId, presenca) => {
+    const { error } = await supabase.from("curso_inscricoes").update({ presenca_confirmada: presenca }).eq("id", inscricaoId);
+    if (!error) {
+      setInscritosPorCurso((atual) => ({
+        ...atual,
+        [cursoId]: (atual[cursoId] || []).map((i) => (i.id === inscricaoId ? { ...i, presenca_confirmada: presenca } : i)),
+      }));
+    }
   };
 
   // -------------------------------------------------------------------------
@@ -4332,7 +4478,8 @@ function AdminPanel() {
 
             <div className="flex flex-col gap-2 max-w-2xl">
               {listaEventos.map((ev) => (
-                <div key={ev.id} className="rounded-xl border p-3.5 flex items-center gap-3 flex-wrap" style={{ borderColor: C.line }}>
+                <div key={ev.id} className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
+                <div className="flex items-center gap-3 flex-wrap">
                   {ev.banner_url ? (
                     <img loading="lazy" decoding="async" src={ev.banner_url} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
                   ) : (
@@ -4346,6 +4493,9 @@ function AdminPanel() {
                       {ev.data_inicio}{ev.data_fim ? ` a ${ev.data_fim}` : ""}{ev.hora ? ` · ${ev.hora}` : ""}{ev.local ? ` · ${ev.local}` : ""} · {ev.tipo}
                     </p>
                   </div>
+                  <button onClick={() => verParticipantes(ev.id)} className="font-body text-[11px] font-bold flex items-center gap-1 shrink-0" style={{ color: C.blue }}>
+                    <Users size={12} /> Participantes{participantesPorEvento[ev.id] ? ` (${participantesPorEvento[ev.id].length})` : ""}
+                  </button>
                   <select value={ev.status || "confirmado"} onChange={(e) => mudarStatusEvento(ev.id, e.target.value)}
                     className="font-body text-[11px] font-bold border rounded-lg px-2 py-1.5 outline-none"
                     style={{
@@ -4357,6 +4507,20 @@ function AdminPanel() {
                     <option value="cancelado">Cancelado</option>
                   </select>
                   <button onClick={() => { if (confirmarExclusao()) { removerEvento(ev.id); notificar("Evento removido."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                </div>
+                {participantesAbertos === ev.id && (
+                  <div className="mt-3 pt-3 border-t flex flex-col gap-1.5" style={{ borderColor: C.line }}>
+                    {(participantesPorEvento[ev.id] ?? []).map((p) => (
+                      <div key={p.id} className="flex items-center justify-between font-body text-[11px]" style={{ color: "#425A70" }}>
+                        <span>{p.nome}</span>
+                        {p.telefone && <span style={{ color: "#8896A6" }}>{p.telefone}</span>}
+                      </div>
+                    ))}
+                    {(participantesPorEvento[ev.id] ?? []).length === 0 && (
+                      <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>Ninguém confirmou presença ainda.</p>
+                    )}
+                  </div>
+                )}
                 </div>
               ))}
               {listaEventos.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum evento cadastrado ainda.</p>}
@@ -4977,13 +5141,35 @@ function AdminPanel() {
             </form>
             <div className="flex flex-col gap-3 max-w-lg">
               {(cursosAdmin ?? []).map((c) => (
-                <div key={c.id} className="rounded-2xl border p-4 flex items-center gap-3" style={{ borderColor: C.line }}>
-                  {c.banner_url && <img loading="lazy" decoding="async" src={c.banner_url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{c.titulo}</p>
-                    <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{c.instituicao}{c.data_inicio ? ` · ${c.data_inicio}` : ""}{c.certificado ? " · Com certificado" : ""}</p>
+                <div key={c.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div className="flex items-center gap-3">
+                    {c.banner_url && <img loading="lazy" decoding="async" src={c.banner_url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{c.titulo}</p>
+                      <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{c.instituicao}{c.data_inicio ? ` · ${c.data_inicio}` : ""}{c.certificado ? " · Com certificado" : ""}</p>
+                    </div>
+                    <button onClick={() => verInscritos(c.id)} className="font-body text-[11px] font-bold flex items-center gap-1 shrink-0" style={{ color: C.blue }}>
+                      <Users size={12} /> Inscritos{inscritosPorCurso[c.id] ? ` (${inscritosPorCurso[c.id].length})` : ""}
+                    </button>
+                    <button onClick={() => { if (confirmarExclusao()) { removerCurso(c.id); notificar("Curso excluído."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                   </div>
-                  <button onClick={() => { if (confirmarExclusao()) { removerCurso(c.id); notificar("Curso excluído."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                  {inscritosAbertos === c.id && (
+                    <div className="mt-3 pt-3 border-t flex flex-col gap-1.5" style={{ borderColor: C.line }}>
+                      {(inscritosPorCurso[c.id] ?? []).map((i) => (
+                        <div key={i.id} className="flex items-center justify-between gap-2 font-body text-[11px]" style={{ color: "#425A70" }}>
+                          <span className="truncate">{i.nome} <span style={{ color: "#8896A6" }}>· {i.telefone}</span></span>
+                          <button onClick={() => confirmarPresencaCurso(i.id, c.id, !i.presenca_confirmada)}
+                            className="font-body text-[10px] font-bold px-2 py-1 rounded-full shrink-0"
+                            style={{ background: i.presenca_confirmada ? "#E7F6EE" : "#F1F4F8", color: i.presenca_confirmada ? "#1E8E5A" : "#5C7186" }}>
+                            {i.presenca_confirmada ? "Presença confirmada" : "Confirmar presença"}
+                          </button>
+                        </div>
+                      ))}
+                      {(inscritosPorCurso[c.id] ?? []).length === 0 && (
+                        <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>Ninguém se inscreveu ainda.</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
               {(cursosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum curso cadastrado ainda.</p>}
@@ -6828,6 +7014,49 @@ function CalendarioEventos() {
     });
   }, []);
 
+  // Participação confirmada — qualquer um clica em "Vou participar", informa
+  // o nome, e isso conta pro organizador saber quantas pessoas esperar. A
+  // contagem pública não expõe nome/telefone de ninguém (função no banco).
+  const [confirmados, setConfirmados] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("cc_eventos_confirmados") || "{}"); } catch { return {}; }
+  });
+  useEffect(() => { try { localStorage.setItem("cc_eventos_confirmados", JSON.stringify(confirmados)); } catch {} }, [confirmados]);
+  const [contagemPresenca, setContagemPresenca] = useState({}); // { [eventoId]: n }
+  const [formPresencaAberto, setFormPresencaAberto] = useState(null);
+  const [nomePresenca, setNomePresenca] = useState("");
+  const [telefonePresenca, setTelefonePresenca] = useState("");
+  const [enviandoPresenca, setEnviandoPresenca] = useState(false);
+
+  const carregarContagemPresenca = (idsEventos) => {
+    if (!supabaseConfigurado) return;
+    idsEventos.forEach((id) => {
+      if (contagemPresenca[id] !== undefined) return;
+      supabase.rpc("contar_participantes", { p_evento_id: id }).then(({ data, error }) => {
+        if (!error) setContagemPresenca((atual) => ({ ...atual, [id]: data ?? 0 }));
+      });
+    });
+  };
+
+  const confirmarPresenca = async (evento) => {
+    if (!nomePresenca.trim()) return;
+    setEnviandoPresenca(true);
+    try {
+      const { error } = await supabase.from("evento_participantes").insert({
+        evento_id: evento.id, nome: nomePresenca, telefone: telefonePresenca || null,
+      });
+      if (error) throw error;
+      setConfirmados((atual) => ({ ...atual, [evento.id]: true }));
+      setContagemPresenca((atual) => ({ ...atual, [evento.id]: (atual[evento.id] ?? 0) + 1 }));
+      setFormPresencaAberto(null);
+      setNomePresenca("");
+      setTelefonePresenca("");
+    } catch {
+      // silencioso — se der erro, a pessoa pode tentar de novo
+    } finally {
+      setEnviandoPresenca(false);
+    }
+  };
+
   const eventosDemo = [
     { id: "d1", titulo: feirasEspeciais[0]?.titulo || "Feira Junina do Empreendedor", data_inicio: "2026-08-15", local: feirasEspeciais[0]?.local || "Praça Central", tipo: "feira" },
     { id: "d2", titulo: "Formalização do MEI na prática", data_inicio: "2026-08-12", local: "Sala do Empreendedor", tipo: "curso" },
@@ -6872,6 +7101,13 @@ function CalendarioEventos() {
   const rotuloTipo = { feira: "Feira", curso: "Curso", institucional: "Institucional", outro: "Evento" };
   const corTipo = { feira: C.amberDark, curso: C.blue, institucional: C.blueDeep, outro: "#5C7186" };
   const formatarData = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
+
+  const listaVisivel = eventosDoDia ?? proximosEventos;
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    const ids = listaVisivel.map((ev) => ev.id).filter((id) => typeof id === "string" && !id.startsWith("d"));
+    if (ids.length > 0) carregarContagemPresenca(ids);
+  }, [listaVisivel.map((e) => e.id).join(",")]);
 
   return (
     <div className="rounded-2xl border p-5 bg-white" style={{ borderColor: C.line }}>
@@ -6956,7 +7192,32 @@ function CalendarioEventos() {
                       <CalendarDays size={10} /> Lembrete
                     </button>
                   )}
+                  {ev.status !== "cancelado" && supabaseConfigurado && (
+                    confirmados[ev.id] ? (
+                      <span className="font-body text-[10px] font-bold flex items-center gap-1" style={{ color: "#1E8E5A" }}>
+                        <CheckCircle2 size={10} /> Presença confirmada
+                      </span>
+                    ) : (
+                      <button onClick={() => setFormPresencaAberto(formPresencaAberto === ev.id ? null : ev.id)} className="font-body text-[10px] font-bold flex items-center gap-1" style={{ color: C.blue }}>
+                        <Users size={10} /> Vou participar
+                      </button>
+                    )
+                  )}
+                  {contagemPresenca[ev.id] > 0 && (
+                    <span className="font-body text-[10px]" style={{ color: "#5C7186" }}>{contagemPresenca[ev.id]} {contagemPresenca[ev.id] === 1 ? "confirmado" : "confirmados"}</span>
+                  )}
                 </div>
+                {formPresencaAberto === ev.id && (
+                  <div className="flex flex-col gap-1.5 mt-2 p-2.5 rounded-lg" style={{ background: C.blueTint2 }}>
+                    <input value={nomePresenca} onChange={(e) => setNomePresenca(e.target.value)} placeholder="Seu nome"
+                      className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                    <input value={telefonePresenca} onChange={(e) => setTelefonePresenca(e.target.value)} placeholder="WhatsApp (opcional)"
+                      className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                    <button onClick={() => confirmarPresenca(ev)} disabled={enviandoPresenca || !nomePresenca.trim()} className="font-body text-xs font-bold rounded-lg py-1.5 text-white disabled:opacity-60" style={{ background: C.blue }}>
+                      {enviandoPresenca ? "Confirmando..." : "Confirmar presença"}
+                    </button>
+                  </div>
+                )}
                 {ev.link_inscricao && (
                   <img loading="lazy" decoding="async"
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=64x64&data=${encodeURIComponent(ev.link_inscricao)}`}
