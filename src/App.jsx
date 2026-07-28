@@ -1033,6 +1033,7 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
 function PrestadorCard({ p }) {
   const linkWhats = p.whatsapp ? `https://wa.me/55${String(p.whatsapp).replace(/\D/g, "")}` : null;
   const linkInsta = p.instagram ? `https://instagram.com/${String(p.instagram).replace(/^@/, "")}` : null;
+  const [agendaAberta, setAgendaAberta] = useState(false);
   return (
     <div className="glow-card rounded-2xl border overflow-hidden flex flex-col"
       style={{ borderColor: C.line, background: "rgba(255,255,255,0.7)", backdropFilter: "blur(10px)" }}>
@@ -1051,6 +1052,9 @@ function PrestadorCard({ p }) {
             <MapPin size={11} /> {p.endereco}
           </p>
         )}
+        <button type="button" onClick={() => setAgendaAberta(true)} className="font-body text-xs font-bold flex items-center justify-center gap-1.5 rounded-lg py-2 border mt-1" style={{ borderColor: C.line, color: C.blue }}>
+          <Clock size={13} /> Agendar horário
+        </button>
         <div className="mt-auto flex gap-2 pt-2">
           {linkWhats && (
             <a href={linkWhats} target="_blank" rel="noreferrer" className="glow-btn flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold font-body text-white" style={{ background: "#25A85B" }}>
@@ -1061,6 +1065,102 @@ function PrestadorCard({ p }) {
             <a href={linkInsta} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-xs font-bold font-body border" style={{ borderColor: C.line, color: C.blue }}>
               <Instagram size={14} />
             </a>
+          )}
+        </div>
+      </div>
+      {agendaAberta && <ModalAgendarHorario prestador={p} onFechar={() => setAgendaAberta(false)} />}
+    </div>
+  );
+}
+
+// Modal de agendamento — mostra os horários disponíveis (gerados pelo admin)
+// de um prestador, o cliente escolhe um e reserva na hora. FASE 50.
+function ModalAgendarHorario({ prestador, onFechar }) {
+  const [slots, setSlots] = useState(null);
+  const [slotEscolhido, setSlotEscolhido] = useState(null);
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [reservando, setReservando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [reservado, setReservado] = useState(false);
+
+  useEffect(() => {
+    if (!supabaseConfigurado || !prestador?.id) { setSlots([]); return; }
+    supabase.from("prestador_agenda").select("id, data, hora").eq("prestador_id", prestador.id).eq("status", "disponivel")
+      .order("data").order("hora").then(({ data, error }) => setSlots(error ? [] : data || []));
+  }, [prestador?.id]);
+
+  const slotsPorData = useMemo(() => {
+    const mapa = {};
+    (slots || []).forEach((s) => { (mapa[s.data] = mapa[s.data] || []).push(s); });
+    return mapa;
+  }, [slots]);
+
+  const reservar = async (e) => {
+    e.preventDefault();
+    setErro("");
+    if (!slotEscolhido) { setErro("Escolha um horário."); return; }
+    if (!nome.trim() || !telefone.trim()) { setErro("Preencha seu nome e telefone."); return; }
+    setReservando(true);
+    try {
+      const { data, error } = await supabase.from("prestador_agenda")
+        .update({ status: "reservado", cliente_nome: nome, cliente_telefone: telefone })
+        .eq("id", slotEscolhido.id).eq("status", "disponivel").select();
+      if (error) throw error;
+      if (!data || data.length === 0) { setErro("Esse horário acabou de ser reservado por outra pessoa. Escolha outro."); setSlotEscolhido(null); setSlots((atual) => (atual || []).filter((s) => s.id !== slotEscolhido.id)); return; }
+      setReservado(true);
+    } catch (err) {
+      setErro(err.message || "Não consegui reservar agora. Tente de novo.");
+    } finally {
+      setReservando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.55)" }} onClick={onFechar}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl max-h-[88vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white flex items-center justify-between px-5 pt-5 pb-3 border-b" style={{ borderColor: C.line }}>
+          <p className="font-display font-bold text-base" style={{ color: C.ink }}>Agendar com {prestador.nome}</p>
+          <button onClick={onFechar} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: C.blueTint2 }} aria-label="Fechar"><X size={16} color="#425A70" /></button>
+        </div>
+        <div className="p-5">
+          {reservado ? (
+            <div className="py-4 text-center">
+              <CheckCircle2 size={30} color="#1E8E5A" className="mx-auto mb-2" />
+              <p className="font-display font-bold text-base" style={{ color: C.ink }}>Horário reservado!</p>
+              <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>{slotEscolhido.data} às {slotEscolhido.hora}, com {prestador.nome}.</p>
+            </div>
+          ) : (
+            <>
+              {slots === null && <div className="flex flex-col gap-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 rounded-lg" />)}</div>}
+              {slots && slots.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum horário disponível no momento — tente falar direto pelo WhatsApp.</p>}
+              <div className="flex flex-col gap-3 mb-4">
+                {Object.entries(slotsPorData).map(([data, doDia]) => (
+                  <div key={data}>
+                    <p className="font-body text-xs font-bold mb-1.5" style={{ color: "#5C7186" }}>{data}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {doDia.map((s) => (
+                        <button key={s.id} type="button" onClick={() => setSlotEscolhido(s)}
+                          className="font-body text-xs font-bold px-2.5 py-1.5 rounded-lg border"
+                          style={{ borderColor: slotEscolhido?.id === s.id ? C.blue : C.line, background: slotEscolhido?.id === s.id ? C.blueTint : "transparent", color: slotEscolhido?.id === s.id ? C.blue : "#425A70" }}>
+                          {s.hora}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {slotEscolhido && (
+                <form onSubmit={reservar} className="flex flex-col gap-2.5">
+                  <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Seu telefone" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  {erro && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{erro}</p>}
+                  <button type="submit" disabled={reservando} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+                    {reservando ? "Reservando..." : `Confirmar ${slotEscolhido.data} às ${slotEscolhido.hora}`}
+                  </button>
+                </form>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -3286,6 +3386,66 @@ function AdminPanel() {
   };
 
   // -------------------------------------------------------------------------
+  // Agendamento de horário — o admin gera os horários disponíveis de cada
+  // prestador de serviço, e o cliente reserva direto pelo site. FASE 50.
+  // -------------------------------------------------------------------------
+  const [prestadorAgendaSelecionado, setPrestadorAgendaSelecionado] = useState("");
+  const [agendaAdmin, setAgendaAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado || !prestadorAgendaSelecionado) { setAgendaAdmin(null); return; }
+    supabase.from("prestador_agenda").select("*").eq("prestador_id", prestadorAgendaSelecionado)
+      .order("data").order("hora").then(({ data, error }) => {
+        if (!error) setAgendaAdmin(data || []);
+      });
+  }, [prestadorAgendaSelecionado]);
+
+  const geradorAgendaVazio = { data: "", hora_inicio: "08:00", hora_fim: "12:00", intervalo_minutos: 30 };
+  const [geradorAgenda, setGeradorAgenda] = useState(geradorAgendaVazio);
+  const [gerandoAgenda, setGerandoAgenda] = useState(false);
+  const [statusGeradorAgenda, setStatusGeradorAgenda] = useState("");
+
+  const gerarHorariosAgenda = async (e) => {
+    e.preventDefault();
+    setStatusGeradorAgenda("");
+    if (!prestadorAgendaSelecionado) { setStatusGeradorAgenda("Escolha o prestador primeiro."); return; }
+    if (!geradorAgenda.data || !geradorAgenda.hora_inicio || !geradorAgenda.hora_fim) { setStatusGeradorAgenda("Preencha data, horário inicial e final."); return; }
+    const intervalo = Number(geradorAgenda.intervalo_minutos) || 30;
+    const [hI, mI] = geradorAgenda.hora_inicio.split(":").map(Number);
+    const [hF, mF] = geradorAgenda.hora_fim.split(":").map(Number);
+    let minutos = hI * 60 + mI;
+    const minutosFim = hF * 60 + mF;
+    const novosSlots = [];
+    while (minutos < minutosFim) {
+      const h = String(Math.floor(minutos / 60)).padStart(2, "0");
+      const m = String(minutos % 60).padStart(2, "0");
+      novosSlots.push({ prestador_id: prestadorAgendaSelecionado, data: geradorAgenda.data, hora: `${h}:${m}`, duracao_minutos: intervalo, status: "disponivel" });
+      minutos += intervalo;
+    }
+    if (novosSlots.length === 0) { setStatusGeradorAgenda("Intervalo inválido."); return; }
+    setGerandoAgenda(true);
+    try {
+      const { data, error } = await supabase.from("prestador_agenda").insert(novosSlots).select();
+      if (error) throw error;
+      setAgendaAdmin((atual) => [...(atual ?? []), ...data].sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora)));
+      setStatusGeradorAgenda("ok");
+    } catch (err) {
+      setStatusGeradorAgenda(err.message || "Erro ao gerar horários.");
+    } finally {
+      setGerandoAgenda(false);
+    }
+  };
+
+  const cancelarReservaAgenda = async (id) => {
+    const { error } = await supabase.from("prestador_agenda").update({ status: "disponivel", cliente_nome: null, cliente_telefone: null }).eq("id", id);
+    if (!error) { setAgendaAdmin((atual) => atual.map((s) => (s.id === id ? { ...s, status: "disponivel", cliente_nome: null, cliente_telefone: null } : s))); notificar("Reserva cancelada."); }
+  };
+
+  const apagarHorarioAgenda = async (id) => {
+    const { error } = await supabase.from("prestador_agenda").delete().eq("id", id);
+    if (!error) setAgendaAdmin((atual) => atual.filter((s) => s.id !== id));
+  };
+
+  // -------------------------------------------------------------------------
   // Avaliações de empresas — o público comenta, o admin só modera (apaga
   // comentário abusivo/spam). FASE 34.
   // -------------------------------------------------------------------------
@@ -3796,6 +3956,7 @@ function AdminPanel() {
     { id: "empresas", label: "Comerciantes", icon: CheckCircle2 },
     { id: "criterios", label: "Critérios de participação", icon: ClipboardList },
     { id: "prestadores", label: "Prestadores de serviço", icon: Wrench },
+    { id: "agenda", label: "Agendamentos", icon: Clock },
     { id: "produtos", label: "Produtos", icon: ShoppingBag },
     { id: "promocoes", label: "Promoções", icon: Tag },
     { id: "feira", label: "Feira do Empreendedor", icon: PartyPopper },
@@ -4725,6 +4886,63 @@ function AdminPanel() {
               ))}
               {listaPrestadores.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum prestador cadastrado ainda.</p>}
             </div>
+          </div>
+        )}
+
+        {tab === "agenda" && (
+          <div>
+            <SectionHeader eyebrow="Agendamento" title="Agendamentos" sub="Gere os horários disponíveis de cada prestador — o cliente reserva direto pelo site" />
+            <select value={prestadorAgendaSelecionado} onChange={(e) => setPrestadorAgendaSelecionado(e.target.value)}
+              className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none w-full max-w-sm mb-4" style={{ borderColor: C.line }}>
+              <option value="">Escolha um prestador...</option>
+              {listaPrestadores.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            </select>
+
+            {prestadorAgendaSelecionado && (
+              <>
+                <form onSubmit={gerarHorariosAgenda} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+                  <input type="date" value={geradorAgenda.data} onChange={(e) => setGeradorAgenda((v) => ({ ...v, data: e.target.value }))}
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                  <input type="time" value={geradorAgenda.hora_inicio} onChange={(e) => setGeradorAgenda((v) => ({ ...v, hora_inicio: e.target.value }))}
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  <input type="time" value={geradorAgenda.hora_fim} onChange={(e) => setGeradorAgenda((v) => ({ ...v, hora_fim: e.target.value }))}
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  <select value={geradorAgenda.intervalo_minutos} onChange={(e) => setGeradorAgenda((v) => ({ ...v, intervalo_minutos: e.target.value }))}
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }}>
+                    <option value="15">Horários de 15 em 15 minutos</option>
+                    <option value="30">Horários de 30 em 30 minutos</option>
+                    <option value="60">Horários de 1 em 1 hora</option>
+                  </select>
+                  {statusGeradorAgenda && statusGeradorAgenda !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusGeradorAgenda}</p>}
+                  {statusGeradorAgenda === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Horários gerados!</p>}
+                  <button type="submit" disabled={gerandoAgenda} className="font-body text-xs font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                    {gerandoAgenda ? "Gerando..." : "Gerar horários pra esse dia"}
+                  </button>
+                </form>
+
+                <div className="flex flex-col gap-2 max-w-lg">
+                  {(agendaAdmin ?? []).map((s) => (
+                    <div key={s.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ borderColor: C.line }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-display font-bold text-xs" style={{ color: C.ink }}>{s.data} às {s.hora}</p>
+                        {s.status === "reservado" ? (
+                          <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>Reservado por {s.cliente_nome}{s.cliente_telefone ? ` · ${s.cliente_telefone}` : ""}</p>
+                        ) : (
+                          <p className="font-body text-[11px]" style={{ color: "#1E8E5A" }}>Disponível</p>
+                        )}
+                      </div>
+                      {s.status === "reservado" && (
+                        <button onClick={() => cancelarReservaAgenda(s.id)} className="font-body text-[11px] font-bold px-2.5 py-1 rounded-lg border shrink-0" style={{ borderColor: C.line, color: "#425A70" }}>
+                          Cancelar reserva
+                        </button>
+                      )}
+                      <button onClick={() => apagarHorarioAgenda(s.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                    </div>
+                  ))}
+                  {(agendaAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum horário gerado ainda pra esse prestador.</p>}
+                </div>
+              </>
+            )}
           </div>
         )}
 
