@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     }
 
     const {
-      nome, email, senha, tipo,
+      nome, email, senha, tipo, cpf, cnpj,
       empresaNome, empresaCategoria, empresaWhatsapp, empresaInstagram, empresaEndereco, empresaGoogleMaps,
       prestadorServico, prestadorWhatsapp, prestadorInstagram, prestadorEndereco, prestadorGoogleMaps,
     } = req.body || {};
@@ -82,6 +82,9 @@ export default async function handler(req, res) {
       id: novoUsuario.user.id,
       nome,
       tipo,
+      email,
+      cpf: cpf || null,
+      cnpj: cnpj || null,
     });
 
     if (erroInsercaoPerfil) {
@@ -89,6 +92,8 @@ export default async function handler(req, res) {
       return;
     }
 
+    // Se for empresário e o admin informou o nome da empresa, já cadastra a
+    // empresa vinculada a essa conta, aprovada, sem precisar de outro passo.
     if (tipo === "empresario" && empresaNome) {
       const { error: erroEmpresa } = await admin.from("empresas").insert({
         dono_id: novoUsuario.user.id,
@@ -98,6 +103,9 @@ export default async function handler(req, res) {
         instagram: empresaInstagram || null,
         endereco: empresaEndereco || null,
         google_maps_url: empresaGoogleMaps || null,
+        email: email || null,
+        cpf: cpf || null,
+        cnpj: cnpj || null,
         status: "aprovada",
       });
       if (erroEmpresa) {
@@ -106,6 +114,9 @@ export default async function handler(req, res) {
       }
     }
 
+    // Se for prestador de serviço, já cadastra o prestador vinculado a essa
+    // conta, aprovado, aparecendo direto no site — igual acontece com
+    // empresas cadastradas por aqui.
     if (tipo === "prestador") {
       const { error: erroPrestador } = await admin.from("prestadores").insert({
         dono_id: novoUsuario.user.id,
@@ -115,6 +126,9 @@ export default async function handler(req, res) {
         instagram: prestadorInstagram || null,
         endereco: prestadorEndereco || null,
         google_maps_url: prestadorGoogleMaps || null,
+        email: email || null,
+        cpf: cpf || null,
+        cnpj: cnpj || null,
         status: "aprovado",
       });
       if (erroPrestador) {
