@@ -33,6 +33,9 @@ const C = {
 // customizada nenhuma.
 const PALETA_GRAFICOS = ["#0A5AA8", "#E8A23D", "#25A85B", "#B4462F", "#7E5BEF", "#0EA5A5"];
 
+// Tipos fixos de credencial — usado no cadastro de credenciamento de eventos.
+const TIPOS_CREDENCIAL = ["Participante", "Palestrante", "Organização", "Mídia/Comunicação", "Expositores", "Patrocinadores"];
+
 // Escurece uma cor hex em uma porcentagem — usado para gerar os tons mais
 // escuros (blueDark/blueDeep) a partir da única cor que o admin escolhe.
 function escurecerCor(hex, quantidade) {
@@ -3543,7 +3546,9 @@ function AdminPanel() {
                 <form onSubmit={criarCredencial} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
                   <input value={novaCredencial.nome} onChange={(e) => setNovaCredencial((v) => ({ ...v, nome: e.target.value }))} placeholder="Nome completo" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
                   <input value={novaCredencial.telefone} onChange={(e) => setNovaCredencial((v) => ({ ...v, telefone: e.target.value }))} placeholder="Telefone (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-                  <input value={novaCredencial.tipo} onChange={(e) => setNovaCredencial((v) => ({ ...v, tipo: e.target.value }))} placeholder="Tipo (ex: Participante, Palestrante)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  <select value={novaCredencial.tipo} onChange={(e) => setNovaCredencial((v) => ({ ...v, tipo: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                    {TIPOS_CREDENCIAL.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
                   <label className="font-body text-xs font-bold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: C.blue }}>
                     <Camera size={14} /> {fotoCredencialAdmin ? `Foto: ${fotoCredencialAdmin.name}` : "Anexar foto (opcional)"}
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => setFotoCredencialAdmin(e.target.files?.[0] || null)} />
@@ -3603,7 +3608,11 @@ function AdminPanel() {
                             <>
                               <td className="px-3 py-2.5"><input value={formCredencial.nome} onChange={(e) => setFormCredencial((f) => ({ ...f, nome: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-32" style={{ borderColor: C.line }} /></td>
                               <td className="px-3 py-2.5"><input value={formCredencial.telefone} onChange={(e) => setFormCredencial((f) => ({ ...f, telefone: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-28" style={{ borderColor: C.line }} /></td>
-                              <td className="px-3 py-2.5"><input value={formCredencial.tipo} onChange={(e) => setFormCredencial((f) => ({ ...f, tipo: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-28" style={{ borderColor: C.line }} /></td>
+                              <td className="px-3 py-2.5">
+                                <select value={formCredencial.tipo} onChange={(e) => setFormCredencial((f) => ({ ...f, tipo: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-32 bg-white" style={{ borderColor: C.line }}>
+                                  {TIPOS_CREDENCIAL.map((t) => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                              </td>
                             </>
                           ) : (
                             <>
