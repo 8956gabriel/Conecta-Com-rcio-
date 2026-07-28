@@ -8,7 +8,7 @@ import {
   Pencil, Trash2, Tag, UserCircle2, ChevronLeft, ShieldCheck, BarChart3, Vote, Sparkles,
   FileText, Receipt, ClipboardList, HandCoins, ExternalLink,
   Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
-  Leaf, ArrowUp, ArrowDown
+  Leaf, ArrowUp, ArrowDown, Phone
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
@@ -2272,6 +2272,7 @@ function AdminPanel() {
     turismo_ativo: false, historia_cidade: "", historia_foto_url: "",
     mural_ativo: false,
     termos_uso: "", politica_privacidade: "",
+    utilidade_ativo: false,
   };
 
   useEffect(() => {
@@ -2420,6 +2421,7 @@ function AdminPanel() {
         mural_ativo: !!siteConfigAdmin.mural_ativo,
         termos_uso: siteConfigAdmin.termos_uso || null,
         politica_privacidade: siteConfigAdmin.politica_privacidade || null,
+        utilidade_ativo: !!siteConfigAdmin.utilidade_ativo,
       });
       if (error) throw error;
       setStatusIdentidade("ok");
@@ -3182,6 +3184,51 @@ function AdminPanel() {
   }, [criteriosPorEmpresa, buscaCriteriosAdmin]);
 
   // -------------------------------------------------------------------------
+  // Utilidade pública — telefones úteis, ônibus e órgãos públicos, pra
+  // ajudar o morador no dia a dia. FASE 47.
+  // -------------------------------------------------------------------------
+  const [utilidadeAdmin, setUtilidadeAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("utilidade_publica").select("*").order("ordem").then(({ data, error }) => {
+      if (!error) setUtilidadeAdmin(data || []);
+    });
+  }, []);
+  const utilidadeVazia = { titulo: "", categoria: "telefone", telefone: "", endereco: "", horario: "", descricao: "", ordem: 0 };
+  const [novaUtilidade, setNovaUtilidade] = useState(utilidadeVazia);
+  const [publicandoUtilidade, setPublicandoUtilidade] = useState(false);
+  const [statusUtilidade, setStatusUtilidade] = useState("");
+
+  const publicarUtilidade = async (e) => {
+    e.preventDefault();
+    setStatusUtilidade("");
+    if (!novaUtilidade.titulo.trim()) { setStatusUtilidade("Informe o título."); return; }
+    setPublicandoUtilidade(true);
+    try {
+      const registro = { ...novaUtilidade, ordem: Number(novaUtilidade.ordem) || 0 };
+      const { data, error } = await supabase.from("utilidade_publica").insert(registro).select().single();
+      if (error) throw error;
+      setUtilidadeAdmin((atual) => [...(atual ?? []), data].sort((a, b) => a.ordem - b.ordem));
+      setNovaUtilidade(utilidadeVazia);
+      setStatusUtilidade("ok");
+    } catch (err) {
+      setStatusUtilidade(err.message || "Erro ao publicar.");
+    } finally {
+      setPublicandoUtilidade(false);
+    }
+  };
+
+  const alternarAtivoUtilidade = async (id, ativo) => {
+    const { error } = await supabase.from("utilidade_publica").update({ ativo }).eq("id", id);
+    if (!error) setUtilidadeAdmin((atual) => atual.map((u) => (u.id === id ? { ...u, ativo } : u)));
+  };
+
+  const apagarUtilidade = async (id) => {
+    const { error } = await supabase.from("utilidade_publica").delete().eq("id", id);
+    if (!error) { setUtilidadeAdmin((atual) => atual.filter((u) => u.id !== id)); notificar("Item removido."); }
+  };
+
+  // -------------------------------------------------------------------------
   // Avaliações de empresas — o público comenta, o admin só modera (apaga
   // comentário abusivo/spam). FASE 34.
   // -------------------------------------------------------------------------
@@ -3701,6 +3748,7 @@ function AdminPanel() {
     { id: "servicos", label: "Serviços do Empreendedor", icon: Landmark },
     { id: "licitacoes", label: "Editais e Licitações", icon: FileText },
     { id: "turismo", label: "Turismo", icon: MapPinned },
+    { id: "utilidade", label: "Utilidade pública", icon: Phone },
     { id: "mural", label: "Mural da comunidade", icon: Users },
     { id: "enquetes", label: "Enquetes", icon: Vote },
     { id: "cupons", label: "Cupons de desconto", icon: Tag },
@@ -5428,6 +5476,67 @@ function AdminPanel() {
                 </div>
               ))}
               {(pontosTuristicosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum ponto turístico cadastrado ainda.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "utilidade" && (
+          <div>
+            <SectionHeader eyebrow="Dia a dia" title="Utilidade pública" sub="Telefones úteis, ônibus e órgãos públicos, pra ajudar o morador" />
+            <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer mb-6" style={{ color: "#425A70" }}>
+              <input type="checkbox" checked={!!siteConfigAdmin?.utilidade_ativo} onChange={(e) => { setSiteConfigAdmin((v) => ({ ...v, utilidade_ativo: e.target.checked })); }} />
+              Mostrar a aba Utilidade pública no menu do site
+            </label>
+            {siteConfigAdmin?.utilidade_ativo !== undefined && (
+              <button onClick={salvarIdentidade} className="font-body text-xs font-bold rounded-lg px-3 py-2 border mb-6 -mt-4" style={{ borderColor: C.line, color: C.blue }}>
+                Salvar essa opção
+              </button>
+            )}
+
+            <form onSubmit={publicarUtilidade} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <select value={novaUtilidade.categoria} onChange={(e) => setNovaUtilidade((v) => ({ ...v, categoria: e.target.value }))}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }}>
+                <option value="telefone">Telefone útil</option>
+                <option value="onibus">Horário de ônibus</option>
+                <option value="orgao">Órgão público</option>
+              </select>
+              <input value={novaUtilidade.titulo} onChange={(e) => setNovaUtilidade((v) => ({ ...v, titulo: e.target.value }))} placeholder="Título (ex: Corpo de Bombeiros, Linha Centro)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <input value={novaUtilidade.telefone} onChange={(e) => setNovaUtilidade((v) => ({ ...v, telefone: e.target.value }))} placeholder="Telefone (opcional)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaUtilidade.horario} onChange={(e) => setNovaUtilidade((v) => ({ ...v, horario: e.target.value }))} placeholder="Horário (opcional)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novaUtilidade.endereco} onChange={(e) => setNovaUtilidade((v) => ({ ...v, endereco: e.target.value }))} placeholder="Endereço (opcional)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <textarea value={novaUtilidade.descricao} onChange={(e) => setNovaUtilidade((v) => ({ ...v, descricao: e.target.value }))} placeholder="Observação (opcional)" rows={2}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2 resize-none" style={{ borderColor: C.line }} />
+              <input type="number" value={novaUtilidade.ordem} onChange={(e) => setNovaUtilidade((v) => ({ ...v, ordem: e.target.value }))} placeholder="Ordem (0, 1, 2...)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              {statusUtilidade && statusUtilidade !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusUtilidade}</p>}
+              {statusUtilidade === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Publicado!</p>}
+              <button type="submit" disabled={publicandoUtilidade} className="font-body text-xs font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                {publicandoUtilidade ? "Publicando..." : "Adicionar"}
+              </button>
+            </form>
+
+            <div className="flex flex-col gap-2 max-w-lg">
+              {(utilidadeAdmin ?? []).map((u) => (
+                <div key={u.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ borderColor: C.line }}>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{u.titulo}</p>
+                    <p className="font-body text-[11px] truncate" style={{ color: "#5C7186" }}>
+                      {u.categoria === "telefone" ? "Telefone útil" : u.categoria === "onibus" ? "Ônibus" : "Órgão público"}
+                      {u.telefone ? ` · ${u.telefone}` : ""}{u.horario ? ` · ${u.horario}` : ""}
+                    </p>
+                  </div>
+                  <label className="font-body text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer shrink-0" style={{ color: u.ativo ? "#1E8E5A" : "#8896A6" }}>
+                    <input type="checkbox" checked={!!u.ativo} onChange={(e) => alternarAtivoUtilidade(u.id, e.target.checked)} />
+                    Ativo
+                  </label>
+                  <button onClick={() => { if (confirmarExclusao("Excluir esse item?")) apagarUtilidade(u.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                </div>
+              ))}
+              {(utilidadeAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum item cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -10523,7 +10632,7 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
@@ -10531,6 +10640,7 @@ function modoDaHash(hash) {
   if (h.startsWith("#/estatisticas") || h.startsWith("#/numeros")) return "estatisticas";
   if (h.startsWith("#/turismo")) return "turismo";
   if (h.startsWith("#/mural")) return "mural";
+  if (h.startsWith("#/utilidade")) return "utilidade";
   if (h.startsWith("#/termos")) return "termos";
   if (h.startsWith("#/privacidade")) return "privacidade";
   if (h.startsWith("#/empresa") || h.startsWith("#/vendedor")) return "empresario";
@@ -10754,6 +10864,83 @@ function PaginaTurismo({ siteConfig }) {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Utilidade pública — telefones úteis, horário de ônibus e endereços de
+// órgãos públicos, organizados em três blocos. FASE 47.
+// ---------------------------------------------------------------------------
+function PaginaUtilidadePublica() {
+  const [itens, setItens] = useState(null);
+
+  useEffect(() => {
+    document.title = "Utilidade pública — Conecta Comércio";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute("content", "Telefones úteis, horário de ônibus e endereços de órgãos públicos de Ivatuba - PR.");
+    return () => {
+      document.title = "Conecta Comércio · Ivatuba - PR";
+      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) { setItens([]); return; }
+    supabase.from("utilidade_publica").select("*").eq("ativo", true).order("ordem").then(({ data, error }) => {
+      setItens(error ? [] : data || []);
+    });
+  }, []);
+
+  const blocos = [
+    { chave: "telefone", titulo: "Telefones úteis", icone: Phone },
+    { chave: "onibus", titulo: "Horário de ônibus", icone: Clock },
+    { chave: "orgao", titulo: "Órgãos públicos", icone: Landmark },
+  ];
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 md:px-6 py-10">
+      <SectionHeader eyebrow="Dia a dia" title="Utilidade pública" sub="Telefones úteis, ônibus e órgãos públicos de Ivatuba - PR" />
+
+      {itens === null && (
+        <div className="flex flex-col gap-3 mt-6">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>
+      )}
+
+      {itens && itens.length === 0 && (
+        <p className="font-body text-sm mt-6" style={{ color: "#5C7186" }}>Nenhuma informação cadastrada ainda.</p>
+      )}
+
+      <div className="flex flex-col gap-8 mt-6">
+        {blocos.map((bloco) => {
+          const doBloco = (itens || []).filter((i) => i.categoria === bloco.chave);
+          if (doBloco.length === 0) return null;
+          const Icone = bloco.icone;
+          return (
+            <div key={bloco.chave}>
+              <h2 className="font-display font-extrabold text-base mb-3 flex items-center gap-2" style={{ color: C.ink }}>
+                <Icone size={17} color={C.blue} /> {bloco.titulo}
+              </h2>
+              <div className="flex flex-col gap-2">
+                {doBloco.map((item) => (
+                  <div key={item.id} className="rounded-2xl border p-4 bg-white" style={{ borderColor: C.line }}>
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{item.titulo}</p>
+                    <div className="flex flex-wrap gap-3 mt-1">
+                      {item.telefone && (
+                        <a href={`tel:${item.telefone.replace(/\D/g, "")}`} className="font-body text-xs font-semibold flex items-center gap-1" style={{ color: C.blue }}>
+                          <Phone size={11} /> {item.telefone}
+                        </a>
+                      )}
+                      {item.horario && <span className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}><Clock size={11} /> {item.horario}</span>}
+                      {item.endereco && <span className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}><MapPin size={11} /> {item.endereco}</span>}
+                    </div>
+                    {item.descricao && <p className="font-body text-xs mt-1.5" style={{ color: "#5C7186" }}>{item.descricao}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -11050,6 +11237,7 @@ export default function ConectaComercio() {
     { id: "site", label: "Site", icon: Store },
     ...(siteConfig?.turismo_ativo ? [{ id: "turismo", label: "Turismo", icon: MapPinned }] : []),
     ...(siteConfig?.mural_ativo ? [{ id: "mural", label: "Mural", icon: Users }] : []),
+    ...(siteConfig?.utilidade_ativo ? [{ id: "utilidade", label: "Utilidade pública", icon: Phone }] : []),
     { id: "estatisticas", label: "Números", icon: TrendingUp },
     { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
@@ -11160,6 +11348,7 @@ export default function ConectaComercio() {
       {modo === "estatisticas" && <EstatisticasPublicas />}
       {modo === "turismo" && <PaginaTurismo siteConfig={siteConfig} />}
       {modo === "mural" && <PaginaMural perfil={perfil} />}
+      {modo === "utilidade" && <PaginaUtilidadePublica />}
       {modo === "termos" && <PaginaLegal titulo="Termos de uso" texto={siteConfig?.termos_uso} />}
       {modo === "privacidade" && <PaginaLegal titulo="Política de privacidade" texto={siteConfig?.politica_privacidade} />}
       {modo === "conta" && (sessao && perfil ? <MinhaConta perfil={perfil} sessao={sessao} /> : <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />)}
