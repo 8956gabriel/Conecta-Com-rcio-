@@ -2151,6 +2151,7 @@ function AdminPanel() {
     sala_horario: "", sala_servicos: "",
     turismo_ativo: false, historia_cidade: "", historia_foto_url: "",
     mural_ativo: false,
+    termos_uso: "", politica_privacidade: "",
   };
 
   useEffect(() => {
@@ -2297,6 +2298,8 @@ function AdminPanel() {
         historia_cidade: siteConfigAdmin.historia_cidade || null,
         historia_foto_url: siteConfigAdmin.historia_foto_url || null,
         mural_ativo: !!siteConfigAdmin.mural_ativo,
+        termos_uso: siteConfigAdmin.termos_uso || null,
+        politica_privacidade: siteConfigAdmin.politica_privacidade || null,
       });
       if (error) throw error;
       setStatusIdentidade("ok");
@@ -5990,6 +5993,13 @@ function AdminPanel() {
                 <input value={siteConfigAdmin?.sala_servicos || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, sala_servicos: e.target.value }))} placeholder="Serviços oferecidos, separados por vírgula" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               </div>
 
+              <label className="font-body text-xs font-bold mt-2" style={{ color: C.ink }}>Termos de uso (aparece na página #/termos)</label>
+              <textarea value={siteConfigAdmin?.termos_uso || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, termos_uso: e.target.value }))} placeholder="Cole aqui o texto dos termos de uso" rows={6} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+
+              <label className="font-body text-xs font-bold mt-2" style={{ color: C.ink }}>Política de privacidade (aparece na página #/privacidade)</label>
+              <textarea value={siteConfigAdmin?.politica_privacidade || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, politica_privacidade: e.target.value }))} placeholder="Cole aqui o texto da política de privacidade" rows={6} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>Já deixamos um texto padrão pronto no banco de dados — edite aqui à vontade pra ajustar à sua realidade. Isso não substitui a orientação de um advogado, mas já cobre o básico da LGPD.</p>
+
               {statusIdentidade && statusIdentidade !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusIdentidade}</p>}
               {statusIdentidade === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Salvo! Recarregue o site para ver tudo aplicado.</p>}
               <button type="submit" disabled={salvandoIdentidade || !siteConfigAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 mt-1 disabled:opacity-60" style={{ background: C.blue }}>
@@ -9544,7 +9554,10 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         </div>
         <div className="max-w-6xl mx-auto px-4 md:px-6 mt-10 pt-5 border-t border-white/10 flex flex-col sm:flex-row justify-between gap-2">
           <p className="font-body text-white/40 text-xs">© 2026 Conecta Comércio · Desenvolvido por Gabriel Oliveira</p>
-          <p className="font-body text-white/40 text-xs">Feito para fortalecer quem move a economia local</p>
+          <div className="flex items-center gap-3">
+            <a href="#/termos" className="font-body text-white/40 text-xs hover:text-white">Termos de uso</a>
+            <a href="#/privacidade" className="font-body text-white/40 text-xs hover:text-white">Política de privacidade</a>
+          </div>
         </div>
       </footer>
 
@@ -10380,7 +10393,7 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
@@ -10388,10 +10401,40 @@ function modoDaHash(hash) {
   if (h.startsWith("#/estatisticas") || h.startsWith("#/numeros")) return "estatisticas";
   if (h.startsWith("#/turismo")) return "turismo";
   if (h.startsWith("#/mural")) return "mural";
+  if (h.startsWith("#/termos")) return "termos";
+  if (h.startsWith("#/privacidade")) return "privacidade";
   if (h.startsWith("#/empresa") || h.startsWith("#/vendedor")) return "empresario";
   if (h.startsWith("#/cadastro")) return "cadastro-conta";
   if (h.startsWith("#/entrar") || h.startsWith("#/conta")) return "conta";
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Página legal simples (Termos de uso / Política de privacidade) — texto
+// editável pelo admin, com parágrafos separados por linha em branco. FASE 45.
+// ---------------------------------------------------------------------------
+function PaginaLegal({ titulo, texto }) {
+  useEffect(() => {
+    document.title = `${titulo} — Conecta Comércio`;
+    return () => { document.title = "Conecta Comércio · Ivatuba - PR"; };
+  }, [titulo]);
+
+  const paragrafos = (texto || "").split(/\n{2,}/).map((t) => t.trim()).filter(Boolean);
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 md:px-6 py-10">
+      <SectionHeader eyebrow="Legal" title={titulo} />
+      <div className="flex flex-col gap-3.5 mt-4">
+        {paragrafos.length > 0 ? (
+          paragrafos.map((par, i) => (
+            <p key={i} className="font-body text-sm leading-relaxed" style={{ color: "#425A70" }}>{par}</p>
+          ))
+        ) : (
+          <p className="font-body text-sm" style={{ color: "#5C7186" }}>Conteúdo ainda não cadastrado.</p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -10987,6 +11030,8 @@ export default function ConectaComercio() {
       {modo === "estatisticas" && <EstatisticasPublicas />}
       {modo === "turismo" && <PaginaTurismo siteConfig={siteConfig} />}
       {modo === "mural" && <PaginaMural perfil={perfil} />}
+      {modo === "termos" && <PaginaLegal titulo="Termos de uso" texto={siteConfig?.termos_uso} />}
+      {modo === "privacidade" && <PaginaLegal titulo="Política de privacidade" texto={siteConfig?.politica_privacidade} />}
       {modo === "conta" && (sessao && perfil ? <MinhaConta perfil={perfil} sessao={sessao} /> : <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />)}
 
       {modo === "admin" && (
