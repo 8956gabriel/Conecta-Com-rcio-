@@ -50,6 +50,15 @@ function escurecerCor(hex, quantidade) {
   }
 }
 
+// Um anúncio patrocinado (FASE 35) pode ter prazo de validade (FASE 37 —
+// "destaque temporário"). Sem data marcada, vale pra sempre, como antes.
+function patrocinadoAtivo(e) {
+  if (!e?.patrocinado) return false;
+  if (!e.patrocinado_ate) return true;
+  const hoje = new Date().toISOString().slice(0, 10);
+  return e.patrocinado_ate >= hoje;
+}
+
 // Aplica a cor principal do site nas variáveis CSS globais — chamado assim
 // que a configuração de identidade visual é carregada (ou salva pelo admin).
 function aplicarCorPrincipal(hex) {
@@ -535,7 +544,7 @@ function EmpresaCard({ e, fav, onFav, onAbrir }) {
             Destaque
           </span>
         )}
-        {e.patrocinado && (
+        {patrocinadoAtivo(e) && (
           <span className="absolute bottom-2.5 right-2.5 flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ background: "rgba(255,255,255,0.95)", color: "#425A70" }}>
             <Sparkles size={10} /> Patrocinado
           </span>
@@ -598,6 +607,56 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
     supabase.from("cupons").select("*").eq("empresa_id", empresa.id).eq("ativo", true)
       .order("criado_em", { ascending: false }).then(({ data, error }) => setCupons(error ? [] : data || []));
   }, [empresa?.id]);
+
+  // Combos e promoções combinadas, produtos ativos (pro catálogo em PDF) e
+  // cartão fidelidade — tudo do FASE 37, mostrado no perfil público.
+  const [combos, setCombos] = useState(null);
+  const [produtosEmpresa, setProdutosEmpresa] = useState(null);
+  const [fidelidadeInfo, setFidelidadeInfo] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado || !empresa?.id) { setCombos([]); setProdutosEmpresa([]); setFidelidadeInfo(null); return; }
+    supabase.from("combos").select("*").eq("empresa_id", empresa.id).eq("ativo", true)
+      .order("criado_em", { ascending: false }).then(({ data, error }) => setCombos(error ? [] : data || []));
+    supabase.from("produtos").select("*").eq("empresa_id", empresa.id).eq("ativo", true)
+      .order("criado_em", { ascending: false }).then(({ data, error }) => setProdutosEmpresa(error ? [] : data || []));
+    supabase.from("fidelidade_config").select("*").eq("empresa_id", empresa.id).eq("ativo", true)
+      .maybeSingle().then(({ data }) => setFidelidadeInfo(data || null));
+  }, [empresa?.id]);
+
+  const baixarCatalogoPublicoPDF = () => {
+    const linhas = (produtosEmpresa || []).map((p) => `
+      <div class="item">
+        ${p.foto_url ? `<img src="${p.foto_url}" />` : `<div class="semfoto"></div>`}
+        <div>
+          <p class="nome">${p.nome}</p>
+          ${p.descricao ? `<p class="desc">${p.descricao}</p>` : ""}
+          <p class="preco">${p.preco ? `R$ ${Number(p.preco).toFixed(2).replace(".", ",")}` : ""}</p>
+        </div>
+      </div>`).join("");
+    const janela = window.open("", "_blank");
+    janela.document.write(`
+      <html><head><title>Catálogo — ${empresa.nome}</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:24px;color:#0E2233}
+        h1{font-size:20px;margin-bottom:4px}
+        p.sub{color:#5C7186;font-size:12px;margin-top:0;margin-bottom:20px}
+        .item{display:flex;gap:12px;align-items:center;border-bottom:1px solid #E4EAF0;padding:10px 0}
+        .item img{width:56px;height:56px;object-fit:cover;border-radius:8px}
+        .semfoto{width:56px;height:56px;border-radius:8px;background:#EAF2FA}
+        .nome{font-weight:bold;font-size:13px;margin:0}
+        .desc{font-size:11px;color:#5C7186;margin:2px 0}
+        .preco{font-size:12px;font-weight:bold;color:#0A5AA8;margin:2px 0 0}
+        @media print{body{padding:0}}
+      </style></head>
+      <body>
+        <h1>${empresa.nome}</h1>
+        <p class="sub">Catálogo gerado pelo Conecta Comércio</p>
+        ${linhas || "<p>Nenhum produto ativo no momento.</p>"}
+        <script>window.onload = () => window.print();</script>
+      </body></html>
+    `);
+    janela.document.close();
+  };
   const [nomeAvaliador, setNomeAvaliador] = useState("");
   const [notaAvaliacao, setNotaAvaliacao] = useState(5);
   const [comentarioAvaliacao, setComentarioAvaliacao] = useState("");
@@ -727,6 +786,56 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {combos && combos.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Combos e promoções</p>
+              {combos.map((c) => (
+                <div key={c.id} className="rounded-xl border p-3" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-body text-xs font-bold" style={{ color: C.ink }}>{c.titulo}</p>
+                    {c.preco && <span className="font-body text-xs font-extrabold shrink-0" style={{ color: C.blue }}>R$ {Number(c.preco).toFixed(2).replace(".", ",")}</span>}
+                  </div>
+                  {c.descricao && <p className="font-body text-[11px] mt-0.5" style={{ color: "#5C7186" }}>{c.descricao}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {fidelidadeInfo && (
+            <div className="rounded-xl border p-3 flex items-center gap-2" style={{ borderColor: C.blue, background: C.blueTint2 }}>
+              <BadgeCheck size={16} color={C.blue} />
+              <p className="font-body text-xs" style={{ color: "#425A70" }}>
+                <span className="font-bold">Cartão fidelidade:</span> a cada {fidelidadeInfo.meta_carimbos} compras{fidelidadeInfo.recompensa ? `, ganhe ${fidelidadeInfo.recompensa.toLowerCase()}` : ""}. Peça pra loja marcar seu carimbo.
+              </p>
+            </div>
+          )}
+
+          {produtosEmpresa && produtosEmpresa.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Produtos ({produtosEmpresa.length})</p>
+                <button onClick={baixarCatalogoPublicoPDF} className="font-body text-[11px] font-bold rounded-lg px-2.5 py-1.5 border flex items-center gap-1" style={{ borderColor: C.line, color: "#425A70" }}>
+                  <FileText size={12} /> Catálogo em PDF
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {produtosEmpresa.slice(0, 6).map((p) => (
+                  <div key={p.id} className="rounded-lg border p-2 flex items-center gap-2" style={{ borderColor: C.line }}>
+                    {p.foto_url ? (
+                      <img loading="lazy" decoding="async" src={p.foto_url} alt="" className="w-9 h-9 rounded-md object-cover shrink-0" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-md shrink-0" style={{ background: C.blueTint }} />
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-body text-[11px] font-bold truncate" style={{ color: C.ink }}>{p.nome}</p>
+                      {p.preco && <p className="font-body text-[10px]" style={{ color: C.blue }}>R$ {Number(p.preco).toFixed(2).replace(".", ",")}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -1288,7 +1397,7 @@ function AdminPanel() {
   const [empresasPend, setEmpresasPend] = useState(null); // null = carregando/indisponível
   const [statusEmpresa, setStatusEmpresa] = useState({});
   const [editandoEmpresa, setEditandoEmpresa] = useState(null);
-  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false });
+  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, patrocinado_ate: "", fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false });
   const [enviandoLogoEmpresa, setEnviandoLogoEmpresa] = useState(false);
   const [enviandoBannerEmpresa, setEnviandoBannerEmpresa] = useState(false);
   const [enviandoFotoGaleria, setEnviandoFotoGaleria] = useState(false);
@@ -1343,6 +1452,7 @@ function AdminPanel() {
       destaque: !!e.destaque, fotos_urls: e.fotos_urls || [],
       email: e.email || "", whatsapp: e.whatsapp || "", instagram: e.instagram || "",
       cpf: e.cpf || "", cnpj: e.cnpj || "", aceita_cartao_servidor: !!e.aceita_cartao_servidor, patrocinado: !!e.patrocinado,
+      patrocinado_ate: e.patrocinado_ate || "",
     });
   };
 
@@ -1408,6 +1518,7 @@ function AdminPanel() {
       email: formEmpresa.email || null, whatsapp: formEmpresa.whatsapp || null, instagram: formEmpresa.instagram || null,
       cpf: formEmpresa.cpf || null, cnpj: formEmpresa.cnpj || null,
       aceita_cartao_servidor: formEmpresa.aceita_cartao_servidor, patrocinado: formEmpresa.patrocinado,
+      patrocinado_ate: formEmpresa.patrocinado_ate || null,
     }).eq("id", id);
     if (!error) setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, ...formEmpresa } : e)));
     setEditandoEmpresa(null);
@@ -2467,6 +2578,56 @@ function AdminPanel() {
   };
 
   // -------------------------------------------------------------------------
+  // Combos e promoções combinadas — o admin também pode cadastrar pra
+  // qualquer empresa. FASE 37.
+  // -------------------------------------------------------------------------
+  const [combosAdmin, setCombosAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("combos").select("*, empresas(nome)").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setCombosAdmin(data || []);
+    });
+  }, []);
+  const comboAdminVazio = { empresa_id: "", titulo: "", descricao: "", preco: "" };
+  const [novoComboAdmin, setNovoComboAdmin] = useState(comboAdminVazio);
+  const [criandoComboAdmin, setCriandoComboAdmin] = useState(false);
+  const [statusComboAdmin, setStatusComboAdmin] = useState("");
+
+  const criarComboAdmin = async (e) => {
+    e.preventDefault();
+    setStatusComboAdmin("");
+    if (!novoComboAdmin.empresa_id || !novoComboAdmin.titulo.trim()) { setStatusComboAdmin("Escolha a empresa e informe o título."); return; }
+    setCriandoComboAdmin(true);
+    try {
+      const { data, error } = await supabase.from("combos").insert({
+        empresa_id: novoComboAdmin.empresa_id,
+        titulo: novoComboAdmin.titulo,
+        descricao: novoComboAdmin.descricao || null,
+        preco: novoComboAdmin.preco ? Number(novoComboAdmin.preco) : null,
+      }).select("*, empresas(nome)").single();
+      if (error) throw error;
+      setCombosAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovoComboAdmin(comboAdminVazio);
+      setStatusComboAdmin("ok");
+      notificar("Combo criado.");
+    } catch (err) {
+      setStatusComboAdmin(err.message || "Erro ao criar combo.");
+    } finally {
+      setCriandoComboAdmin(false);
+    }
+  };
+
+  const alternarAtivoComboAdmin = async (id, ativo) => {
+    const { error } = await supabase.from("combos").update({ ativo }).eq("id", id);
+    if (!error) { setCombosAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ativo } : c))); notificar(ativo ? "Combo ativado." : "Combo desativado."); }
+  };
+
+  const apagarComboAdmin = async (id) => {
+    const { error } = await supabase.from("combos").delete().eq("id", id);
+    if (!error) { setCombosAdmin((atual) => atual.filter((c) => c.id !== id)); notificar("Combo excluído."); }
+  };
+
+  // -------------------------------------------------------------------------
   // Avaliações de empresas — o público comenta, o admin só modera (apaga
   // comentário abusivo/spam). FASE 34.
   // -------------------------------------------------------------------------
@@ -2985,6 +3146,7 @@ function AdminPanel() {
     { id: "servicos", label: "Serviços do Empreendedor", icon: Landmark },
     { id: "enquetes", label: "Enquetes", icon: Vote },
     { id: "cupons", label: "Cupons de desconto", icon: Tag },
+    { id: "combos", label: "Combos e promoções", icon: HandCoins },
     { id: "avaliacoes", label: "Avaliações", icon: MessageCircle },
     { id: "depoimentos", label: "Depoimentos", icon: Star },
     { id: "faq", label: "FAQ", icon: FileText },
@@ -3683,6 +3845,14 @@ function AdminPanel() {
                         <input type="checkbox" checked={formEmpresa.patrocinado} onChange={(e) => setFormEmpresa((f) => ({ ...f, patrocinado: e.target.checked }))} />
                         Anúncio patrocinado (aparece primeiro nas buscas)
                       </label>
+                      {formEmpresa.patrocinado && (
+                        <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit" style={{ color: "#425A70" }}>
+                          Destaque temporário até:
+                          <input type="date" value={formEmpresa.patrocinado_ate} onChange={(e) => setFormEmpresa((f) => ({ ...f, patrocinado_ate: e.target.value }))}
+                            className="font-body text-xs border rounded-lg px-2 py-1 outline-none" style={{ borderColor: C.line }} />
+                          <span className="font-body text-[10px]" style={{ color: "#8896A6" }}>(em branco = sem prazo)</span>
+                        </label>
+                      )}
                       <div>
                         <p className="font-body text-xs font-bold mb-1.5" style={{ color: "#425A70" }}>Galeria de fotos</p>
                         <div className="flex flex-wrap gap-2">
@@ -4523,6 +4693,45 @@ function AdminPanel() {
                 </div>
               ))}
               {(cuponsAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum cupom cadastrado ainda.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "combos" && (
+          <div>
+            <SectionHeader eyebrow="Vendas" title="Combos e promoções combinadas" sub="Cadastre pra qualquer empresa — os donos também podem criar os deles" />
+            <form onSubmit={criarComboAdmin} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <select value={novoComboAdmin.empresa_id} onChange={(e) => setNovoComboAdmin((v) => ({ ...v, empresa_id: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }}>
+                <option value="">Selecione a empresa</option>
+                {listaEmpresas.map((emp) => <option key={emp.id} value={emp.id}>{emp.nome}</option>)}
+              </select>
+              <input value={novoComboAdmin.titulo} onChange={(e) => setNovoComboAdmin((v) => ({ ...v, titulo: e.target.value }))} placeholder="Título (ex: Combo lanche + suco)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <input value={novoComboAdmin.preco} onChange={(e) => setNovoComboAdmin((v) => ({ ...v, preco: e.target.value }))} type="number" step="0.01" placeholder="Preço do combo (R$)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novoComboAdmin.descricao} onChange={(e) => setNovoComboAdmin((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição (opcional)" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              {statusComboAdmin && statusComboAdmin !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusComboAdmin}</p>}
+              {statusComboAdmin === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Combo criado!</p>}
+              <button type="submit" disabled={criandoComboAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                {criandoComboAdmin ? "Criando..." : "Criar combo"}
+              </button>
+            </form>
+            <div className="flex flex-col gap-3 max-w-lg">
+              {(combosAdmin ?? []).map((c) => (
+                <div key={c.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.titulo} <span className="font-body text-xs font-normal" style={{ color: "#5C7186" }}>· {c.empresas?.nome}</span></p>
+                    <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: c.ativo ? "#E7F6EE" : "#FBEAE5", color: c.ativo ? "#1E8E5A" : "#B4462F" }}>
+                      {c.ativo ? "Ativo" : "Inativo"}
+                    </span>
+                  </div>
+                  {c.descricao && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{c.descricao}</p>}
+                  {c.preco && <p className="font-body text-xs mt-1 font-bold" style={{ color: C.blue }}>R$ {Number(c.preco).toFixed(2).replace(".", ",")}</p>}
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => alternarAtivoComboAdmin(c.id, !c.ativo)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>{c.ativo ? "Desativar" : "Ativar"}</button>
+                    <button onClick={() => { if (confirmarExclusao("Excluir esse combo?")) apagarComboAdmin(c.id); }} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ color: "#B4462F" }}>Excluir</button>
+                  </div>
+                </div>
+              ))}
+              {(combosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum combo cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -5541,6 +5750,8 @@ function EmpresarioPanel() {
         carregarMinhasVagas(data.id);
         carregarMinhasAvaliacoes(data.id);
         carregarMeusCupons(data.id);
+        carregarMeusCombos(data.id);
+        carregarFidelidade(data.id);
       }
     })();
   }, []);
@@ -5600,6 +5811,166 @@ function EmpresarioPanel() {
     if (!error) setMeusCupons((atual) => atual.filter((c) => c.id !== id));
   };
 
+  // Combos e promoções combinadas (ex: "Combo lanche + suco por R$ 20").
+  const [meusCombos, setMeusCombos] = useState(null);
+  const comboVazio = { titulo: "", descricao: "", preco: "" };
+  const [novoCombo, setNovoCombo] = useState(comboVazio);
+  const [criandoCombo, setCriandoCombo] = useState(false);
+  const [statusCombo, setStatusCombo] = useState("");
+
+  const carregarMeusCombos = (idEmpresa) => {
+    if (!supabaseConfigurado || !idEmpresa) return;
+    supabase.from("combos").select("*").eq("empresa_id", idEmpresa).order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMeusCombos(data || []);
+    });
+  };
+
+  const criarCombo = async (e, idEmpresaAtual) => {
+    e.preventDefault();
+    setStatusCombo("");
+    if (!novoCombo.titulo.trim()) { setStatusCombo("Informe o título do combo."); return; }
+    setCriandoCombo(true);
+    try {
+      const { data, error } = await supabase.from("combos").insert({
+        empresa_id: idEmpresaAtual,
+        titulo: novoCombo.titulo,
+        descricao: novoCombo.descricao || null,
+        preco: novoCombo.preco ? Number(novoCombo.preco) : null,
+      }).select().single();
+      if (error) throw error;
+      setMeusCombos((atual) => [data, ...(atual ?? [])]);
+      setNovoCombo(comboVazio);
+      setStatusCombo("ok");
+    } catch (err) {
+      setStatusCombo(err.message || "Erro ao criar combo.");
+    } finally {
+      setCriandoCombo(false);
+    }
+  };
+
+  const alternarAtivoCombo = async (id, ativo) => {
+    const { error } = await supabase.from("combos").update({ ativo }).eq("id", id);
+    if (!error) setMeusCombos((atual) => atual.map((c) => (c.id === id ? { ...c, ativo } : c)));
+  };
+
+  const apagarCombo = async (id) => {
+    const { error } = await supabase.from("combos").delete().eq("id", id);
+    if (!error) setMeusCombos((atual) => atual.filter((c) => c.id !== id));
+  };
+
+  // Cartão fidelidade digital — a loja define a regra (ex: "a cada 10
+  // compras, ganhe 1 grátis") e vai marcando os carimbos de cada cliente
+  // (identificado pelo telefone) direto no balcão.
+  const [fidelidadeConfig, setFidelidadeConfig] = useState(null); // null = carregando
+  const [salvandoFidelidadeConfig, setSalvandoFidelidadeConfig] = useState(false);
+  const [statusFidelidadeConfig, setStatusFidelidadeConfig] = useState("");
+  const [buscaFidelidadeTelefone, setBuscaFidelidadeTelefone] = useState("");
+  const [buscaFidelidadeNome, setBuscaFidelidadeNome] = useState("");
+  const [clienteFidelidade, setClienteFidelidade] = useState(null); // undefined = buscando, null = não encontrado ainda
+  const [meusClientesFidelidade, setMeusClientesFidelidade] = useState(null);
+
+  const carregarFidelidade = (idEmpresa) => {
+    if (!supabaseConfigurado || !idEmpresa) return;
+    supabase.from("fidelidade_config").select("*").eq("empresa_id", idEmpresa).maybeSingle().then(({ data }) => {
+      setFidelidadeConfig(data || { empresa_id: idEmpresa, meta_carimbos: 10, recompensa: "", ativo: false });
+    });
+    supabase.from("fidelidade_clientes").select("*").eq("empresa_id", idEmpresa).order("carimbos", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMeusClientesFidelidade(data || []);
+    });
+  };
+
+  const salvarFidelidadeConfig = async (e, idEmpresaAtual) => {
+    e.preventDefault();
+    setStatusFidelidadeConfig("");
+    setSalvandoFidelidadeConfig(true);
+    try {
+      const { error } = await supabase.from("fidelidade_config").upsert({
+        empresa_id: idEmpresaAtual,
+        meta_carimbos: Number(fidelidadeConfig.meta_carimbos) || 10,
+        recompensa: fidelidadeConfig.recompensa || null,
+        ativo: fidelidadeConfig.ativo,
+      });
+      if (error) throw error;
+      setStatusFidelidadeConfig("ok");
+    } catch (err) {
+      setStatusFidelidadeConfig(err.message || "Erro ao salvar.");
+    } finally {
+      setSalvandoFidelidadeConfig(false);
+    }
+  };
+
+  const buscarOuCriarClienteFidelidade = async (idEmpresaAtual) => {
+    const telefone = buscaFidelidadeTelefone.replace(/\D/g, "");
+    if (!telefone) return;
+    setClienteFidelidade(undefined);
+    const { data } = await supabase.from("fidelidade_clientes").select("*").eq("empresa_id", idEmpresaAtual).eq("telefone", telefone).maybeSingle();
+    if (data) { setClienteFidelidade(data); return; }
+    const { data: novo, error } = await supabase.from("fidelidade_clientes").insert({
+      empresa_id: idEmpresaAtual, telefone, nome: buscaFidelidadeNome || null, carimbos: 0,
+    }).select().single();
+    if (!error) {
+      setClienteFidelidade(novo);
+      setMeusClientesFidelidade((atual) => [novo, ...(atual ?? [])]);
+    }
+  };
+
+  const darCarimbo = async () => {
+    if (!clienteFidelidade) return;
+    const novoValor = clienteFidelidade.carimbos + 1;
+    const { error } = await supabase.from("fidelidade_clientes").update({ carimbos: novoValor }).eq("id", clienteFidelidade.id);
+    if (!error) {
+      setClienteFidelidade((c) => ({ ...c, carimbos: novoValor }));
+      setMeusClientesFidelidade((atual) => atual.map((c) => (c.id === clienteFidelidade.id ? { ...c, carimbos: novoValor } : c)));
+    }
+  };
+
+  const resgatarFidelidade = async () => {
+    if (!clienteFidelidade) return;
+    const { error } = await supabase.from("fidelidade_clientes").update({ carimbos: 0 }).eq("id", clienteFidelidade.id);
+    if (!error) {
+      setClienteFidelidade((c) => ({ ...c, carimbos: 0 }));
+      setMeusClientesFidelidade((atual) => atual.map((c) => (c.id === clienteFidelidade.id ? { ...c, carimbos: 0 } : c)));
+    }
+  };
+
+  // Catálogo de produtos em PDF — abre uma página pronta pra imprimir (o
+  // cliente escolhe "Salvar como PDF" na janela de impressão do navegador).
+  const baixarCatalogoPDF = () => {
+    const produtosAtivos = (meusProdutosReais || []).filter((p) => p.ativo);
+    const linhas = produtosAtivos.map((p) => `
+      <div class="item">
+        ${p.foto_url ? `<img src="${p.foto_url}" />` : `<div class="semfoto"></div>`}
+        <div>
+          <p class="nome">${p.nome}</p>
+          ${p.descricao ? `<p class="desc">${p.descricao}</p>` : ""}
+          <p class="preco">${p.preco ? `R$ ${Number(p.preco).toFixed(2).replace(".", ",")}` : ""}</p>
+        </div>
+      </div>`).join("");
+    const janela = window.open("", "_blank");
+    janela.document.write(`
+      <html><head><title>Catálogo — ${perfilForm.nome || "Minha empresa"}</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:24px;color:#0E2233}
+        h1{font-size:20px;margin-bottom:4px}
+        p.sub{color:#5C7186;font-size:12px;margin-top:0;margin-bottom:20px}
+        .item{display:flex;gap:12px;align-items:center;border-bottom:1px solid #E4EAF0;padding:10px 0}
+        .item img{width:56px;height:56px;object-fit:cover;border-radius:8px}
+        .semfoto{width:56px;height:56px;border-radius:8px;background:#EAF2FA}
+        .nome{font-weight:bold;font-size:13px;margin:0}
+        .desc{font-size:11px;color:#5C7186;margin:2px 0}
+        .preco{font-size:12px;font-weight:bold;color:#0A5AA8;margin:2px 0 0}
+        @media print{body{padding:0}}
+      </style></head>
+      <body>
+        <h1>${perfilForm.nome || "Catálogo de produtos"}</h1>
+        <p class="sub">Catálogo gerado pelo Conecta Comércio</p>
+        ${linhas || "<p>Nenhum produto ativo no momento.</p>"}
+        <script>window.onload = () => window.print();</script>
+      </body></html>
+    `);
+    janela.document.close();
+  };
+
   // Avaliações recebidas pela empresa — o dono pode responder.
   const [minhasAvaliacoes, setMinhasAvaliacoes] = useState(null);
   const [respostaAvaliacao, setRespostaAvaliacao] = useState({}); // { [id]: texto }
@@ -5648,6 +6019,8 @@ function EmpresarioPanel() {
     { id: "promocoes", label: "Promoções", icon: Tag },
     { id: "vagas", label: "Publicar vaga", icon: Briefcase },
     { id: "cupons", label: "Cupons de desconto", icon: Tag },
+    { id: "combos", label: "Combos e promoções", icon: HandCoins },
+    { id: "fidelidade", label: "Cartão fidelidade", icon: BadgeCheck },
     { id: "avaliacoes", label: "Avaliações", icon: Star },
     { id: "visualizacoes", label: "Visualizações", icon: Eye },
   ];
@@ -5710,11 +6083,16 @@ function EmpresarioPanel() {
 
         {tab === "produtos" && (
           <div>
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
               <SectionHeader eyebrow="Vitrine" title="Meus produtos" />
-              <button onClick={() => setModalProdutoAberto(true)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-2 flex items-center gap-1.5 h-fit shrink-0" style={{ background: C.blue }}>
-                <PlusCircle size={14} /> Novo produto
-              </button>
+              <div className="flex gap-2 h-fit shrink-0">
+                <button onClick={baixarCatalogoPDF} className="font-body text-xs font-bold rounded-lg px-3 py-2 flex items-center gap-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>
+                  <FileText size={14} /> Catálogo em PDF
+                </button>
+                <button onClick={() => setModalProdutoAberto(true)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-2 flex items-center gap-1.5" style={{ background: C.blue }}>
+                  <PlusCircle size={14} /> Novo produto
+                </button>
+              </div>
             </div>
             <div className="flex flex-col gap-3 -mt-4">
               {(meusProdutosReais ?? meusProdutos.map((p, i) => ({ id: `demo-${i}`, ...p, preco_exibicao: p.preco }))).map((p) => {
@@ -5868,6 +6246,114 @@ function EmpresarioPanel() {
                 </div>
               ))}
               {(meusCupons ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum cupom criado ainda.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "combos" && (
+          <div>
+            <SectionHeader eyebrow="Vendas" title="Combos e promoções combinadas" sub="Ex: 'Combo lanche + suco por R$ 20' — aparece no perfil público da sua empresa" />
+            <form onSubmit={(e) => criarCombo(e, empresaId)} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-md mb-6" style={{ borderColor: C.line }}>
+              <input value={novoCombo.titulo} onChange={(e) => setNovoCombo((v) => ({ ...v, titulo: e.target.value }))} placeholder="Título (ex: Combo lanche + suco)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novoCombo.descricao} onChange={(e) => setNovoCombo((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição (opcional)" rows={2}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novoCombo.preco} onChange={(e) => setNovoCombo((v) => ({ ...v, preco: e.target.value }))} type="number" step="0.01" placeholder="Preço do combo (R$)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              {statusCombo && statusCombo !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusCombo}</p>}
+              {statusCombo === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Combo criado!</p>}
+              <button type="submit" disabled={criandoCombo} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+                {criandoCombo ? "Criando..." : "Criar combo"}
+              </button>
+            </form>
+            <div className="flex flex-col gap-3 max-w-md">
+              {(meusCombos ?? []).map((c) => (
+                <div key={c.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.titulo}</p>
+                    <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: c.ativo ? "#E7F6EE" : "#FBEAE5", color: c.ativo ? "#1E8E5A" : "#B4462F" }}>
+                      {c.ativo ? "Ativo" : "Inativo"}
+                    </span>
+                  </div>
+                  {c.descricao && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{c.descricao}</p>}
+                  {c.preco && <p className="font-body text-xs mt-1 font-bold" style={{ color: C.blue }}>R$ {Number(c.preco).toFixed(2).replace(".", ",")}</p>}
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => alternarAtivoCombo(c.id, !c.ativo)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>{c.ativo ? "Desativar" : "Ativar"}</button>
+                    <button onClick={() => apagarCombo(c.id)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ color: "#B4462F" }}>Excluir</button>
+                  </div>
+                </div>
+              ))}
+              {(meusCombos ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum combo criado ainda.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "fidelidade" && fidelidadeConfig && (
+          <div>
+            <SectionHeader eyebrow="Fidelização" title="Cartão fidelidade" sub="Defina a regra e vá marcando os carimbos dos clientes direto no balcão" />
+            <form onSubmit={(e) => salvarFidelidadeConfig(e, empresaId)} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-md mb-6" style={{ borderColor: C.line }}>
+              <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={fidelidadeConfig.ativo} onChange={(e) => setFidelidadeConfig((f) => ({ ...f, ativo: e.target.checked }))} />
+                Ativar cartão fidelidade (aparece no perfil público)
+              </label>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="font-body text-xs" style={{ color: "#425A70" }}>
+                  Carimbos necessários
+                  <input value={fidelidadeConfig.meta_carimbos} onChange={(e) => setFidelidadeConfig((f) => ({ ...f, meta_carimbos: e.target.value }))} type="number" min="1"
+                    className="mt-1 font-body text-sm border rounded-lg px-3 py-2.5 outline-none w-full" style={{ borderColor: C.line }} />
+                </label>
+              </div>
+              <label className="font-body text-xs" style={{ color: "#425A70" }}>
+                Recompensa
+                <input value={fidelidadeConfig.recompensa || ""} onChange={(e) => setFidelidadeConfig((f) => ({ ...f, recompensa: e.target.value }))} placeholder="Ex: 1 produto grátis"
+                  className="mt-1 font-body text-sm border rounded-lg px-3 py-2.5 outline-none w-full" style={{ borderColor: C.line }} />
+              </label>
+              {statusFidelidadeConfig && statusFidelidadeConfig !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusFidelidadeConfig}</p>}
+              {statusFidelidadeConfig === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Salvo!</p>}
+              <button type="submit" disabled={salvandoFidelidadeConfig} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+                {salvandoFidelidadeConfig ? "Salvando..." : "Salvar regra"}
+              </button>
+            </form>
+
+            <div className="rounded-2xl border p-5 max-w-md mb-6" style={{ borderColor: C.line }}>
+              <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Marcar carimbo de um cliente</p>
+              <div className="flex gap-2 mb-2">
+                <input value={buscaFidelidadeTelefone} onChange={(e) => setBuscaFidelidadeTelefone(e.target.value)} placeholder="Telefone do cliente"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none flex-1" style={{ borderColor: C.line }} />
+                <input value={buscaFidelidadeNome} onChange={(e) => setBuscaFidelidadeNome(e.target.value)} placeholder="Nome (1ª vez)"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none flex-1" style={{ borderColor: C.line }} />
+              </div>
+              <button onClick={() => buscarOuCriarClienteFidelidade(empresaId)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border w-full" style={{ borderColor: C.line, color: "#425A70" }}>
+                Buscar / cadastrar cliente
+              </button>
+              {clienteFidelidade === undefined && <p className="font-body text-xs mt-2" style={{ color: "#5C7186" }}>Buscando...</p>}
+              {clienteFidelidade && (
+                <div className="mt-3 rounded-xl p-3" style={{ background: C.blueTint2 }}>
+                  <p className="font-body text-sm font-bold" style={{ color: C.ink }}>{clienteFidelidade.nome || clienteFidelidade.telefone}</p>
+                  <p className="font-body text-xs mt-0.5" style={{ color: "#425A70" }}>
+                    {clienteFidelidade.carimbos} de {fidelidadeConfig.meta_carimbos} carimbos
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={darCarimbo} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 text-white" style={{ background: "#25A85B" }}>+1 carimbo</button>
+                    {clienteFidelidade.carimbos >= fidelidadeConfig.meta_carimbos && (
+                      <button onClick={resgatarFidelidade} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 text-white" style={{ background: C.amber, color: C.blueDeep }}>Resgatar e zerar</button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="max-w-md">
+              <p className="font-display font-bold text-sm mb-2" style={{ color: C.ink }}>Clientes cadastrados</p>
+              <div className="flex flex-col gap-2">
+                {(meusClientesFidelidade ?? []).map((c) => (
+                  <div key={c.id} className="flex items-center justify-between rounded-lg border px-3 py-2" style={{ borderColor: C.line }}>
+                    <span className="font-body text-xs" style={{ color: "#425A70" }}>{c.nome || c.telefone}</span>
+                    <span className="font-body text-xs font-bold" style={{ color: C.blue }}>{c.carimbos}/{fidelidadeConfig.meta_carimbos}</span>
+                  </div>
+                ))}
+                {(meusClientesFidelidade ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum cliente cadastrado ainda.</p>}
+              </div>
             </div>
           </div>
         )}
@@ -6893,7 +7379,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (!supabaseConfigurado) return;
     supabase
       .from("empresas")
-      .select("id, nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, logo_url, facebook, site, destaque, patrocinado, whatsapp, instagram, endereco, google_maps_url, email, criado_em, fotos_urls")
+      .select("id, nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, logo_url, facebook, site, destaque, patrocinado, patrocinado_ate, whatsapp, instagram, endereco, google_maps_url, email, criado_em, fotos_urls")
       .eq("status", "aprovada")
       .order("destaque", { ascending: false })
       .order("visualizacoes", { ascending: false })
@@ -6903,7 +7389,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           setEmpresasReais(data.map((d) => ({
             id: d.id, nome: d.nome, cat: d.categoria, bairro: d.bairro, cidade: d.cidade,
             rating: d.rating ?? "—", cartaoServidor: !!d.cartao_servidor, itens: d.itens ?? 0,
-            banner_url: d.banner_url, logo_url: d.logo_url, facebook: d.facebook, site: d.site, destaque: d.destaque, patrocinado: !!d.patrocinado, whatsapp: d.whatsapp,
+            banner_url: d.banner_url, logo_url: d.logo_url, facebook: d.facebook, site: d.site, destaque: d.destaque, patrocinado: !!d.patrocinado, patrocinado_ate: d.patrocinado_ate || null, whatsapp: d.whatsapp,
             instagram: d.instagram, endereco: d.endereco, google_maps_url: d.google_maps_url, email: d.email, criado_em: d.criado_em,
             fotos_urls: d.fotos_urls || [],
             verificada: !!(d.logo_url && d.whatsapp && d.endereco && (d.instagram || d.site)),
@@ -7019,7 +7505,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (ordenacaoEmpresas === "avaliacao") lista.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
     // Anúncio patrocinado — empresas marcadas pelo admin aparecem primeiro
     // nos resultados de busca por nome/categoria.
-    if (temBusca) lista.sort((a, b) => (b.patrocinado ? 1 : 0) - (a.patrocinado ? 1 : 0));
+    if (temBusca) lista.sort((a, b) => (patrocinadoAtivo(b) ? 1 : 0) - (patrocinadoAtivo(a) ? 1 : 0));
     return lista;
   }, [query, listaBase, ordenacaoEmpresas]);
 
