@@ -5486,6 +5486,23 @@ function SiteHome({ onAuth, logoUrl, frase }) {
   const [prestadoresReais, setPrestadoresReais] = useState(null);
   const [faqAberta, setFaqAberta] = useState(null);
   const [faqReais, setFaqReais] = useState(null);
+
+  // Números reais da plataforma pro hero (empresas/produtos/vagas) — antes
+  // eram 3 números fixos (206/540/18) que nunca mudavam de verdade.
+  const [statsPublicosHome, setStatsPublicosHome] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) { setStatsPublicosHome({ empresas: 206, produtos: 540, vagas: 18 }); return; }
+    const contarPublico = (tabela, filtro) => {
+      let q = supabase.from(tabela).select("*", { count: "exact", head: true });
+      if (filtro) q = filtro(q);
+      return q.then(({ count }) => count ?? 0);
+    };
+    Promise.all([
+      contarPublico("empresas", (q) => q.eq("status", "aprovada")),
+      contarPublico("produtos", (q) => q.eq("ativo", true)),
+      contarPublico("vagas", (q) => q.eq("status", "aberta")),
+    ]).then(([empresas, produtos, vagas]) => setStatsPublicosHome({ empresas, produtos, vagas }));
+  }, []);
   useEffect(() => {
     if (!supabaseConfigurado) return;
     supabase.from("faq").select("*").eq("ativa", true).order("ordem").then(({ data, error }) => {
@@ -5754,7 +5771,7 @@ function SiteHome({ onAuth, logoUrl, frase }) {
   return (
     <div className="font-body min-h-screen" style={{ background: "#fff", color: C.ink }}>
       {/* Barra institucional */}
-      <div className="text-white text-[11px] font-body" style={{ background: C.blueDeep }}>
+      <div className="text-white text-[11px] font-body" style={{ background: `linear-gradient(90deg, ${C.blueDeep}, ${C.blue})` }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6 py-1.5 flex items-center justify-between">
           <span className="flex items-center gap-1.5 truncate"><MapPinned size={12} /> Feito para fortalecer o comércio de Ivatuba</span>
           <span className="hidden sm:inline">Desenvolvido por Gabriel Oliveira</span>
@@ -5866,13 +5883,22 @@ function SiteHome({ onAuth, logoUrl, frase }) {
               ))}
             </div>
 
-            <div className="flex gap-6 mt-8">
-              {[[206, "", "empresas"], [540, "+", "produtos"], [18, "", "vagas abertas"]].map(([n, s, l]) => (
-                <div key={l}>
-                  <p className="font-display font-extrabold text-white text-2xl tabular-nums">
-                    <AnimatedNumber value={n} suffix={s} />
-                  </p>
-                  <p className="font-body text-white/60 text-xs">{l}</p>
+            <div className="flex gap-3 mt-8 flex-wrap">
+              {[
+                [statsPublicosHome?.empresas, "empresas", Building2],
+                [statsPublicosHome?.produtos, "produtos", ShoppingBag],
+                [statsPublicosHome?.vagas, "vagas abertas", Briefcase],
+              ].map(([n, l, Icon]) => (
+                <div key={l} className="rounded-xl px-4 py-3 flex items-center gap-2.5" style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(6px)" }}>
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg shrink-0" style={{ background: "rgba(255,255,255,0.14)" }}>
+                    <Icon size={15} color="#fff" />
+                  </span>
+                  <div>
+                    <p className="font-display font-extrabold text-white text-lg leading-none tabular-nums">
+                      {statsPublicosHome ? <AnimatedNumber value={n ?? 0} /> : "…"}
+                    </p>
+                    <p className="font-body text-white/60 text-[11px] mt-0.5">{l}</p>
+                  </div>
                 </div>
               ))}
             </div>
