@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://conecta-com-rcio.vercel.app/sitemap.xml
+Sitemap: https://conecta-com-rcio.vercel.app/api/sitemap
