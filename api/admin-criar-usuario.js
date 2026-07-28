@@ -47,7 +47,7 @@ export default async function handler(req, res) {
 
     const {
       nome, email, senha, tipo, cpf, cnpj,
-      empresaNome, empresaCategoria, empresaWhatsapp, empresaInstagram, empresaEndereco, empresaGoogleMaps,
+      empresaNome, empresaCategoria, empresaWhatsapp, empresaInstagram, empresaEndereco, empresaGoogleMaps, empresaAceitaCartaoServidor,
       prestadorServico, prestadorWhatsapp, prestadorInstagram, prestadorEndereco, prestadorGoogleMaps,
     } = req.body || {};
     if (!nome || !email || !senha) {
@@ -106,6 +106,7 @@ export default async function handler(req, res) {
         email: email || null,
         cpf: cpf || null,
         cnpj: cnpj || null,
+        aceita_cartao_servidor: !!empresaAceitaCartaoServidor,
         status: "aprovada",
       });
       if (erroEmpresa) {
