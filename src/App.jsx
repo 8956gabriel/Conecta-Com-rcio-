@@ -1782,8 +1782,8 @@ function AdminPanel() {
   const [feirantes, setFeirantes] = useState(null);
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("feirantes").select("*").order("criado_em", { ascending: false }).then(({ data, error }) => {
-      if (!error) setFeirantes(data || []);
+    supabase.from("feirantes").select("*, credenciais(codigo)").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setFeirantes((data || []).map((f) => ({ ...f, credencial_codigo: f.credenciais?.codigo || null })));
     });
   }, []);
 
@@ -2546,6 +2546,29 @@ function AdminPanel() {
     }
     const { error } = await supabase.from("feirantes").update(valores).eq("id", id);
     if (!error) setFeirantes((atual) => atual.map((f) => (f.id === id ? { ...f, ...valores } : f)));
+  };
+
+  // Credencial digital da barraca — reaproveita o mesmo sistema de crachá
+  // com QR Code já usado nos eventos (aba Credenciamento), só que gerada
+  // automaticamente a partir do cadastro do feirante. FASE 39.
+  const [gerandoCredencialFeirante, setGerandoCredencialFeirante] = useState(null);
+  const gerarCredencialFeirante = async (f) => {
+    if (!f.evento_id) { notificar("Escolha a feira/evento antes de gerar a credencial.", "aviso"); return; }
+    setGerandoCredencialFeirante(f.id);
+    try {
+      const { data, error } = await supabase.from("credenciais").insert({
+        evento_id: f.evento_id, nome: f.nome, telefone: f.whatsapp, tipo: "Barraca", status: "ativa",
+      }).select().single();
+      if (error) throw error;
+      const { error: erroLink } = await supabase.from("feirantes").update({ credencial_id: data.id }).eq("id", f.id);
+      if (erroLink) throw erroLink;
+      setFeirantes((atual) => atual.map((x) => (x.id === f.id ? { ...x, credencial_id: data.id, credencial_codigo: data.codigo } : x)));
+      notificar("Credencial gerada.");
+    } catch (err) {
+      notificar("Não foi possível gerar: " + (err.message || "erro"), "erro");
+    } finally {
+      setGerandoCredencialFeirante(null);
+    }
   };
 
   // -------------------------------------------------------------------------
@@ -4413,8 +4436,35 @@ function AdminPanel() {
                         placeholder="Local na feira" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none w-44" style={{ borderColor: C.line }} />
                       <input value={editando.numero_estande} onChange={(e) => setEditandoLocalFeirante((s) => ({ ...s, [f.id]: { ...editando, numero_estande: e.target.value } }))}
                         placeholder="Nº da barraca" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none w-32" style={{ borderColor: C.line }} />
+                      <select value={editando.evento_id ?? (f.evento_id || "")} onChange={(e) => setEditandoLocalFeirante((s) => ({ ...s, [f.id]: { ...editando, evento_id: e.target.value } }))}
+                        className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }}>
+                        <option value="">Vincular a uma feira...</option>
+                        {listaEventos.filter((ev) => ev.tipo === "feira").map((ev) => <option key={ev.id} value={ev.id}>{ev.titulo}</option>)}
+                      </select>
                       <button onClick={() => salvarLocalFeirante(f.id)} className="font-body text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.blueTint, color: C.blue }}>Salvar local</button>
                     </div>
+                    {f.status === "aprovado" && (
+                      <div className="flex items-center gap-2 flex-wrap pt-1">
+                        {f.credencial_id || f.credencial_codigo ? (
+                          <>
+                            <span className="font-body text-[11px] font-semibold flex items-center gap-1" style={{ color: "#1E8E5A" }}>
+                              <BadgeCheck size={12} /> Credencial gerada
+                            </span>
+                            {f.credencial_codigo && (
+                              <button onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/#/credencial-${f.credencial_codigo}`); notificar("Link copiado."); }}
+                                className="font-body text-[11px] font-bold flex items-center gap-1" style={{ color: C.blue }}>
+                                Copiar link do crachá
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <button onClick={() => gerarCredencialFeirante({ ...f, evento_id: editando.evento_id ?? f.evento_id })} disabled={gerandoCredencialFeirante === f.id}
+                            className="font-body text-[11px] font-bold px-3 py-1.5 rounded-lg border disabled:opacity-60" style={{ borderColor: C.line, color: "#425A70" }}>
+                            {gerandoCredencialFeirante === f.id ? "Gerando..." : "Gerar credencial digital"}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                   );
                 })}
