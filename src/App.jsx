@@ -8,7 +8,7 @@ import {
   Pencil, Trash2, Tag, UserCircle2, ChevronLeft, ShieldCheck, BarChart3, Vote, Sparkles,
   FileText, Receipt, ClipboardList, HandCoins, ExternalLink,
   Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
-  Leaf, ArrowUp, ArrowDown, Phone, Repeat
+  Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
@@ -123,6 +123,58 @@ function resumoHorarioHoje(horario) {
   const cfg = horario[chaveHoje];
   if (!cfg?.aberto || !cfg.abre || !cfg.fecha) return "Fechado hoje";
   return estaAbertaAgora(horario) ? `Aberto agora · fecha às ${cfg.fecha}` : `Fechado agora · hoje das ${cfg.abre} às ${cfg.fecha}`;
+}
+
+// -----------------------------------------------------------------------
+// Pix "copia e cola" gerado no navegador — segue o padrão público do Banco
+// Central (BR Code / EMV), o mesmo que qualquer maquininha ou app de banco
+// usa. O site só monta o código; quem confirma o pagamento é o banco de
+// cada um, o Conecta Comércio não processa nem vê o dinheiro. FASE 51.
+// -----------------------------------------------------------------------
+function crc16Pix(payload) {
+  let crc = 0xffff;
+  for (let i = 0; i < payload.length; i++) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+      crc &= 0xffff;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, "0");
+}
+
+function campoPix(id, valor) {
+  const tamanho = String(valor).length.toString().padStart(2, "0");
+  return `${id}${tamanho}${valor}`;
+}
+
+function removerAcentos(texto) {
+  return (texto || "").normalize("NFD").split("").filter((ch) => {
+    const codigo = ch.charCodeAt(0);
+    return codigo < 0x0300 || codigo > 0x036f; // remove marcas de acento (combining diacritics)
+  }).join("");
+}
+
+function gerarPayloadPix({ chave, nomeRecebedor, cidade, valor }) {
+  if (!chave) return null;
+  const nome = removerAcentos(nomeRecebedor || "CONECTA COMERCIO").toUpperCase().slice(0, 25);
+  const cidadeLimpa = removerAcentos(cidade || "IVATUBA").toUpperCase().slice(0, 15);
+  const merchantAccount = campoPix("00", "BR.GOV.BCB.PIX") + campoPix("01", chave);
+  let payload =
+    campoPix("00", "01") +
+    campoPix("26", merchantAccount) +
+    campoPix("52", "0000") +
+    campoPix("53", "986");
+  if (valor != null && Number(valor) > 0) {
+    payload += campoPix("54", Number(valor).toFixed(2));
+  }
+  payload +=
+    campoPix("58", "BR") +
+    campoPix("59", nome || "CONECTA COMERCIO") +
+    campoPix("60", cidadeLimpa || "IVATUBA") +
+    campoPix("62", campoPix("05", "***"));
+  payload += "6304";
+  return payload + crc16Pix(payload);
 }
 
 // Editor compacto de horário de funcionamento, reutilizado no cadastro da
@@ -1204,7 +1256,7 @@ function ProdutoCard({ p, onAdicionarCarrinho, fav, onFav }) {
         {podeAdicionar && (
           <button type="button" onClick={() => onAdicionarCarrinho({
             itemId: p.id, nome: p.nome, preco: precoCarrinho, foto_url: p.foto_url,
-            empresaId: p.empresaId, empresaNome: p.empresa, empresaWhatsapp: p.whatsapp,
+            empresaId: p.empresaId, empresaNome: p.empresa, empresaWhatsapp: p.whatsapp, empresaChavePix: p.chavePix,
           })}
             className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold font-body text-white glow-btn"
             style={{ background: C.blue }}>
@@ -1737,14 +1789,14 @@ function AdminPanel() {
   const [empresasPend, setEmpresasPend] = useState(null); // null = carregando/indisponível
   const [statusEmpresa, setStatusEmpresa] = useState({});
   const [editandoEmpresa, setEditandoEmpresa] = useState(null);
-  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, patrocinado_ate: "", fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false, possui_mei: false, horario_funcionamento: null });
+  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, patrocinado_ate: "", fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false, possui_mei: false, horario_funcionamento: null, chave_pix: "" });
   const [enviandoLogoEmpresa, setEnviandoLogoEmpresa] = useState(false);
   const [enviandoBannerEmpresa, setEnviandoBannerEmpresa] = useState(false);
   const [enviandoFotoGaleria, setEnviandoFotoGaleria] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em, email, whatsapp, instagram, cpf, cnpj, possui_mei, horario_funcionamento").order("criado_em", { ascending: false })
+    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em, email, whatsapp, instagram, cpf, cnpj, possui_mei, horario_funcionamento, chave_pix").order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setEmpresasPend(data || []); });
   }, []);
 
@@ -1793,7 +1845,7 @@ function AdminPanel() {
       email: e.email || "", whatsapp: e.whatsapp || "", instagram: e.instagram || "",
       cpf: e.cpf || "", cnpj: e.cnpj || "", aceita_cartao_servidor: !!e.aceita_cartao_servidor, patrocinado: !!e.patrocinado,
       patrocinado_ate: e.patrocinado_ate || "", possui_mei: !!e.possui_mei,
-      horario_funcionamento: e.horario_funcionamento || null,
+      horario_funcionamento: e.horario_funcionamento || null, chave_pix: e.chave_pix || "",
     });
   };
 
@@ -1860,7 +1912,7 @@ function AdminPanel() {
       cpf: formEmpresa.cpf || null, cnpj: formEmpresa.cnpj || null,
       aceita_cartao_servidor: formEmpresa.aceita_cartao_servidor, patrocinado: formEmpresa.patrocinado,
       patrocinado_ate: formEmpresa.patrocinado_ate || null, possui_mei: formEmpresa.possui_mei,
-      horario_funcionamento: formEmpresa.horario_funcionamento,
+      horario_funcionamento: formEmpresa.horario_funcionamento, chave_pix: formEmpresa.chave_pix || null,
     }).eq("id", id);
     if (!error) setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, ...formEmpresa } : e)));
     setEditandoEmpresa(null);
@@ -4671,6 +4723,8 @@ function AdminPanel() {
                         <p className="font-body text-xs font-bold mb-1.5" style={{ color: C.ink }}>Horário de funcionamento</p>
                         <EditorHorarioSemana valor={formEmpresa.horario_funcionamento} onChange={(novo) => setFormEmpresa((f) => ({ ...f, horario_funcionamento: novo }))} />
                       </div>
+                      <input value={formEmpresa.chave_pix} onChange={(e) => setFormEmpresa((f) => ({ ...f, chave_pix: e.target.value }))}
+                        placeholder="Chave Pix (CPF, CNPJ, e-mail, telefone ou aleatória)" className="font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none w-full" style={{ borderColor: C.line }} />
                       <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
                         <input type="checkbox" checked={formEmpresa.aceita_cartao_servidor} onChange={(e) => setFormEmpresa((f) => ({ ...f, aceita_cartao_servidor: e.target.checked }))} />
                         Aceita Cartão do Servidor
@@ -7101,7 +7155,7 @@ function EmpresarioPanel() {
   // já existem no banco (tabela `empresas`), só faltava esta tela ler e
   // gravar de verdade em vez de mostrar valores fixos.
   const [empresaId, setEmpresaId] = useState(null);
-  const [perfilForm, setPerfilForm] = useState({ nome: "", whatsapp: "", instagram: "", endereco: "", horario_atendimento: "", horario_funcionamento: null });
+  const [perfilForm, setPerfilForm] = useState({ nome: "", whatsapp: "", instagram: "", endereco: "", horario_atendimento: "", horario_funcionamento: null, chave_pix: "" });
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [statusPerfil, setStatusPerfil] = useState("");
 
@@ -7234,7 +7288,7 @@ function EmpresarioPanel() {
         setPerfilForm({
           nome: data.nome || "", whatsapp: data.whatsapp || "", instagram: data.instagram || "",
           endereco: data.endereco || "", horario_atendimento: data.horario_atendimento || "",
-          horario_funcionamento: data.horario_funcionamento || null,
+          horario_funcionamento: data.horario_funcionamento || null, chave_pix: data.chave_pix || "",
         });
         setVisualizacoesEmpresa(data.visualizacoes ?? 0);
         carregarMeusProdutos(data.id);
@@ -7494,7 +7548,7 @@ function EmpresarioPanel() {
       const { error } = await supabase.from("empresas").update({
         nome: perfilForm.nome, whatsapp: perfilForm.whatsapp, instagram: perfilForm.instagram,
         endereco: perfilForm.endereco, horario_atendimento: perfilForm.horario_atendimento,
-        horario_funcionamento: perfilForm.horario_funcionamento,
+        horario_funcionamento: perfilForm.horario_funcionamento, chave_pix: perfilForm.chave_pix || null,
       }).eq("id", empresaId);
       if (error) throw error;
       setStatusPerfil("ok");
@@ -7568,6 +7622,9 @@ function EmpresarioPanel() {
                 <p className="font-body text-xs font-bold mb-1.5" style={{ color: C.ink }}>Horário de funcionamento (mostra "aberto agora" pro cliente)</p>
                 <EditorHorarioSemana valor={perfilForm.horario_funcionamento} onChange={(novo) => setPerfilForm((f) => ({ ...f, horario_funcionamento: novo }))} />
               </div>
+              <input value={perfilForm.chave_pix} onChange={(e) => atualizarPerfilForm("chave_pix", e.target.value)} placeholder="Chave Pix (CPF, CNPJ, e-mail, telefone ou aleatória)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <p className="font-body text-[11px] sm:col-span-2 -mt-1.5" style={{ color: "#8896A6" }}>Com a chave Pix cadastrada, o cliente vê um código Pix pra pagar direto no carrinho — o dinheiro cai na sua conta, o site não participa do pagamento.</p>
               <button type="submit" disabled={salvandoPerfil} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
                 {salvandoPerfil ? "Salvando..." : "Salvar alterações"}
               </button>
@@ -8634,11 +8691,12 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
   const [nomeClienteCarrinho, setNomeClienteCarrinho] = useState("");
   const [enderecoClienteCarrinho, setEnderecoClienteCarrinho] = useState("");
+  const [pixCopiadoId, setPixCopiadoId] = useState(null);
 
   const adicionarAoCarrinho = (produto) => {
     if (!produto?.empresaId || produto.preco == null) return;
     setCarrinho((atual) => {
-      const grupoAtual = atual[produto.empresaId] || { empresaNome: produto.empresaNome, empresaWhatsapp: produto.empresaWhatsapp, itens: {} };
+      const grupoAtual = atual[produto.empresaId] || { empresaNome: produto.empresaNome, empresaWhatsapp: produto.empresaWhatsapp, empresaChavePix: produto.empresaChavePix, itens: {} };
       const itemAtual = grupoAtual.itens[produto.itemId];
       const novoItem = itemAtual
         ? { ...itemAtual, quantidade: itemAtual.quantidade + 1 }
@@ -9017,7 +9075,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (!supabaseConfigurado) return;
     supabase
       .from("produtos")
-      .select("id, nome, descricao, preco, preco_promocional, estoque, foto_url, categoria, empresa_id, empresas(id, nome, whatsapp)")
+      .select("id, nome, descricao, preco, preco_promocional, estoque, foto_url, categoria, empresa_id, empresas(id, nome, whatsapp, chave_pix)")
       .eq("ativo", true)
       .order("criado_em", { ascending: false })
       .limit(40)
@@ -9031,6 +9089,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             empresa: d.empresas?.nome || "",
             empresaId: d.empresas?.id || d.empresa_id || null,
             whatsapp: d.empresas?.whatsapp || "",
+            chavePix: d.empresas?.chave_pix || "",
             foto_url: d.foto_url,
             estoque: d.estoque,
             preco: d.preco != null ? `R$ ${Number(d.preco).toFixed(2).replace(".", ",")}` : "Consulte",
@@ -10271,6 +10330,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
 
               {gruposCarrinho.map((grupo) => {
                 const subtotal = grupo.itensLista.reduce((s, i) => s + i.preco * i.quantidade, 0);
+                const payloadPix = grupo.empresaChavePix ? gerarPayloadPix({ chave: grupo.empresaChavePix, nomeRecebedor: grupo.empresaNome, valor: subtotal }) : null;
                 return (
                   <div key={grupo.empresaId} className="rounded-2xl border p-3.5 flex flex-col gap-2.5" style={{ borderColor: C.line }}>
                     <div className="flex items-center justify-between">
@@ -10304,6 +10364,21 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
                       className="glow-btn w-full flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-bold font-body text-white" style={{ background: "#25A85B" }}>
                       <MessageCircle size={14} /> Finalizar pelo WhatsApp
                     </button>
+                    {payloadPix && (
+                      <div className="rounded-xl border p-3 flex flex-col items-center gap-2" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                        <p className="font-body text-[11px] font-bold flex items-center gap-1.5" style={{ color: C.blue }}>
+                          <QrCode size={13} /> Ou pague com Pix direto pra {grupo.empresaNome}
+                        </p>
+                        <img loading="lazy" decoding="async" src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(payloadPix)}`} alt="QR Code Pix" className="w-32 h-32" />
+                        <button onClick={() => { navigator.clipboard?.writeText(payloadPix); setPixCopiadoId(grupo.empresaId); setTimeout(() => setPixCopiadoId(null), 2500); }}
+                          className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border w-full" style={{ borderColor: C.line, color: C.blue }}>
+                          {pixCopiadoId === grupo.empresaId ? "Copiado! Cole no app do seu banco" : "Copiar código Pix (copia e cola)"}
+                        </button>
+                        <p className="font-body text-[10px] text-center" style={{ color: "#8896A6" }}>
+                          O pagamento vai direto pra empresa — o Conecta Comércio não processa nem recebe o valor.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 );
               })}
