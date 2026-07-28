@@ -50,6 +50,19 @@ function escurecerCor(hex, quantidade) {
   }
 }
 
+// Busca inteligente (FASE 40): ignora acento e maiúscula/minúscula, então
+// "cafe", "café" e "CAFÉ" encontram a mesma coisa.
+function normalizarTexto(s) {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+function textoContem(campo, termo) {
+  return normalizarTexto(campo).includes(normalizarTexto(termo));
+}
+
 // Um anúncio patrocinado (FASE 35) pode ter prazo de validade (FASE 37 —
 // "destaque temporário"). Sem data marcada, vale pra sempre, como antes.
 function patrocinadoAtivo(e) {
@@ -7713,7 +7726,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (!supabaseConfigurado) return;
     supabase
       .from("produtos")
-      .select("id, nome, preco, preco_promocional, estoque, foto_url, categoria, empresa_id, empresas(id, nome, whatsapp)")
+      .select("id, nome, descricao, preco, preco_promocional, estoque, foto_url, categoria, empresa_id, empresas(id, nome, whatsapp)")
       .eq("ativo", true)
       .order("criado_em", { ascending: false })
       .limit(40)
@@ -7723,6 +7736,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             id: d.id || `demo-produto-${i}`,
             nome: d.nome,
             cat: d.categoria,
+            descricao: d.descricao || "",
             empresa: d.empresas?.nome || "",
             empresaId: d.empresas?.id || d.empresa_id || null,
             whatsapp: d.empresas?.whatsapp || "",
@@ -7810,7 +7824,9 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   const [ordenacaoEmpresas, setOrdenacaoEmpresas] = useState("recentes");
   const empresasFiltradas = useMemo(() => {
     const temBusca = !!query.trim();
-    let lista = !temBusca ? listaBase : listaBase.filter((e) => e.nome.toLowerCase().includes(query.toLowerCase()) || e.cat.toLowerCase().includes(query.toLowerCase()));
+    let lista = !temBusca ? listaBase : listaBase.filter((e) =>
+      textoContem(e.nome, query) || textoContem(e.cat, query) || textoContem(e.bairro, query) || textoContem(e.cidade, query)
+    );
     lista = [...lista];
     if (ordenacaoEmpresas === "az") lista.sort((a, b) => a.nome.localeCompare(b.nome));
     if (ordenacaoEmpresas === "avaliacao") lista.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
@@ -7825,8 +7841,10 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   const produtosFiltrados = useMemo(() => {
     let lista = (produtosReais ?? []);
     if (queryProdutos.trim()) {
-      const q = queryProdutos.toLowerCase();
-      lista = lista.filter((p) => p.nome.toLowerCase().includes(q) || (p.empresa || "").toLowerCase().includes(q));
+      lista = lista.filter((p) =>
+        textoContem(p.nome, queryProdutos) || textoContem(p.empresa, queryProdutos) ||
+        textoContem(p.cat, queryProdutos) || textoContem(p.descricao, queryProdutos)
+      );
     }
     lista = [...lista];
     const precoNum = (p) => Number((p.precoPromocional || p.preco || "0").replace(/[^\d,]/g, "").replace(",", "."));
@@ -7841,8 +7859,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   const vagasFiltradas = useMemo(() => {
     let lista = (vagasReais ?? []);
     if (queryVagas.trim()) {
-      const q = queryVagas.toLowerCase();
-      lista = lista.filter((v) => v.cargo.toLowerCase().includes(q) || (v.cidade || "").toLowerCase().includes(q));
+      lista = lista.filter((v) => textoContem(v.cargo, queryVagas) || textoContem(v.cidade, queryVagas) || textoContem(v.requisitos, queryVagas));
     }
     if (filtroTipoVaga) lista = lista.filter((v) => v.tipo === filtroTipoVaga);
     return lista;
@@ -8897,6 +8914,101 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
 // (logo + card branco), com o acabamento moderno da
 // plataforma.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Minha conta — perfil simples pra qualquer pessoa logada (morador/cliente,
+// empresário ou admin): editar nome/telefone, ver empresas favoritadas e
+// sair da conta. FASE 40.
+// ---------------------------------------------------------------------------
+function MinhaConta({ perfil, sessao }) {
+  const [dados, setDados] = useState(null); // null = carregando
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [status, setStatus] = useState("");
+  const [favoritas, setFavoritas] = useState(null);
+
+  useEffect(() => {
+    if (!supabaseConfigurado || !sessao?.user?.id) return;
+    supabase.from("perfis").select("nome, email, telefone, tipo").eq("id", sessao.user.id).single().then(({ data }) => {
+      if (data) { setDados(data); setNome(data.nome || ""); setTelefone(data.telefone || ""); }
+    });
+  }, [sessao?.user?.id]);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) { setFavoritas([]); return; }
+    let mapa = {};
+    try { mapa = JSON.parse(localStorage.getItem("cc_favoritos_empresas") || "{}"); } catch { mapa = {}; }
+    const ids = Object.keys(mapa).filter((id) => mapa[id]);
+    if (ids.length === 0) { setFavoritas([]); return; }
+    supabase.from("empresas").select("id, nome, categoria").in("id", ids).then(({ data, error }) => {
+      setFavoritas(error ? [] : data || []);
+    });
+  }, []);
+
+  const salvar = async (e) => {
+    e.preventDefault();
+    setStatus("");
+    setSalvando(true);
+    try {
+      const { error } = await supabase.from("perfis").update({ nome, telefone }).eq("id", sessao.user.id);
+      if (error) throw error;
+      setStatus("ok");
+    } catch (err) {
+      setStatus(err.message || "Não foi possível salvar agora.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const sair = async () => {
+    if (supabaseConfigurado) await supabase.auth.signOut();
+  };
+
+  const rotuloTipo = { cliente: "Morador", empresario: "Empresário", prestador: "Prestador de serviço", admin: "Administrador" };
+
+  return (
+    <div className="max-w-lg mx-auto px-4 md:px-6 py-10">
+      <SectionHeader eyebrow="Sua conta" title="Minha conta" sub={rotuloTipo[perfil?.tipo] || ""} />
+      <form onSubmit={salvar} className="rounded-2xl border p-5 flex flex-col gap-3 mt-6" style={{ borderColor: C.line }}>
+        <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+          Nome
+          <input value={nome} onChange={(e) => setNome(e.target.value)} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+        </label>
+        <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+          Telefone / WhatsApp
+          <input value={telefone} onChange={(e) => setTelefone(e.target.value)} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+        </label>
+        {dados?.email && (
+          <p className="font-body text-xs" style={{ color: "#8896A6" }}>E-mail: {dados.email}</p>
+        )}
+        {status && status !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{status}</p>}
+        {status === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Salvo!</p>}
+        <button type="submit" disabled={salvando} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+          {salvando ? "Salvando..." : "Salvar alterações"}
+        </button>
+      </form>
+
+      <div className="mt-6">
+        <p className="font-display font-bold text-sm mb-2" style={{ color: C.ink }}>Empresas favoritadas</p>
+        {favoritas === null && <Skeleton className="h-10 w-full" />}
+        {favoritas && favoritas.length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Você ainda não favoritou nenhuma empresa.</p>}
+        <div className="flex flex-col gap-2">
+          {(favoritas || []).map((f) => (
+            <div key={f.id} className="rounded-lg border px-3 py-2 flex items-center justify-between" style={{ borderColor: C.line }}>
+              <span className="font-body text-xs font-semibold" style={{ color: C.ink }}>{f.nome}</span>
+              <span className="font-body text-[11px]" style={{ color: "#8896A6" }}>{f.categoria}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={sair} className="font-body text-xs font-bold rounded-lg px-4 py-2.5 border mt-6 flex items-center gap-1.5" style={{ borderColor: C.line, color: "#B4462F" }}>
+        Sair da conta
+      </button>
+    </div>
+  );
+}
+
 function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
   const categoriasReaisConta = useCategoriasReais();
   // tela: "entrar" | "escolha" | "cadastro-cliente" | "cadastro-empresario"
@@ -9836,7 +9948,7 @@ export default function ConectaComercio() {
   const modos = [
     { id: "site", label: "Site", icon: Store },
     { id: "estatisticas", label: "Números", icon: TrendingUp },
-    { id: "conta", label: "Entrar / Cadastro", icon: UserCircle2 },
+    { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
     { id: "empresario", label: "Painel Empresário", icon: Briefcase, restrito: "empresario" },
   ];
@@ -9943,7 +10055,7 @@ export default function ConectaComercio() {
 
       {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} siteConfig={siteConfig} sessao={sessao} perfil={perfil} />}
       {modo === "estatisticas" && <EstatisticasPublicas />}
-      {modo === "conta" && <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />}
+      {modo === "conta" && (sessao && perfil ? <MinhaConta perfil={perfil} sessao={sessao} /> : <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />)}
 
       {modo === "admin" && (
         sessao === undefined ? (
