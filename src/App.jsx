@@ -2273,6 +2273,7 @@ function AdminPanel() {
     mural_ativo: false,
     termos_uso: "", politica_privacidade: "",
     utilidade_ativo: false,
+    ouvidoria_ativo: false,
   };
 
   useEffect(() => {
@@ -2422,6 +2423,7 @@ function AdminPanel() {
         termos_uso: siteConfigAdmin.termos_uso || null,
         politica_privacidade: siteConfigAdmin.politica_privacidade || null,
         utilidade_ativo: !!siteConfigAdmin.utilidade_ativo,
+        ouvidoria_ativo: !!siteConfigAdmin.ouvidoria_ativo,
       });
       if (error) throw error;
       setStatusIdentidade("ok");
@@ -3229,6 +3231,37 @@ function AdminPanel() {
   };
 
   // -------------------------------------------------------------------------
+  // Ouvidoria — morador denuncia problema na cidade (buraco, iluminação,
+  // lixo etc.), acompanha pelo protocolo, e o admin atualiza o status.
+  // FASE 48.
+  // -------------------------------------------------------------------------
+  const [ouvidoriaAdmin, setOuvidoriaAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("ouvidoria_denuncias").select("*").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setOuvidoriaAdmin(data || []);
+    });
+  }, []);
+  const [respostaOuvidoria, setRespostaOuvidoria] = useState({}); // { [id]: texto }
+
+  const mudarStatusDenuncia = async (id, status) => {
+    const { error } = await supabase.from("ouvidoria_denuncias").update({ status }).eq("id", id);
+    if (!error) { setOuvidoriaAdmin((atual) => atual.map((d) => (d.id === id ? { ...d, status } : d))); notificar("Status atualizado."); }
+  };
+
+  const enviarRespostaOuvidoria = async (id) => {
+    const texto = (respostaOuvidoria[id] || "").trim();
+    if (!texto) return;
+    const { error } = await supabase.from("ouvidoria_denuncias").update({ resposta_admin: texto }).eq("id", id);
+    if (!error) { setOuvidoriaAdmin((atual) => atual.map((d) => (d.id === id ? { ...d, resposta_admin: texto } : d))); notificar("Resposta salva."); }
+  };
+
+  const apagarDenuncia = async (id) => {
+    const { error } = await supabase.from("ouvidoria_denuncias").delete().eq("id", id);
+    if (!error) { setOuvidoriaAdmin((atual) => atual.filter((d) => d.id !== id)); notificar("Denúncia excluída."); }
+  };
+
+  // -------------------------------------------------------------------------
   // Avaliações de empresas — o público comenta, o admin só modera (apaga
   // comentário abusivo/spam). FASE 34.
   // -------------------------------------------------------------------------
@@ -3749,6 +3782,7 @@ function AdminPanel() {
     { id: "licitacoes", label: "Editais e Licitações", icon: FileText },
     { id: "turismo", label: "Turismo", icon: MapPinned },
     { id: "utilidade", label: "Utilidade pública", icon: Phone },
+    { id: "ouvidoria", label: "Ouvidoria", icon: MessageCircle },
     { id: "mural", label: "Mural da comunidade", icon: Users },
     { id: "enquetes", label: "Enquetes", icon: Vote },
     { id: "cupons", label: "Cupons de desconto", icon: Tag },
@@ -5537,6 +5571,83 @@ function AdminPanel() {
                 </div>
               ))}
               {(utilidadeAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum item cadastrado ainda.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "ouvidoria" && (
+          <div>
+            <SectionHeader eyebrow="Comunidade" title="Ouvidoria" sub="Denúncias de problemas na cidade — buraco, iluminação, lixo e outros" />
+            <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer mb-6" style={{ color: "#425A70" }}>
+              <input type="checkbox" checked={!!siteConfigAdmin?.ouvidoria_ativo} onChange={(e) => { setSiteConfigAdmin((v) => ({ ...v, ouvidoria_ativo: e.target.checked })); }} />
+              Mostrar a aba Ouvidoria no menu do site
+            </label>
+            {siteConfigAdmin?.ouvidoria_ativo !== undefined && (
+              <button onClick={salvarIdentidade} className="font-body text-xs font-bold rounded-lg px-3 py-2 border mb-6 -mt-4" style={{ borderColor: C.line, color: C.blue }}>
+                Salvar essa opção
+              </button>
+            )}
+
+            {(ouvidoriaAdmin ?? []).filter((d) => d.status === "recebido").length > 0 && (
+              <div className="mb-8">
+                <p className="font-body text-xs font-bold mb-2" style={{ color: "#8A5A12" }}>Recebidas, aguardando análise ({(ouvidoriaAdmin ?? []).filter((d) => d.status === "recebido").length})</p>
+                <div className="flex flex-col gap-3 max-w-2xl">
+                  {(ouvidoriaAdmin ?? []).filter((d) => d.status === "recebido").map((d) => (
+                    <div key={d.id} className="rounded-2xl border p-4" style={{ borderColor: C.amber, background: "#FFF9EE" }}>
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>
+                          {d.categoria} <span className="font-body text-[10px] font-normal" style={{ color: "#8A5A12" }}>· protocolo {d.protocolo}</span>
+                        </p>
+                        <select value={d.status} onChange={(e) => mudarStatusDenuncia(d.id, e.target.value)}
+                          className="font-body text-[11px] font-bold border rounded-lg px-2 py-1 outline-none" style={{ borderColor: C.line }}>
+                          <option value="recebido">Recebido</option>
+                          <option value="em_analise">Em análise</option>
+                          <option value="resolvido">Resolvido</option>
+                        </select>
+                      </div>
+                      {d.local && <p className="font-body text-xs mt-1" style={{ color: "#425A70" }}><MapPin size={11} className="inline mr-1" />{d.local}</p>}
+                      <p className="font-body text-sm mt-1" style={{ color: "#425A70" }}>{d.descricao}</p>
+                      {(d.nome || d.telefone) && <p className="font-body text-[11px] mt-1" style={{ color: "#8896A6" }}>{d.nome}{d.telefone ? ` · ${d.telefone}` : ""}</p>}
+                      {d.foto_url && <img loading="lazy" decoding="async" src={d.foto_url} alt="" className="w-24 h-24 rounded-lg object-cover mt-2" />}
+                      <div className="flex gap-2 mt-2">
+                        <input value={respostaOuvidoria[d.id] || ""} onChange={(e) => setRespostaOuvidoria((r) => ({ ...r, [d.id]: e.target.value }))} placeholder="Resposta (opcional, visível pra quem consultar o protocolo)"
+                          className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none flex-1" style={{ borderColor: C.line }} />
+                        <button onClick={() => enviarRespostaOuvidoria(d.id)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ background: C.blueTint, color: C.blue }}>Salvar</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Em análise / resolvidas</p>
+            <div className="flex flex-col gap-3 max-w-2xl">
+              {(ouvidoriaAdmin ?? []).filter((d) => d.status !== "recebido").map((d) => (
+                <div key={d.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>
+                      {d.categoria} <span className="font-body text-[10px] font-normal" style={{ color: "#5C7186" }}>· protocolo {d.protocolo}</span>
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <select value={d.status} onChange={(e) => mudarStatusDenuncia(d.id, e.target.value)}
+                        className="font-body text-[11px] font-bold border rounded-lg px-2 py-1 outline-none" style={{ borderColor: C.line, color: d.status === "resolvido" ? "#1E8E5A" : "#425A70" }}>
+                        <option value="recebido">Recebido</option>
+                        <option value="em_analise">Em análise</option>
+                        <option value="resolvido">Resolvido</option>
+                      </select>
+                      <button onClick={() => { if (confirmarExclusao("Excluir essa denúncia?")) apagarDenuncia(d.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                    </div>
+                  </div>
+                  {d.local && <p className="font-body text-xs mt-1" style={{ color: "#425A70" }}><MapPin size={11} className="inline mr-1" />{d.local}</p>}
+                  <p className="font-body text-sm mt-1" style={{ color: "#425A70" }}>{d.descricao}</p>
+                  <div className="flex gap-2 mt-2">
+                    <input value={respostaOuvidoria[d.id] ?? d.resposta_admin ?? ""} onChange={(e) => setRespostaOuvidoria((r) => ({ ...r, [d.id]: e.target.value }))} placeholder="Resposta (opcional)"
+                      className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none flex-1" style={{ borderColor: C.line }} />
+                    <button onClick={() => enviarRespostaOuvidoria(d.id)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ background: C.blueTint, color: C.blue }}>Salvar</button>
+                  </div>
+                </div>
+              ))}
+              {(ouvidoriaAdmin ?? []).filter((d) => d.status !== "recebido").length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma por aqui ainda.</p>}
             </div>
           </div>
         )}
@@ -10632,7 +10743,7 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
@@ -10641,6 +10752,7 @@ function modoDaHash(hash) {
   if (h.startsWith("#/turismo")) return "turismo";
   if (h.startsWith("#/mural")) return "mural";
   if (h.startsWith("#/utilidade")) return "utilidade";
+  if (h.startsWith("#/ouvidoria")) return "ouvidoria";
   if (h.startsWith("#/termos")) return "termos";
   if (h.startsWith("#/privacidade")) return "privacidade";
   if (h.startsWith("#/empresa") || h.startsWith("#/vendedor")) return "empresario";
@@ -10947,6 +11059,145 @@ function PaginaUtilidadePublica() {
 }
 
 // ---------------------------------------------------------------------------
+// Ouvidoria — morador denuncia problema na cidade (buraco, iluminação, lixo
+// etc.), recebe um protocolo e pode consultar o status depois sem precisar
+// de login. FASE 48.
+// ---------------------------------------------------------------------------
+function gerarProtocoloOuvidoria() {
+  return `OUV${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
+function PaginaOuvidoria() {
+  const [categoria, setCategoria] = useState("buraco");
+  const [descricao, setDescricao] = useState("");
+  const [local, setLocal] = useState("");
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [protocoloGerado, setProtocoloGerado] = useState(null);
+
+  const [protocoloConsulta, setProtocoloConsulta] = useState("");
+  const [consultando, setConsultando] = useState(false);
+  const [resultadoConsulta, setResultadoConsulta] = useState(null);
+  const [erroConsulta, setErroConsulta] = useState("");
+
+  useEffect(() => {
+    document.title = "Ouvidoria — Conecta Comércio";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute("content", "Denuncie problemas na cidade de Ivatuba - PR: buraco na via, iluminação, lixo e mais.");
+    return () => {
+      document.title = "Conecta Comércio · Ivatuba - PR";
+      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+    };
+  }, []);
+
+  const categorias = { buraco: "Buraco na via", iluminacao: "Iluminação pública", lixo: "Lixo / entulho", agua_esgoto: "Água / esgoto", outro: "Outro" };
+  const labelStatus = { recebido: "Recebido", em_analise: "Em análise", resolvido: "Resolvido" };
+  const corStatus = { recebido: "#8A5A12", em_analise: C.blue, resolvido: "#1E8E5A" };
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    setErro("");
+    if (!descricao.trim()) { setErro("Descreva o problema."); return; }
+    const protocolo = gerarProtocoloOuvidoria();
+    if (!supabaseConfigurado) { setProtocoloGerado(protocolo); return; }
+    setEnviando(true);
+    try {
+      const { error } = await supabase.from("ouvidoria_denuncias").insert({
+        protocolo, categoria, descricao, local: local || null, nome: nome || null, telefone: telefone || null, status: "recebido",
+      });
+      if (error) throw error;
+      setProtocoloGerado(protocolo);
+    } catch (err) {
+      setErro(err.message || "Não consegui enviar agora. Tente de novo.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const consultar = async (e) => {
+    e.preventDefault();
+    setErroConsulta("");
+    setResultadoConsulta(null);
+    if (!protocoloConsulta.trim()) return;
+    setConsultando(true);
+    try {
+      const { data, error } = await supabase.rpc("consultar_denuncia", { p_protocolo: protocoloConsulta.trim().toUpperCase() });
+      if (error) throw error;
+      if (!data || data.length === 0) { setErroConsulta("Protocolo não encontrado."); return; }
+      setResultadoConsulta(data[0]);
+    } catch (err) {
+      setErroConsulta(err.message || "Não consegui consultar agora.");
+    } finally {
+      setConsultando(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 md:px-6 py-10">
+      <SectionHeader eyebrow="Comunidade" title="Ouvidoria" sub="Denuncie problemas na cidade — buraco na via, iluminação, lixo e outros" />
+
+      <div className="rounded-2xl border p-5 mt-6" style={{ borderColor: C.line }}>
+        {protocoloGerado ? (
+          <div>
+            <p className="font-body text-sm font-semibold flex items-center gap-1.5" style={{ color: "#1E8E5A" }}>
+              <CheckCircle2 size={15} /> Denúncia registrada!
+            </p>
+            <p className="font-body text-sm mt-2" style={{ color: "#425A70" }}>
+              Guarde esse protocolo pra acompanhar o andamento: <span className="font-display font-bold" style={{ color: C.blue }}>{protocoloGerado}</span>
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={enviar} className="flex flex-col gap-2.5">
+            <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }}>
+              {Object.entries(categorias).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} placeholder="Descreva o problema..." className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+            <input value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Local (rua, bairro, referência)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+            <div className="grid sm:grid-cols-2 gap-2.5">
+              <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Telefone (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+            </div>
+            {erro && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{erro}</p>}
+            <button type="submit" disabled={enviando} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+              {enviando ? "Enviando..." : "Enviar denúncia"}
+            </button>
+          </form>
+        )}
+      </div>
+
+      <div className="rounded-2xl border p-5 mt-6" style={{ borderColor: C.line }}>
+        <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Consultar protocolo</p>
+        <form onSubmit={consultar} className="flex gap-2">
+          <input value={protocoloConsulta} onChange={(e) => setProtocoloConsulta(e.target.value)} placeholder="Ex: OUV123456"
+            className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none flex-1" style={{ borderColor: C.line }} />
+          <button type="submit" disabled={consultando} className="font-body text-xs font-bold rounded-lg px-4 disabled:opacity-60" style={{ background: C.blueTint, color: C.blue }}>
+            {consultando ? "..." : "Consultar"}
+          </button>
+        </form>
+        {erroConsulta && <p className="font-body text-xs mt-2" style={{ color: "#B4462F" }}>{erroConsulta}</p>}
+        {resultadoConsulta && (
+          <div className="mt-3 rounded-xl p-3" style={{ background: C.blueTint2 }}>
+            <div className="flex items-center justify-between">
+              <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{categorias[resultadoConsulta.categoria] || resultadoConsulta.categoria}</p>
+              <span className="font-body text-[10px] font-bold" style={{ color: corStatus[resultadoConsulta.status] }}>{labelStatus[resultadoConsulta.status] || resultadoConsulta.status}</span>
+            </div>
+            <p className="font-body text-xs mt-1" style={{ color: "#425A70" }}>{resultadoConsulta.descricao}</p>
+            {resultadoConsulta.resposta_admin && (
+              <div className="mt-2 rounded-lg px-2.5 py-2 bg-white">
+                <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>Resposta</p>
+                <p className="font-body text-xs" style={{ color: "#425A70" }}>{resultadoConsulta.resposta_admin}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Página pública de estatísticas — números reais da plataforma, sem precisar
 // de login. Serve tanto pra transparência com a comunidade quanto pra dar ao
 // Google uma página com conteúdo textual rico (bom pra indexação/SEO).
@@ -11238,6 +11489,7 @@ export default function ConectaComercio() {
     ...(siteConfig?.turismo_ativo ? [{ id: "turismo", label: "Turismo", icon: MapPinned }] : []),
     ...(siteConfig?.mural_ativo ? [{ id: "mural", label: "Mural", icon: Users }] : []),
     ...(siteConfig?.utilidade_ativo ? [{ id: "utilidade", label: "Utilidade pública", icon: Phone }] : []),
+    ...(siteConfig?.ouvidoria_ativo ? [{ id: "ouvidoria", label: "Ouvidoria", icon: MessageCircle }] : []),
     { id: "estatisticas", label: "Números", icon: TrendingUp },
     { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
@@ -11349,6 +11601,7 @@ export default function ConectaComercio() {
       {modo === "turismo" && <PaginaTurismo siteConfig={siteConfig} />}
       {modo === "mural" && <PaginaMural perfil={perfil} />}
       {modo === "utilidade" && <PaginaUtilidadePublica />}
+      {modo === "ouvidoria" && <PaginaOuvidoria />}
       {modo === "termos" && <PaginaLegal titulo="Termos de uso" texto={siteConfig?.termos_uso} />}
       {modo === "privacidade" && <PaginaLegal titulo="Política de privacidade" texto={siteConfig?.politica_privacidade} />}
       {modo === "conta" && (sessao && perfil ? <MinhaConta perfil={perfil} sessao={sessao} /> : <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />)}
