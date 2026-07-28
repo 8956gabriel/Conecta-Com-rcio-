@@ -72,6 +72,92 @@ function patrocinadoAtivo(e) {
   return e.patrocinado_ate >= hoje;
 }
 
+// -----------------------------------------------------------------------
+// Horário de funcionamento por dia da semana e indicador "aberto agora".
+// Guardado como JSON: { seg: { aberto, abre, fecha }, ter: {...}, ... }.
+// FASE 46.
+// -----------------------------------------------------------------------
+const DIAS_SEMANA = [
+  { chave: "dom", label: "Domingo" },
+  { chave: "seg", label: "Segunda" },
+  { chave: "ter", label: "Terça" },
+  { chave: "qua", label: "Quarta" },
+  { chave: "qui", label: "Quinta" },
+  { chave: "sex", label: "Sexta" },
+  { chave: "sab", label: "Sábado" },
+];
+
+const horarioFuncionamentoVazio = () => ({
+  dom: { aberto: false, abre: "", fecha: "" },
+  seg: { aberto: true, abre: "08:00", fecha: "18:00" },
+  ter: { aberto: true, abre: "08:00", fecha: "18:00" },
+  qua: { aberto: true, abre: "08:00", fecha: "18:00" },
+  qui: { aberto: true, abre: "08:00", fecha: "18:00" },
+  sex: { aberto: true, abre: "08:00", fecha: "18:00" },
+  sab: { aberto: true, abre: "08:00", fecha: "12:00" },
+});
+
+function horarioFuncionamentoCadastrado(horario) {
+  return !!horario && DIAS_SEMANA.some((d) => horario[d.chave]?.aberto && horario[d.chave]?.abre && horario[d.chave]?.fecha);
+}
+
+function estaAbertaAgora(horario) {
+  if (!horarioFuncionamentoCadastrado(horario)) return null;
+  const agora = new Date();
+  const chaveHoje = DIAS_SEMANA[agora.getDay()].chave;
+  const cfg = horario[chaveHoje];
+  if (!cfg?.aberto || !cfg.abre || !cfg.fecha) return false;
+  const [hA, mA] = cfg.abre.split(":").map(Number);
+  const [hF, mF] = cfg.fecha.split(":").map(Number);
+  const minAgora = agora.getHours() * 60 + agora.getMinutes();
+  const minAbre = hA * 60 + (mA || 0);
+  const minFecha = hF * 60 + (mF || 0);
+  if (minFecha <= minAbre) return false;
+  return minAgora >= minAbre && minAgora < minFecha;
+}
+
+function resumoHorarioHoje(horario) {
+  if (!horarioFuncionamentoCadastrado(horario)) return null;
+  const agora = new Date();
+  const chaveHoje = DIAS_SEMANA[agora.getDay()].chave;
+  const cfg = horario[chaveHoje];
+  if (!cfg?.aberto || !cfg.abre || !cfg.fecha) return "Fechado hoje";
+  return estaAbertaAgora(horario) ? `Aberto agora · fecha às ${cfg.fecha}` : `Fechado agora · hoje das ${cfg.abre} às ${cfg.fecha}`;
+}
+
+// Editor compacto de horário de funcionamento, reutilizado no cadastro da
+// empresa (admin) e no perfil do próprio empresário.
+function EditorHorarioSemana({ valor, onChange }) {
+  const dados = valor && Object.keys(valor).length > 0 ? valor : horarioFuncionamentoVazio();
+  const atualizarDia = (chave, campo, novoValor) => {
+    onChange({ ...dados, [chave]: { ...dados[chave], [campo]: novoValor } });
+  };
+  return (
+    <div className="flex flex-col gap-1.5">
+      {DIAS_SEMANA.filter((d) => d.chave !== "dom").concat(DIAS_SEMANA.filter((d) => d.chave === "dom")).map((d) => {
+        const cfg = dados[d.chave] || { aberto: false, abre: "", fecha: "" };
+        return (
+          <div key={d.chave} className="flex items-center gap-2 flex-wrap">
+            <label className="font-body text-xs font-semibold flex items-center gap-1.5 w-24 shrink-0 cursor-pointer" style={{ color: "#425A70" }}>
+              <input type="checkbox" checked={!!cfg.aberto} onChange={(e) => atualizarDia(d.chave, "aberto", e.target.checked)} />
+              {d.label}
+            </label>
+            {cfg.aberto && (
+              <>
+                <input type="time" value={cfg.abre || ""} onChange={(e) => atualizarDia(d.chave, "abre", e.target.value)}
+                  className="font-body text-xs border rounded-lg px-2 py-1 outline-none" style={{ borderColor: C.line }} />
+                <span className="font-body text-xs" style={{ color: "#8896A6" }}>às</span>
+                <input type="time" value={cfg.fecha || ""} onChange={(e) => atualizarDia(d.chave, "fecha", e.target.value)}
+                  className="font-body text-xs border rounded-lg px-2 py-1 outline-none" style={{ borderColor: C.line }} />
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // Aplica a cor principal do site nas variáveis CSS globais — chamado assim
 // que a configuração de identidade visual é carregada (ou salva pelo admin).
 function aplicarCorPrincipal(hex) {
@@ -585,6 +671,16 @@ function EmpresaCard({ e, fav, onFav, onAbrir }) {
               <BadgeCheck size={11} /> Aceita Cartão do Servidor
             </span>
           )}
+          {estaAbertaAgora(e.horario_funcionamento) === true && (
+            <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>
+              <Clock size={11} /> Aberto agora
+            </span>
+          )}
+          {estaAbertaAgora(e.horario_funcionamento) === false && (
+            <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5" style={{ background: "#FBEAE5", color: "#B4462F" }}>
+              <Clock size={11} /> Fechado agora
+            </span>
+          )}
         </div>
         {(e.facebook || e.site) && (
           <div className="flex gap-2 mt-0.5">
@@ -745,6 +841,12 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
                   <Star size={11} fill="#E8A23D" color="#E8A23D" /> {mediaAvaliacoes} ({avaliacoes.length})
                 </span>
               )}
+              {resumoHorarioHoje(empresa.horario_funcionamento) && (
+                <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body"
+                  style={{ background: estaAbertaAgora(empresa.horario_funcionamento) ? "#E7F6EE" : "#FBEAE5", color: estaAbertaAgora(empresa.horario_funcionamento) ? "#1E8E5A" : "#B4462F" }}>
+                  <Clock size={11} /> {resumoHorarioHoje(empresa.horario_funcionamento)}
+                </span>
+              )}
             </div>
           </div>
 
@@ -773,6 +875,22 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
               </a>
             )}
           </div>
+
+          {horarioFuncionamentoCadastrado(empresa.horario_funcionamento) && (
+            <div className="rounded-xl border p-3" style={{ borderColor: C.line }}>
+              <p className="font-body text-[11px] font-bold mb-1.5 flex items-center gap-1.5" style={{ color: C.ink }}><Clock size={12} /> Horário de funcionamento</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                {DIAS_SEMANA.map((d) => {
+                  const cfg = empresa.horario_funcionamento[d.chave];
+                  return (
+                    <p key={d.chave} className="font-body text-[11px]" style={{ color: "#5C7186" }}>
+                      {d.label}: {cfg?.aberto && cfg.abre && cfg.fecha ? `${cfg.abre} às ${cfg.fecha}` : "fechado"}
+                    </p>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {cupons && cupons.length > 0 && (
             <div className="flex flex-col gap-2">
@@ -1519,14 +1637,14 @@ function AdminPanel() {
   const [empresasPend, setEmpresasPend] = useState(null); // null = carregando/indisponível
   const [statusEmpresa, setStatusEmpresa] = useState({});
   const [editandoEmpresa, setEditandoEmpresa] = useState(null);
-  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, patrocinado_ate: "", fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false, possui_mei: false });
+  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, patrocinado_ate: "", fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false, possui_mei: false, horario_funcionamento: null });
   const [enviandoLogoEmpresa, setEnviandoLogoEmpresa] = useState(false);
   const [enviandoBannerEmpresa, setEnviandoBannerEmpresa] = useState(false);
   const [enviandoFotoGaleria, setEnviandoFotoGaleria] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em, email, whatsapp, instagram, cpf, cnpj, possui_mei").order("criado_em", { ascending: false })
+    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em, email, whatsapp, instagram, cpf, cnpj, possui_mei, horario_funcionamento").order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setEmpresasPend(data || []); });
   }, []);
 
@@ -1575,6 +1693,7 @@ function AdminPanel() {
       email: e.email || "", whatsapp: e.whatsapp || "", instagram: e.instagram || "",
       cpf: e.cpf || "", cnpj: e.cnpj || "", aceita_cartao_servidor: !!e.aceita_cartao_servidor, patrocinado: !!e.patrocinado,
       patrocinado_ate: e.patrocinado_ate || "", possui_mei: !!e.possui_mei,
+      horario_funcionamento: e.horario_funcionamento || null,
     });
   };
 
@@ -1641,6 +1760,7 @@ function AdminPanel() {
       cpf: formEmpresa.cpf || null, cnpj: formEmpresa.cnpj || null,
       aceita_cartao_servidor: formEmpresa.aceita_cartao_servidor, patrocinado: formEmpresa.patrocinado,
       patrocinado_ate: formEmpresa.patrocinado_ate || null, possui_mei: formEmpresa.possui_mei,
+      horario_funcionamento: formEmpresa.horario_funcionamento,
     }).eq("id", id);
     if (!error) setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, ...formEmpresa } : e)));
     setEditandoEmpresa(null);
@@ -4279,6 +4399,10 @@ function AdminPanel() {
                         <input type="checkbox" checked={formEmpresa.possui_mei} onChange={(e) => setFormEmpresa((f) => ({ ...f, possui_mei: e.target.checked }))} />
                         Possui MEI
                       </label>
+                      <div>
+                        <p className="font-body text-xs font-bold mb-1.5" style={{ color: C.ink }}>Horário de funcionamento</p>
+                        <EditorHorarioSemana valor={formEmpresa.horario_funcionamento} onChange={(novo) => setFormEmpresa((f) => ({ ...f, horario_funcionamento: novo }))} />
+                      </div>
                       <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
                         <input type="checkbox" checked={formEmpresa.aceita_cartao_servidor} onChange={(e) => setFormEmpresa((f) => ({ ...f, aceita_cartao_servidor: e.target.checked }))} />
                         Aceita Cartão do Servidor
@@ -6448,7 +6572,7 @@ function EmpresarioPanel() {
   // já existem no banco (tabela `empresas`), só faltava esta tela ler e
   // gravar de verdade em vez de mostrar valores fixos.
   const [empresaId, setEmpresaId] = useState(null);
-  const [perfilForm, setPerfilForm] = useState({ nome: "", whatsapp: "", instagram: "", endereco: "", horario_atendimento: "" });
+  const [perfilForm, setPerfilForm] = useState({ nome: "", whatsapp: "", instagram: "", endereco: "", horario_atendimento: "", horario_funcionamento: null });
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [statusPerfil, setStatusPerfil] = useState("");
 
@@ -6581,6 +6705,7 @@ function EmpresarioPanel() {
         setPerfilForm({
           nome: data.nome || "", whatsapp: data.whatsapp || "", instagram: data.instagram || "",
           endereco: data.endereco || "", horario_atendimento: data.horario_atendimento || "",
+          horario_funcionamento: data.horario_funcionamento || null,
         });
         setVisualizacoesEmpresa(data.visualizacoes ?? 0);
         carregarMeusProdutos(data.id);
@@ -6840,6 +6965,7 @@ function EmpresarioPanel() {
       const { error } = await supabase.from("empresas").update({
         nome: perfilForm.nome, whatsapp: perfilForm.whatsapp, instagram: perfilForm.instagram,
         endereco: perfilForm.endereco, horario_atendimento: perfilForm.horario_atendimento,
+        horario_funcionamento: perfilForm.horario_funcionamento,
       }).eq("id", empresaId);
       if (error) throw error;
       setStatusPerfil("ok");
@@ -6909,6 +7035,10 @@ function EmpresarioPanel() {
               <button type="button" className="font-body text-sm font-bold px-3 py-2.5 rounded-lg border flex items-center justify-center gap-2" style={{ borderColor: C.line, color: "#425A70" }}>
                 <MapPin size={14} /> Ajustar localização no mapa
               </button>
+              <div className="sm:col-span-2">
+                <p className="font-body text-xs font-bold mb-1.5" style={{ color: C.ink }}>Horário de funcionamento (mostra "aberto agora" pro cliente)</p>
+                <EditorHorarioSemana valor={perfilForm.horario_funcionamento} onChange={(novo) => setPerfilForm((f) => ({ ...f, horario_funcionamento: novo }))} />
+              </div>
               <button type="submit" disabled={salvandoPerfil} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
                 {salvandoPerfil ? "Salvando..." : "Salvar alterações"}
               </button>
@@ -8335,7 +8465,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (!supabaseConfigurado) return;
     supabase
       .from("empresas")
-      .select("id, nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, logo_url, facebook, site, destaque, patrocinado, patrocinado_ate, whatsapp, instagram, endereco, google_maps_url, email, criado_em, fotos_urls")
+      .select("id, nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, logo_url, facebook, site, destaque, patrocinado, patrocinado_ate, whatsapp, instagram, endereco, google_maps_url, email, criado_em, fotos_urls, horario_funcionamento")
       .eq("status", "aprovada")
       .order("destaque", { ascending: false })
       .order("visualizacoes", { ascending: false })
@@ -8347,7 +8477,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             rating: d.rating ?? "—", cartaoServidor: !!d.cartao_servidor, itens: d.itens ?? 0,
             banner_url: d.banner_url, logo_url: d.logo_url, facebook: d.facebook, site: d.site, destaque: d.destaque, patrocinado: !!d.patrocinado, patrocinado_ate: d.patrocinado_ate || null, whatsapp: d.whatsapp,
             instagram: d.instagram, endereco: d.endereco, google_maps_url: d.google_maps_url, email: d.email, criado_em: d.criado_em,
-            fotos_urls: d.fotos_urls || [],
+            fotos_urls: d.fotos_urls || [], horario_funcionamento: d.horario_funcionamento || null,
             verificada: !!(d.logo_url && d.whatsapp && d.endereco && (d.instagram || d.site)),
           })));
         }
