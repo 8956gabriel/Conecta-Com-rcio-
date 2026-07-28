@@ -2126,6 +2126,7 @@ function AdminPanel() {
     agencia_ativo: false, agencia_texto: "", agencia_endereco: "", agencia_whatsapp: "", agencia_horario: "",
     sala_horario: "", sala_servicos: "",
     turismo_ativo: false, historia_cidade: "", historia_foto_url: "",
+    mural_ativo: false,
   };
 
   useEffect(() => {
@@ -2271,6 +2272,7 @@ function AdminPanel() {
         turismo_ativo: !!siteConfigAdmin.turismo_ativo,
         historia_cidade: siteConfigAdmin.historia_cidade || null,
         historia_foto_url: siteConfigAdmin.historia_foto_url || null,
+        mural_ativo: !!siteConfigAdmin.mural_ativo,
       });
       if (error) throw error;
       setStatusIdentidade("ok");
@@ -2949,6 +2951,36 @@ function AdminPanel() {
   };
 
   // -------------------------------------------------------------------------
+  // Mural da comunidade — moradores publicam sugestão/elogio/reclamação/
+  // aviso, e só aparece pra todo mundo depois que o admin aprova. FASE 43.
+  // -------------------------------------------------------------------------
+  const [muralAdmin, setMuralAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("mural_comunidade").select("*").order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMuralAdmin(data || []);
+    });
+  }, []);
+  const [respostaMural, setRespostaMural] = useState({}); // { [id]: texto }
+
+  const moderarMural = async (id, status) => {
+    const { error } = await supabase.from("mural_comunidade").update({ status }).eq("id", id);
+    if (!error) { setMuralAdmin((atual) => atual.map((m) => (m.id === id ? { ...m, status } : m))); notificar(status === "aprovado" ? "Publicação aprovada." : "Publicação recusada."); }
+  };
+
+  const enviarRespostaMural = async (id) => {
+    const texto = (respostaMural[id] || "").trim();
+    if (!texto) return;
+    const { error } = await supabase.from("mural_comunidade").update({ resposta_admin: texto }).eq("id", id);
+    if (!error) { setMuralAdmin((atual) => atual.map((m) => (m.id === id ? { ...m, resposta_admin: texto } : m))); notificar("Resposta publicada."); }
+  };
+
+  const apagarMural = async (id) => {
+    const { error } = await supabase.from("mural_comunidade").delete().eq("id", id);
+    if (!error) { setMuralAdmin((atual) => atual.filter((m) => m.id !== id)); notificar("Publicação excluída."); }
+  };
+
+  // -------------------------------------------------------------------------
   // Avaliações de empresas — o público comenta, o admin só modera (apaga
   // comentário abusivo/spam). FASE 34.
   // -------------------------------------------------------------------------
@@ -3467,6 +3499,7 @@ function AdminPanel() {
     { id: "servicos", label: "Serviços do Empreendedor", icon: Landmark },
     { id: "licitacoes", label: "Editais e Licitações", icon: FileText },
     { id: "turismo", label: "Turismo", icon: MapPinned },
+    { id: "mural", label: "Mural da comunidade", icon: Users },
     { id: "enquetes", label: "Enquetes", icon: Vote },
     { id: "cupons", label: "Cupons de desconto", icon: Tag },
     { id: "combos", label: "Combos e promoções", icon: HandCoins },
@@ -5094,6 +5127,65 @@ function AdminPanel() {
                 </div>
               ))}
               {(pontosTuristicosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum ponto turístico cadastrado ainda.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "mural" && (
+          <div>
+            <SectionHeader eyebrow="Comunidade" title="Mural da comunidade" sub="Aprove antes de aparecer no site — dá pra responder publicamente" />
+            <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer mb-6" style={{ color: "#425A70" }}>
+              <input type="checkbox" checked={!!siteConfigAdmin?.mural_ativo} onChange={(e) => { setSiteConfigAdmin((v) => ({ ...v, mural_ativo: e.target.checked })); }} />
+              Mostrar a aba Mural no menu do site
+            </label>
+            {siteConfigAdmin?.mural_ativo !== undefined && (
+              <button onClick={salvarIdentidade} className="font-body text-xs font-bold rounded-lg px-3 py-2 border mb-6 -mt-4" style={{ borderColor: C.line, color: C.blue }}>
+                Salvar essa opção
+              </button>
+            )}
+
+            {(muralAdmin ?? []).filter((m) => m.status === "pendente").length > 0 && (
+              <div className="mb-8">
+                <p className="font-body text-xs font-bold mb-2" style={{ color: "#8A5A12" }}>Aguardando aprovação ({(muralAdmin ?? []).filter((m) => m.status === "pendente").length})</p>
+                <div className="flex flex-col gap-3 max-w-2xl">
+                  {(muralAdmin ?? []).filter((m) => m.status === "pendente").map((m) => (
+                    <div key={m.id} className="rounded-2xl border p-4" style={{ borderColor: C.amber, background: "#FFF9EE" }}>
+                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{m.nome} <span className="font-body text-[10px] font-normal uppercase" style={{ color: "#8A5A12" }}>· {m.categoria}</span></p>
+                      <p className="font-body text-sm mt-1" style={{ color: "#425A70" }}>{m.mensagem}</p>
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => moderarMural(m.id, "aprovado")} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 text-white" style={{ background: "#25A85B" }}>Aprovar</button>
+                        <button onClick={() => moderarMural(m.id, "recusado")} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ color: "#B4462F" }}>Recusar</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Publicadas</p>
+            <div className="flex flex-col gap-3 max-w-2xl">
+              {(muralAdmin ?? []).filter((m) => m.status === "aprovado").map((m) => (
+                <div key={m.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{m.nome} <span className="font-body text-[10px] font-normal uppercase" style={{ color: "#5C7186" }}>· {m.categoria}</span></p>
+                    <button onClick={() => { if (confirmarExclusao("Excluir essa publicação?")) apagarMural(m.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                  </div>
+                  <p className="font-body text-sm mt-1" style={{ color: "#425A70" }}>{m.mensagem}</p>
+                  {m.resposta_admin ? (
+                    <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: C.blueTint2 }}>
+                      <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>Resposta da administração</p>
+                      <p className="font-body text-xs" style={{ color: "#425A70" }}>{m.resposta_admin}</p>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 mt-2">
+                      <input value={respostaMural[m.id] || ""} onChange={(e) => setRespostaMural((r) => ({ ...r, [m.id]: e.target.value }))} placeholder="Responder publicamente (opcional)"
+                        className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none flex-1" style={{ borderColor: C.line }} />
+                      <button onClick={() => enviarRespostaMural(m.id)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ background: C.blueTint, color: C.blue }}>Responder</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(muralAdmin ?? []).filter((m) => m.status === "aprovado").length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma publicação aprovada ainda.</p>}
             </div>
           </div>
         )}
@@ -10108,17 +10200,127 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
   if (h.startsWith("#/admin")) return "admin";
   if (h.startsWith("#/estatisticas") || h.startsWith("#/numeros")) return "estatisticas";
   if (h.startsWith("#/turismo")) return "turismo";
+  if (h.startsWith("#/mural")) return "mural";
   if (h.startsWith("#/empresa") || h.startsWith("#/vendedor")) return "empresario";
   if (h.startsWith("#/cadastro")) return "cadastro-conta";
   if (h.startsWith("#/entrar") || h.startsWith("#/conta")) return "conta";
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Mural da comunidade — qualquer morador publica sugestão, elogio,
+// reclamação ou aviso; só aparece pra todo mundo depois que o admin aprova.
+// FASE 43 (última do backlog de novas funcionalidades).
+// ---------------------------------------------------------------------------
+function PaginaMural({ perfil }) {
+  const [publicacoes, setPublicacoes] = useState(null);
+  const [nome, setNome] = useState(perfil?.nome || "");
+  const [categoria, setCategoria] = useState("sugestao");
+  const [mensagem, setMensagem] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    document.title = "Mural da comunidade — Conecta Comércio";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute("content", "Sugestões, elogios, reclamações e avisos da comunidade de Ivatuba - PR.");
+    return () => {
+      document.title = "Conecta Comércio · Ivatuba - PR";
+      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+    };
+  }, []);
+
+  const carregar = () => {
+    if (!supabaseConfigurado) { setPublicacoes([]); return; }
+    supabase.from("mural_comunidade").select("*").eq("status", "aprovado").order("criado_em", { ascending: false }).limit(50).then(({ data, error }) => {
+      setPublicacoes(error ? [] : data || []);
+    });
+  };
+  useEffect(carregar, []);
+
+  const publicar = async (e) => {
+    e.preventDefault();
+    setErro("");
+    if (!nome.trim() || !mensagem.trim()) { setErro("Preencha seu nome e a mensagem."); return; }
+    if (!supabaseConfigurado) { setEnviado(true); return; }
+    setEnviando(true);
+    try {
+      const { error } = await supabase.from("mural_comunidade").insert({ nome, categoria, mensagem, status: "pendente" });
+      if (error) throw error;
+      setEnviado(true);
+      setMensagem("");
+    } catch (err) {
+      setErro(err.message || "Não consegui publicar agora. Tente de novo.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const categorias = { sugestao: "Sugestão", elogio: "Elogio", reclamacao: "Reclamação", aviso: "Aviso" };
+  const corCategoria = { sugestao: C.blue, elogio: "#1E8E5A", reclamacao: "#B4462F", aviso: "#8A5A12" };
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 md:px-6 py-10">
+      <SectionHeader eyebrow="Sua voz" title="Mural da comunidade" sub="Sugestões, elogios, reclamações e avisos de quem mora na cidade" />
+
+      <div className="rounded-2xl border p-5 mt-6" style={{ borderColor: C.line }}>
+        {enviado ? (
+          <p className="font-body text-sm font-semibold flex items-center gap-1.5" style={{ color: "#1E8E5A" }}>
+            <CheckCircle2 size={15} /> Recebemos sua publicação! Ela aparece aqui assim que for aprovada.
+          </p>
+        ) : (
+          <form onSubmit={publicar} className="flex flex-col gap-2.5">
+            <div className="grid sm:grid-cols-2 gap-2.5">
+              <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }}>
+                {Object.entries(categorias).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
+            <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={3} placeholder="Escreva sua mensagem..." className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+            {erro && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{erro}</p>}
+            <button type="submit" disabled={enviando} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+              {enviando ? "Publicando..." : "Publicar no mural"}
+            </button>
+          </form>
+        )}
+      </div>
+
+      <div className="mt-8 flex flex-col gap-3">
+        {publicacoes === null && <Skeleton className="h-24 w-full" />}
+        {publicacoes && publicacoes.length === 0 && (
+          <p className="font-body text-sm" style={{ color: "#5C7186" }}>Ainda não tem nenhuma publicação — seja o primeiro a escrever.</p>
+        )}
+        {(publicacoes || []).map((m) => (
+          <div key={m.id} className="rounded-2xl border p-4 bg-white" style={{ borderColor: C.line }}>
+            <div className="flex items-center justify-between">
+              <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{m.nome}</p>
+              <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint2, color: corCategoria[m.categoria] || C.blue }}>
+                {categorias[m.categoria] || m.categoria}
+              </span>
+            </div>
+            <p className="font-body text-sm mt-1.5" style={{ color: "#425A70" }}>{m.mensagem}</p>
+            {m.resposta_admin && (
+              <div className="mt-2.5 rounded-lg px-3 py-2" style={{ background: C.blueTint2 }}>
+                <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>Resposta da administração</p>
+                <p className="font-body text-xs" style={{ color: "#425A70" }}>{m.resposta_admin}</p>
+              </div>
+            )}
+            <p className="font-body text-[10px] mt-2" style={{ color: "#8896A6" }}>
+              {m.criado_em ? new Date(m.criado_em).toLocaleDateString("pt-BR") : ""}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -10494,6 +10696,7 @@ export default function ConectaComercio() {
   const modos = [
     { id: "site", label: "Site", icon: Store },
     ...(siteConfig?.turismo_ativo ? [{ id: "turismo", label: "Turismo", icon: MapPinned }] : []),
+    ...(siteConfig?.mural_ativo ? [{ id: "mural", label: "Mural", icon: Users }] : []),
     { id: "estatisticas", label: "Números", icon: TrendingUp },
     { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
@@ -10603,6 +10806,7 @@ export default function ConectaComercio() {
       {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} siteConfig={siteConfig} sessao={sessao} perfil={perfil} />}
       {modo === "estatisticas" && <EstatisticasPublicas />}
       {modo === "turismo" && <PaginaTurismo siteConfig={siteConfig} />}
+      {modo === "mural" && <PaginaMural perfil={perfil} />}
       {modo === "conta" && (sessao && perfil ? <MinhaConta perfil={perfil} sessao={sessao} /> : <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />)}
 
       {modo === "admin" && (
