@@ -2123,6 +2123,8 @@ function AdminPanel() {
     fomento_ativo: false, fomento_foto_url: "", fomento_texto: "",
     fomento_link: "https://www.fomento.pr.gov.br/Linhas-de-Credito",
     fomento_whatsapp: "", fomento_agente_nome: "Gabriel Oliveira",
+    agencia_ativo: false, agencia_texto: "", agencia_endereco: "", agencia_whatsapp: "", agencia_horario: "",
+    sala_horario: "", sala_servicos: "",
   };
 
   useEffect(() => {
@@ -2190,6 +2192,13 @@ function AdminPanel() {
         fomento_link: siteConfigAdmin.fomento_link || null,
         fomento_whatsapp: siteConfigAdmin.fomento_whatsapp || null,
         fomento_agente_nome: siteConfigAdmin.fomento_agente_nome || null,
+        agencia_ativo: !!siteConfigAdmin.agencia_ativo,
+        agencia_texto: siteConfigAdmin.agencia_texto || null,
+        agencia_endereco: siteConfigAdmin.agencia_endereco || null,
+        agencia_whatsapp: siteConfigAdmin.agencia_whatsapp || null,
+        agencia_horario: siteConfigAdmin.agencia_horario || null,
+        sala_horario: siteConfigAdmin.sala_horario || null,
+        sala_servicos: siteConfigAdmin.sala_servicos || null,
       });
       if (error) throw error;
       setStatusIdentidade("ok");
@@ -2810,6 +2819,64 @@ function AdminPanel() {
   };
 
   // -------------------------------------------------------------------------
+  // Editais e licitações municipais abertas pra empresas locais. FASE 41.
+  // -------------------------------------------------------------------------
+  const [licitacoesAdmin, setLicitacoesAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("licitacoes").select("*").order("data_limite", { ascending: true, nullsFirst: false }).then(({ data, error }) => {
+      if (!error) setLicitacoesAdmin(data || []);
+    });
+  }, []);
+  const [licitacaoLeadsAdmin, setLicitacaoLeadsAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("licitacao_leads").select("*").order("criado_em", { ascending: false }).limit(50).then(({ data, error }) => {
+      if (!error) setLicitacaoLeadsAdmin(data || []);
+    });
+  }, []);
+  const licitacaoAdminVazia = { titulo: "", orgao: "", descricao: "", valor_estimado: "", data_limite: "", link_edital: "" };
+  const [novaLicitacaoAdmin, setNovaLicitacaoAdmin] = useState(licitacaoAdminVazia);
+  const [criandoLicitacaoAdmin, setCriandoLicitacaoAdmin] = useState(false);
+  const [statusLicitacaoAdmin, setStatusLicitacaoAdmin] = useState("");
+
+  const criarLicitacaoAdmin = async (e) => {
+    e.preventDefault();
+    setStatusLicitacaoAdmin("");
+    if (!novaLicitacaoAdmin.titulo.trim()) { setStatusLicitacaoAdmin("Informe o título."); return; }
+    setCriandoLicitacaoAdmin(true);
+    try {
+      const { data, error } = await supabase.from("licitacoes").insert({
+        titulo: novaLicitacaoAdmin.titulo,
+        orgao: novaLicitacaoAdmin.orgao || null,
+        descricao: novaLicitacaoAdmin.descricao || null,
+        valor_estimado: novaLicitacaoAdmin.valor_estimado ? Number(novaLicitacaoAdmin.valor_estimado) : null,
+        data_limite: novaLicitacaoAdmin.data_limite || null,
+        link_edital: novaLicitacaoAdmin.link_edital || null,
+      }).select().single();
+      if (error) throw error;
+      setLicitacoesAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovaLicitacaoAdmin(licitacaoAdminVazia);
+      setStatusLicitacaoAdmin("ok");
+      notificar("Edital publicado.");
+    } catch (err) {
+      setStatusLicitacaoAdmin(err.message || "Erro ao publicar edital.");
+    } finally {
+      setCriandoLicitacaoAdmin(false);
+    }
+  };
+
+  const alternarAtivoLicitacaoAdmin = async (id, ativo) => {
+    const { error } = await supabase.from("licitacoes").update({ ativo }).eq("id", id);
+    if (!error) { setLicitacoesAdmin((atual) => atual.map((l) => (l.id === id ? { ...l, ativo } : l))); notificar(ativo ? "Edital reativado." : "Edital encerrado."); }
+  };
+
+  const apagarLicitacaoAdmin = async (id) => {
+    const { error } = await supabase.from("licitacoes").delete().eq("id", id);
+    if (!error) { setLicitacoesAdmin((atual) => atual.filter((l) => l.id !== id)); notificar("Edital excluído."); }
+  };
+
+  // -------------------------------------------------------------------------
   // Avaliações de empresas — o público comenta, o admin só modera (apaga
   // comentário abusivo/spam). FASE 34.
   // -------------------------------------------------------------------------
@@ -3326,6 +3393,7 @@ function AdminPanel() {
     { id: "credenciais", label: "Credenciamento", icon: BadgeCheck },
     { id: "cursos", label: "Cursos", icon: GraduationCap },
     { id: "servicos", label: "Serviços do Empreendedor", icon: Landmark },
+    { id: "licitacoes", label: "Editais e Licitações", icon: FileText },
     { id: "enquetes", label: "Enquetes", icon: Vote },
     { id: "cupons", label: "Cupons de desconto", icon: Tag },
     { id: "combos", label: "Combos e promoções", icon: HandCoins },
@@ -4822,6 +4890,74 @@ function AdminPanel() {
           </div>
         )}
 
+        {tab === "licitacoes" && (
+          <div>
+            <SectionHeader eyebrow="Compras públicas" title="Editais e Licitações" sub="Publique editais abertos pra empresas locais participarem" />
+            <form onSubmit={criarLicitacaoAdmin} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <input value={novaLicitacaoAdmin.titulo} onChange={(e) => setNovaLicitacaoAdmin((v) => ({ ...v, titulo: e.target.value }))} placeholder="Título do edital" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <input value={novaLicitacaoAdmin.orgao} onChange={(e) => setNovaLicitacaoAdmin((v) => ({ ...v, orgao: e.target.value }))} placeholder="Órgão (ex: Prefeitura de Ivatuba)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <input value={novaLicitacaoAdmin.valor_estimado} onChange={(e) => setNovaLicitacaoAdmin((v) => ({ ...v, valor_estimado: e.target.value }))} type="number" step="0.01" placeholder="Valor estimado (R$, opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                Prazo final pra participar
+                <input type="date" value={novaLicitacaoAdmin.data_limite} onChange={(e) => setNovaLicitacaoAdmin((v) => ({ ...v, data_limite: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <input value={novaLicitacaoAdmin.link_edital} onChange={(e) => setNovaLicitacaoAdmin((v) => ({ ...v, link_edital: e.target.value }))} placeholder="Link do edital completo (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <textarea value={novaLicitacaoAdmin.descricao} onChange={(e) => setNovaLicitacaoAdmin((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição / objeto do edital" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              {statusLicitacaoAdmin && statusLicitacaoAdmin !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusLicitacaoAdmin}</p>}
+              {statusLicitacaoAdmin === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Edital publicado!</p>}
+              <button type="submit" disabled={criandoLicitacaoAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                {criandoLicitacaoAdmin ? "Publicando..." : "Publicar edital"}
+              </button>
+            </form>
+            <div className="flex flex-col gap-3 max-w-lg mb-8">
+              {(licitacoesAdmin ?? []).map((l) => (
+                <div key={l.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{l.titulo}</p>
+                    <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: l.ativo ? "#E7F6EE" : "#FBEAE5", color: l.ativo ? "#1E8E5A" : "#B4462F" }}>
+                      {l.ativo ? "Aberto" : "Encerrado"}
+                    </span>
+                  </div>
+                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
+                    {l.orgao}{l.data_limite ? ` · prazo ${l.data_limite.split("-").reverse().join("/")}` : ""}{l.valor_estimado ? ` · R$ ${Number(l.valor_estimado).toFixed(2).replace(".", ",")}` : ""}
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => alternarAtivoLicitacaoAdmin(l.id, !l.ativo)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>{l.ativo ? "Encerrar" : "Reabrir"}</button>
+                    <button onClick={() => { if (confirmarExclusao("Excluir esse edital?")) apagarLicitacaoAdmin(l.id); }} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ color: "#B4462F" }}>Excluir</button>
+                  </div>
+                </div>
+              ))}
+              {(licitacoesAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum edital cadastrado ainda.</p>}
+            </div>
+
+            {licitacaoLeadsAdmin && licitacaoLeadsAdmin.length > 0 && (
+              <div className="max-w-lg">
+                <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Empresários que querem ser avisados ({licitacaoLeadsAdmin.length})</p>
+                <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Nome</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>WhatsApp</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Data</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {licitacaoLeadsAdmin.map((l) => (
+                        <tr key={l.id} style={{ borderBottom: `1px solid ${C.line}` }}>
+                          <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{l.nome}</td>
+                          <td className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.whatsapp}</td>
+                          <td className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {tab === "enquetes" && (
           <div>
             <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
@@ -5443,6 +5579,10 @@ function AdminPanel() {
                 <input value={siteConfigAdmin?.instagram_contato || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, instagram_contato: e.target.value }))} placeholder="Instagram (@usuario)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 <input value={siteConfigAdmin?.endereco_sala_empreendedor || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, endereco_sala_empreendedor: e.target.value }))} placeholder="Endereço da Sala do Empreendedor" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <input value={siteConfigAdmin?.sala_horario || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, sala_horario: e.target.value }))} placeholder="Horário de atendimento (ex: Seg a sex, 8h às 17h)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={siteConfigAdmin?.sala_servicos || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, sala_servicos: e.target.value }))} placeholder="Serviços oferecidos, separados por vírgula" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </div>
 
               {statusIdentidade && statusIdentidade !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusIdentidade}</p>}
               {statusIdentidade === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Salvo! Recarregue o site para ver tudo aplicado.</p>}
@@ -5525,6 +5665,38 @@ function AdminPanel() {
                 </div>
               </div>
             )}
+
+            <SectionHeader eyebrow="Emprego" title="Agência do Trabalhador" sub="Card no site, no mesmo estilo do Fomento Paraná, com endereço e WhatsApp" />
+            <form onSubmit={salvarIdentidade} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg" style={{ borderColor: C.line }}>
+              <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={!!siteConfigAdmin?.agencia_ativo} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, agencia_ativo: e.target.checked }))} />
+                Mostrar o card da Agência do Trabalhador no site
+              </label>
+              <label className="font-body text-xs font-bold mt-1" style={{ color: C.ink }}>Texto de apresentação</label>
+              <textarea value={siteConfigAdmin?.agencia_texto || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, agencia_texto: e.target.value }))}
+                placeholder="Ex: Procurando emprego ou precisa contratar? A Agência do Trabalhador de Ivatuba conecta candidatos e empresas locais."
+                rows={3} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  Endereço
+                  <input value={siteConfigAdmin?.agencia_endereco || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, agencia_endereco: e.target.value }))}
+                    className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  Horário de atendimento
+                  <input value={siteConfigAdmin?.agencia_horario || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, agencia_horario: e.target.value }))}
+                    placeholder="Seg a sex, 8h às 17h" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+              </div>
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                WhatsApp
+                <input value={siteConfigAdmin?.agencia_whatsapp || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, agencia_whatsapp: e.target.value }))}
+                  placeholder="(44) 90000-0000" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <button type="submit" disabled={salvandoIdentidade || !siteConfigAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 mt-1 disabled:opacity-60" style={{ background: C.blue }}>
+                {salvandoIdentidade ? "Salvando..." : "Salvar Agência do Trabalhador"}
+              </button>
+            </form>
           </div>
         )}
       </div>
@@ -7329,6 +7501,44 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     ? `https://wa.me/55${String(siteConfig.fomento_whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Quero solicitar informações sobre as linhas de crédito da Fomento Paraná com o agente de crédito ${siteConfig?.fomento_agente_nome || "Gabriel Oliveira"}.`)}`
     : null;
 
+  // Agência do Trabalhador — mesmo estilo de card do Fomento Paraná. FASE 41.
+  const linkWhatsAgencia = siteConfig?.agencia_whatsapp
+    ? `https://wa.me/55${String(siteConfig.agencia_whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent("Olá! Vim pelo Conecta Comércio e quero falar com a Agência do Trabalhador.")}`
+    : null;
+
+  // Editais e licitações abertas — lista pública + cadastro de quem quer
+  // ser avisado de novos editais. FASE 41.
+  const [licitacoesPublicas, setLicitacoesPublicas] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("licitacoes").select("*").eq("ativo", true).order("data_limite", { ascending: true, nullsFirst: false }).then(({ data, error }) => {
+      if (!error) setLicitacoesPublicas(data || []);
+    });
+  }, []);
+  const [licitacaoNome, setLicitacaoNome] = useState("");
+  const [licitacaoWhatsapp, setLicitacaoWhatsapp] = useState("");
+  const [enviandoLicitacao, setEnviandoLicitacao] = useState(false);
+  const [licitacaoEnviada, setLicitacaoEnviada] = useState(false);
+  const [erroLicitacao, setErroLicitacao] = useState("");
+  const cadastrarInteresseLicitacao = async (e) => {
+    e.preventDefault();
+    setErroLicitacao("");
+    if (!licitacaoNome.trim() || !licitacaoWhatsapp.trim()) { setErroLicitacao("Preencha nome e WhatsApp."); return; }
+    if (!supabaseConfigurado) { setLicitacaoEnviada(true); return; }
+    setEnviandoLicitacao(true);
+    try {
+      const { error } = await supabase.from("licitacao_leads").insert({ nome: licitacaoNome, whatsapp: licitacaoWhatsapp });
+      if (error) throw error;
+      setLicitacaoEnviada(true);
+      setLicitacaoNome("");
+      setLicitacaoWhatsapp("");
+    } catch (err) {
+      setErroLicitacao(err.message || "Não consegui enviar agora. Tente de novo.");
+    } finally {
+      setEnviandoLicitacao(false);
+    }
+  };
+
   // ---------------------------------------------------------------------
   // Carrinho de compras — separado por comerciante (não mistura empresas
   // diferentes no mesmo pedido), salvo no navegador (localStorage), sem
@@ -8247,6 +8457,111 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         </section>
       )}
 
+      {/* Agência do Trabalhador */}
+      {siteConfig?.agencia_ativo && (
+        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+          <Reveal>
+            <div className="rounded-3xl overflow-hidden relative border" style={{ borderColor: C.line }}>
+              <div className="grid md:grid-cols-[1fr_1.1fr]">
+                <div className="h-48 md:h-full relative flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.blueDeep}, ${C.blue})` }}>
+                  <Briefcase size={48} className="text-white/90" />
+                </div>
+                <div className="p-6 md:p-8 flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.blueTint, color: C.blue }}>
+                      <Briefcase size={16} />
+                    </span>
+                    <span className="font-display text-xs font-bold tracking-[0.16em] uppercase" style={{ color: C.blue }}>Emprego</span>
+                  </div>
+                  <h2 className="font-display font-extrabold text-xl md:text-2xl" style={{ color: C.ink }}>Agência do Trabalhador</h2>
+                  <p className="font-body text-sm" style={{ color: "#5C7186" }}>
+                    {siteConfig?.agencia_texto || "Procurando emprego ou precisa contratar? A Agência do Trabalhador conecta candidatos e empresas locais."}
+                  </p>
+                  {(siteConfig?.agencia_endereco || siteConfig?.agencia_horario) && (
+                    <div className="font-body text-xs flex flex-col gap-1" style={{ color: "#5C7186" }}>
+                      {siteConfig?.agencia_endereco && <span className="flex items-center gap-1"><MapPin size={12} /> {siteConfig.agencia_endereco}</span>}
+                      {siteConfig?.agencia_horario && <span className="flex items-center gap-1"><Clock size={12} /> {siteConfig.agencia_horario}</span>}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => vagasSecaoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      className="font-body text-xs font-bold rounded-lg px-4 py-2.5 border flex items-center gap-1.5" style={{ borderColor: C.line, color: C.blue }}>
+                      <Briefcase size={13} /> Ver vagas disponíveis
+                    </button>
+                    {linkWhatsAgencia && (
+                      <a href={linkWhatsAgencia} target="_blank" rel="noopener noreferrer"
+                        className="glow-btn font-body text-xs font-bold rounded-lg px-4 py-2.5 text-white flex items-center gap-1.5" style={{ background: "#25A85B" }}>
+                        <MessageCircle size={13} /> Falar no WhatsApp
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+        </section>
+      )}
+
+      {/* Editais e Licitações */}
+      {licitacoesPublicas && licitacoesPublicas.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+          <Reveal><SectionHeader eyebrow="Compras públicas" title="Editais e Licitações" sub="Oportunidades abertas pra empresas locais participarem" /></Reveal>
+          <div className="grid sm:grid-cols-2 gap-4 mt-4">
+            {licitacoesPublicas.map((l) => {
+              const hoje = new Date().toISOString().slice(0, 10);
+              const vencido = l.data_limite && l.data_limite < hoje;
+              return (
+                <Reveal key={l.id}>
+                  <div className="rounded-2xl border p-4 bg-white h-full flex flex-col gap-1.5" style={{ borderColor: C.line }}>
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{l.titulo}</p>
+                    {l.orgao && <p className="font-body text-xs" style={{ color: "#5C7186" }}>{l.orgao}</p>}
+                    {l.descricao && <p className="font-body text-xs" style={{ color: "#5C7186" }}>{l.descricao}</p>}
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {l.valor_estimado && (
+                        <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>
+                          R$ {Number(l.valor_estimado).toFixed(2).replace(".", ",")}
+                        </span>
+                      )}
+                      {l.data_limite && (
+                        <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: vencido ? "#FBEAE5" : "#FFF6E9", color: vencido ? "#B4462F" : "#8A5A12" }}>
+                          {vencido ? "Prazo encerrado" : `Prazo: ${l.data_limite.split("-").reverse().join("/")}`}
+                        </span>
+                      )}
+                    </div>
+                    {l.link_edital && (
+                      <a href={l.link_edital} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold flex items-center gap-1 mt-1 w-fit" style={{ color: C.blue }}>
+                        <ExternalLink size={11} /> Ver edital completo
+                      </a>
+                    )}
+                  </div>
+                </Reveal>
+              );
+            })}
+          </div>
+          <div className="max-w-md mt-6">
+            {licitacaoEnviada ? (
+              <p className="font-body text-sm font-semibold flex items-center gap-1.5" style={{ color: "#1E8E5A" }}>
+                <CheckCircle2 size={15} /> Recebemos seu contato! Vamos te avisar de novos editais.
+              </p>
+            ) : (
+              <form onSubmit={cadastrarInteresseLicitacao} className="flex flex-col gap-2">
+                <p className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>Quer ser avisado quando surgir um edital novo?</p>
+                <div className="flex flex-wrap gap-2">
+                  <input value={licitacaoNome} onChange={(e) => setLicitacaoNome(e.target.value)} placeholder="Seu nome"
+                    className="font-body text-sm border rounded-lg px-3 py-2 outline-none flex-1 min-w-[140px]" style={{ borderColor: C.line }} />
+                  <input value={licitacaoWhatsapp} onChange={(e) => setLicitacaoWhatsapp(e.target.value)} placeholder="WhatsApp"
+                    className="font-body text-sm border rounded-lg px-3 py-2 outline-none flex-1 min-w-[140px]" style={{ borderColor: C.line }} />
+                  <button type="submit" disabled={enviandoLicitacao} className="font-body text-xs font-bold rounded-lg px-4 py-2 text-white disabled:opacity-60" style={{ background: C.blue }}>
+                    {enviandoLicitacao ? "Enviando..." : "Cadastrar"}
+                  </button>
+                </div>
+                {erroLicitacao && <p className="font-body text-[11px]" style={{ color: "#B4462F" }}>{erroLicitacao}</p>}
+              </form>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Feira do Empreendedor — em destaque */}
       <section ref={feiraSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
         <Reveal>
@@ -8783,13 +9098,20 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           <div>
             <p className="font-display font-bold text-sm mb-3">Sala do Empreendedor</p>
             <ul className="font-body text-white/60 text-xs space-y-2">
-              <li>Abrir um MEI</li>
-              <li>Cursos e capacitações</li>
+              {siteConfig?.sala_servicos ? (
+                siteConfig.sala_servicos.split(",").map((s, i) => s.trim() && <li key={i}>{s.trim()}</li>)
+              ) : (
+                <>
+                  <li>Abrir um MEI</li>
+                  <li>Cursos e capacitações</li>
+                </>
+              )}
               {siteConfig?.endereco_sala_empreendedor ? (
                 <li className="flex items-start gap-1"><MapPin size={12} className="mt-0.5 shrink-0" /> {siteConfig.endereco_sala_empreendedor}</li>
               ) : (
                 <li>Atendimento presencial</li>
               )}
+              {siteConfig?.sala_horario && <li className="flex items-start gap-1"><Clock size={12} className="mt-0.5 shrink-0" /> {siteConfig.sala_horario}</li>}
               {siteConfig?.telefone && <li>Tel: {siteConfig.telefone}</li>}
             </ul>
           </div>
