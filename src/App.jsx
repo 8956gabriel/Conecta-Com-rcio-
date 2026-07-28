@@ -72,6 +72,18 @@ function patrocinadoAtivo(e) {
   return e.patrocinado_ate >= hoje;
 }
 
+// Plano Premium (FASE 52) — assinatura opcional do comerciante, ativada
+// manualmente pelo admin depois de combinar o pagamento por fora da
+// plataforma (mesmo esquema já usado no "patrocinado").
+function planoPremiumAtivo(e) {
+  if (!e?.plano_premium) return false;
+  if (!e.plano_premium_ate) return true;
+  const hoje = new Date().toISOString().slice(0, 10);
+  return e.plano_premium_ate >= hoje;
+}
+const LIMITE_FOTOS_GRATUITO = 3;
+const LIMITE_FOTOS_PREMIUM = 15;
+
 // -----------------------------------------------------------------------
 // Horário de funcionamento por dia da semana e indicador "aberto agora".
 // Guardado como JSON: { seg: { aberto, abre, fecha }, ter: {...}, ... }.
@@ -713,6 +725,11 @@ function EmpresaCard({ e, fav, onFav, onAbrir }) {
         </p>
         <p className="font-body text-xs" style={{ color: "#5C7186" }}>{e.itens} {e.itens === 1 ? "item ativo" : "itens ativos"}</p>
         <div className="flex flex-wrap gap-1.5">
+          {planoPremiumAtivo(e) && (
+            <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5 text-white" style={{ background: "linear-gradient(120deg, #C6811F, #E8A23D)" }}>
+              <Sparkles size={11} /> Premium
+            </span>
+          )}
           {e.verificada && (
             <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>
               <BadgeCheck size={11} /> Comerciante verificado
@@ -878,6 +895,11 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
             </p>
             <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{empresa.cat} · {empresa.bairro}, {empresa.cidade}</p>
             <div className="flex flex-wrap gap-1.5 mt-2">
+              {planoPremiumAtivo(empresa) && (
+                <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body text-white" style={{ background: "linear-gradient(120deg, #C6811F, #E8A23D)" }}>
+                  <Sparkles size={11} /> Premium
+                </span>
+              )}
               {empresa.verificada && (
                 <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>
                   <BadgeCheck size={11} /> Comerciante verificado
@@ -1789,14 +1811,14 @@ function AdminPanel() {
   const [empresasPend, setEmpresasPend] = useState(null); // null = carregando/indisponível
   const [statusEmpresa, setStatusEmpresa] = useState({});
   const [editandoEmpresa, setEditandoEmpresa] = useState(null);
-  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, patrocinado_ate: "", fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false, possui_mei: false, horario_funcionamento: null, chave_pix: "" });
+  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, patrocinado_ate: "", fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false, possui_mei: false, horario_funcionamento: null, chave_pix: "", plano_premium: false, plano_premium_ate: "" });
   const [enviandoLogoEmpresa, setEnviandoLogoEmpresa] = useState(false);
   const [enviandoBannerEmpresa, setEnviandoBannerEmpresa] = useState(false);
   const [enviandoFotoGaleria, setEnviandoFotoGaleria] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em, email, whatsapp, instagram, cpf, cnpj, possui_mei, horario_funcionamento, chave_pix").order("criado_em", { ascending: false })
+    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em, email, whatsapp, instagram, cpf, cnpj, possui_mei, horario_funcionamento, chave_pix, plano_premium, plano_premium_ate").order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setEmpresasPend(data || []); });
   }, []);
 
@@ -1846,6 +1868,7 @@ function AdminPanel() {
       cpf: e.cpf || "", cnpj: e.cnpj || "", aceita_cartao_servidor: !!e.aceita_cartao_servidor, patrocinado: !!e.patrocinado,
       patrocinado_ate: e.patrocinado_ate || "", possui_mei: !!e.possui_mei,
       horario_funcionamento: e.horario_funcionamento || null, chave_pix: e.chave_pix || "",
+      plano_premium: !!e.plano_premium, plano_premium_ate: e.plano_premium_ate || "",
     });
   };
 
@@ -1882,6 +1905,8 @@ function AdminPanel() {
   const enviarFotoGaleriaEmpresa = (e) => {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
+    const limiteFotos = formEmpresa.plano_premium ? LIMITE_FOTOS_PREMIUM : LIMITE_FOTOS_GRATUITO;
+    if (formEmpresa.fotos_urls.length >= limiteFotos) { notificar(`Limite de ${limiteFotos} fotos atingido.`, "aviso"); return; }
     if (!supabaseConfigurado) { setFormEmpresa((f) => ({ ...f, fotos_urls: [...f.fotos_urls, URL.createObjectURL(arquivo)] })); return; }
     setEnviandoFotoGaleria(true);
     const caminho = `galeria/${Date.now()}-${arquivo.name}`;
@@ -1913,6 +1938,7 @@ function AdminPanel() {
       aceita_cartao_servidor: formEmpresa.aceita_cartao_servidor, patrocinado: formEmpresa.patrocinado,
       patrocinado_ate: formEmpresa.patrocinado_ate || null, possui_mei: formEmpresa.possui_mei,
       horario_funcionamento: formEmpresa.horario_funcionamento, chave_pix: formEmpresa.chave_pix || null,
+      plano_premium: formEmpresa.plano_premium, plano_premium_ate: formEmpresa.plano_premium_ate || null,
     }).eq("id", id);
     if (!error) setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, ...formEmpresa } : e)));
     setEditandoEmpresa(null);
@@ -4741,8 +4767,22 @@ function AdminPanel() {
                           <span className="font-body text-[10px]" style={{ color: "#8896A6" }}>(em branco = sem prazo)</span>
                         </label>
                       )}
+                      <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#C6811F" }}>
+                        <input type="checkbox" checked={formEmpresa.plano_premium} onChange={(e) => setFormEmpresa((f) => ({ ...f, plano_premium: e.target.checked }))} />
+                        Plano Premium (selo fixo + mais fotos + relatório de desempenho)
+                      </label>
+                      {formEmpresa.plano_premium && (
+                        <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit" style={{ color: "#425A70" }}>
+                          Premium até:
+                          <input type="date" value={formEmpresa.plano_premium_ate} onChange={(e) => setFormEmpresa((f) => ({ ...f, plano_premium_ate: e.target.value }))}
+                            className="font-body text-xs border rounded-lg px-2 py-1 outline-none" style={{ borderColor: C.line }} />
+                          <span className="font-body text-[10px]" style={{ color: "#8896A6" }}>(em branco = sem prazo)</span>
+                        </label>
+                      )}
                       <div>
-                        <p className="font-body text-xs font-bold mb-1.5" style={{ color: "#425A70" }}>Galeria de fotos</p>
+                        <p className="font-body text-xs font-bold mb-1.5" style={{ color: "#425A70" }}>
+                          Galeria de fotos <span style={{ color: "#8896A6", fontWeight: 400 }}>({formEmpresa.fotos_urls.length}/{formEmpresa.plano_premium ? LIMITE_FOTOS_PREMIUM : LIMITE_FOTOS_GRATUITO})</span>
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           {formEmpresa.fotos_urls.map((url, i) => (
                             <div key={url + i} className="relative w-14 h-14 rounded-lg overflow-hidden border" style={{ borderColor: C.line }}>
@@ -4750,11 +4790,16 @@ function AdminPanel() {
                               <button onClick={() => removerFotoGaleriaEmpresa(i)} type="button" className="absolute top-0 right-0 w-5 h-5 bg-black/60 text-white flex items-center justify-center"><X size={11} /></button>
                             </div>
                           ))}
-                          <label className="w-14 h-14 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, color: "#5C7186" }}>
-                            {enviandoFotoGaleria ? "..." : <PlusCircle size={16} />}
-                            <input type="file" accept="image/*" className="hidden" onChange={enviarFotoGaleriaEmpresa} />
-                          </label>
+                          {formEmpresa.fotos_urls.length < (formEmpresa.plano_premium ? LIMITE_FOTOS_PREMIUM : LIMITE_FOTOS_GRATUITO) && (
+                            <label className="w-14 h-14 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, color: "#5C7186" }}>
+                              {enviandoFotoGaleria ? "..." : <PlusCircle size={16} />}
+                              <input type="file" accept="image/*" className="hidden" onChange={enviarFotoGaleriaEmpresa} />
+                            </label>
+                          )}
                         </div>
+                        {!formEmpresa.plano_premium && formEmpresa.fotos_urls.length >= LIMITE_FOTOS_GRATUITO && (
+                          <p className="font-body text-[10px] mt-1" style={{ color: "#8A5A12" }}>Limite do plano gratuito. Ative o Plano Premium pra liberar até {LIMITE_FOTOS_PREMIUM} fotos.</p>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -7147,7 +7192,7 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
   );
 }
 
-function EmpresarioPanel() {
+function EmpresarioPanel({ siteConfig }) {
   const [tab, setTab] = useState("perfil");
   const [modalProdutoAberto, setModalProdutoAberto] = useState(false);
 
@@ -7269,6 +7314,7 @@ function EmpresarioPanel() {
   // Visualizações do perfil — a coluna já existia na empresa (usada até pra
   // ordenar "empresas em destaque"), só faltava mostrar aqui de verdade.
   const [visualizacoesEmpresa, setVisualizacoesEmpresa] = useState(null);
+  const [planoPremiumEmpresa, setPlanoPremiumEmpresa] = useState({ ativo: false, ate: null });
 
   useEffect(() => {
     if (!supabaseConfigurado) {
@@ -7291,6 +7337,7 @@ function EmpresarioPanel() {
           horario_funcionamento: data.horario_funcionamento || null, chave_pix: data.chave_pix || "",
         });
         setVisualizacoesEmpresa(data.visualizacoes ?? 0);
+        setPlanoPremiumEmpresa({ ativo: planoPremiumAtivo(data), ate: data.plano_premium_ate || null });
         carregarMeusProdutos(data.id);
         carregarMinhasVagas(data.id);
         carregarMinhasAvaliacoes(data.id);
@@ -7568,7 +7615,7 @@ function EmpresarioPanel() {
     { id: "combos", label: "Combos e promoções", icon: HandCoins },
     { id: "fidelidade", label: "Cartão fidelidade", icon: BadgeCheck },
     { id: "avaliacoes", label: "Avaliações", icon: Star },
-    { id: "visualizacoes", label: "Visualizações", icon: Eye },
+    { id: "visualizacoes", label: "Desempenho / Premium", icon: Eye },
   ];
 
   return (
@@ -7948,11 +7995,56 @@ function EmpresarioPanel() {
 
         {tab === "visualizacoes" && (
           <div>
-            <SectionHeader eyebrow="Desempenho" title="Visualizações do meu perfil" sub="Contagem real de acessos à ficha da sua empresa" />
-            <div className="rounded-2xl border p-5 max-w-xs" style={{ borderColor: C.line }}>
+            <SectionHeader eyebrow="Desempenho" title="Visualizações e Plano Premium" sub="Contagem real de acessos à ficha da sua empresa" />
+            <div className="rounded-2xl border p-5 max-w-xs mb-6" style={{ borderColor: C.line }}>
               <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{visualizacoesEmpresa ?? "—"}</p>
               <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Total de visualizações desde o cadastro</p>
             </div>
+
+            {planoPremiumEmpresa.ativo ? (
+              <div>
+                <div className="rounded-2xl border p-4 mb-5 flex items-center gap-2 w-fit" style={{ borderColor: "#E8A23D", background: "#FFF9EE" }}>
+                  <Sparkles size={16} color="#C6811F" />
+                  <div>
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Plano Premium ativo</p>
+                    <p className="font-body text-[11px]" style={{ color: "#8A5A12" }}>{planoPremiumEmpresa.ate ? `Válido até ${planoPremiumEmpresa.ate}` : "Sem data de expiração"}</p>
+                  </div>
+                </div>
+                <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Relatório de desempenho</p>
+                <div className="grid sm:grid-cols-2 gap-3 max-w-lg">
+                  <div className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
+                    <p className="font-display font-extrabold text-xl" style={{ color: C.ink }}>{(meusProdutosReais ?? []).filter((p) => p.ativo).length}</p>
+                    <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>Produtos ativos no catálogo</p>
+                  </div>
+                  <div className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
+                    <p className="font-display font-extrabold text-xl" style={{ color: C.ink }}>{(minhasAvaliacoes ?? []).length}</p>
+                    <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>
+                      Avaliações recebidas{(minhasAvaliacoes ?? []).length > 0 ? ` · média ${(minhasAvaliacoes.reduce((s, a) => s + (a.nota || 0), 0) / minhasAvaliacoes.length).toFixed(1)}` : ""}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
+                    <p className="font-display font-extrabold text-xl" style={{ color: C.ink }}>{(meusCupons ?? []).filter((c) => c.ativo).length}</p>
+                    <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>Cupons de desconto ativos</p>
+                  </div>
+                  <div className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
+                    <p className="font-display font-extrabold text-xl" style={{ color: C.ink }}>{(meusCombos ?? []).filter((c) => c.ativo).length}</p>
+                    <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>Combos ativos</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border p-5 max-w-lg" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                <p className="font-display font-bold text-sm flex items-center gap-1.5" style={{ color: C.ink }}><Sparkles size={15} color="#C6811F" /> Plano Premium</p>
+                <p className="font-body text-sm mt-1.5" style={{ color: "#425A70" }}>
+                  Selo Premium fixo na sua ficha, mais fotos na galeria (até {LIMITE_FOTOS_PREMIUM} em vez de {LIMITE_FOTOS_GRATUITO}) e este relatório de desempenho detalhado.
+                </p>
+                <a href={`https://wa.me/55${String(siteConfig?.whatsapp_contato || "").replace(/\D/g, "")}?text=${encodeURIComponent("Olá! Quero saber mais sobre o Plano Premium do Conecta Comércio.")}`}
+                  target="_blank" rel="noreferrer"
+                  className="mt-3 inline-flex items-center gap-1.5 font-body text-xs font-bold rounded-lg px-4 py-2.5 text-white" style={{ background: C.blue }}>
+                  <MessageCircle size={13} /> Quero ser Premium
+                </a>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -9052,7 +9144,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (!supabaseConfigurado) return;
     supabase
       .from("empresas")
-      .select("id, nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, logo_url, facebook, site, destaque, patrocinado, patrocinado_ate, whatsapp, instagram, endereco, google_maps_url, email, criado_em, fotos_urls, horario_funcionamento")
+      .select("id, nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, logo_url, facebook, site, destaque, patrocinado, patrocinado_ate, whatsapp, instagram, endereco, google_maps_url, email, criado_em, fotos_urls, horario_funcionamento, plano_premium, plano_premium_ate")
       .eq("status", "aprovada")
       .order("destaque", { ascending: false })
       .order("visualizacoes", { ascending: false })
@@ -9065,6 +9157,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             banner_url: d.banner_url, logo_url: d.logo_url, facebook: d.facebook, site: d.site, destaque: d.destaque, patrocinado: !!d.patrocinado, patrocinado_ate: d.patrocinado_ate || null, whatsapp: d.whatsapp,
             instagram: d.instagram, endereco: d.endereco, google_maps_url: d.google_maps_url, email: d.email, criado_em: d.criado_em,
             fotos_urls: d.fotos_urls || [], horario_funcionamento: d.horario_funcionamento || null,
+            plano_premium: !!d.plano_premium, plano_premium_ate: d.plano_premium_ate || null,
             verificada: !!(d.logo_url && d.whatsapp && d.endereco && (d.instagram || d.site)),
           })));
         }
@@ -12176,7 +12269,7 @@ export default function ConectaComercio() {
         ) : podeVer("empresario") ? (
           <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
             <SectionHeader eyebrow="Área restrita" title="Painel do empresário" sub={perfil?.nome ? `Olá, ${perfil.nome}` : "Visível só para o dono da empresa, após login"} />
-            <EmpresarioPanel />
+            <EmpresarioPanel siteConfig={siteConfig} />
           </div>
         ) : (
           <AcessoRestrito tipo="empresario" onEntrar={() => irPara(modos.find((m) => m.id === "empresario"))} />
