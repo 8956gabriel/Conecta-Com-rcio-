@@ -1080,6 +1080,22 @@ function AdminPanel() {
     else setStatusEmpresa((s) => ({ ...s, [id]: error.message }));
   };
 
+  // Bloquear/desbloquear e excluir empresa — FASE 25.
+  const alternarBloqueioEmpresa = async (e) => {
+    const novoStatus = e.status === "bloqueada" ? "aprovada" : "bloqueada";
+    const { error } = await supabase.from("empresas").update({ status: novoStatus }).eq("id", e.id);
+    if (!error) {
+      setEmpresasPend((atual) => atual.map((x) => (x.id === e.id ? { ...x, status: novoStatus } : x)));
+      notificar(novoStatus === "bloqueada" ? "Empresa bloqueada." : "Empresa desbloqueada.", novoStatus === "bloqueada" ? "aviso" : "sucesso");
+    } else notificar("Não consegui atualizar: " + error.message, "erro");
+  };
+
+  const removerEmpresaAdmin = async (id) => {
+    const { error } = await supabase.from("empresas").delete().eq("id", id);
+    if (!error) { setEmpresasPend((atual) => atual.filter((e) => e.id !== id)); notificar("Empresa excluída."); }
+    else notificar("Não consegui excluir: " + error.message, "erro");
+  };
+
   const iniciarEdicaoEmpresa = (e) => {
     setEditandoEmpresa(e.id);
     setFormEmpresa({
@@ -1315,6 +1331,22 @@ function AdminPanel() {
     if (!supabaseConfigurado) { setFeirantes((atual) => (atual || []).map((f) => (f.id === id ? { ...f, status } : f))); return; }
     const { error } = await supabase.from("feirantes").update({ status }).eq("id", id);
     if (!error) setFeirantes((atual) => atual.map((f) => (f.id === id ? { ...f, status } : f)));
+  };
+
+  // Bloquear/desbloquear e excluir feirante — FASE 25.
+  const alternarBloqueioFeirante = async (f) => {
+    const novoStatus = f.status === "bloqueado" ? "aprovado" : "bloqueado";
+    const { error } = await supabase.from("feirantes").update({ status: novoStatus }).eq("id", f.id);
+    if (!error) {
+      setFeirantes((atual) => atual.map((x) => (x.id === f.id ? { ...x, status: novoStatus } : x)));
+      notificar(novoStatus === "bloqueado" ? "Feirante bloqueado." : "Feirante desbloqueado.", novoStatus === "bloqueado" ? "aviso" : "sucesso");
+    } else notificar("Não consegui atualizar: " + error.message, "erro");
+  };
+
+  const removerFeiranteAdmin = async (id) => {
+    const { error } = await supabase.from("feirantes").delete().eq("id", id);
+    if (!error) { setFeirantes((atual) => atual.filter((f) => f.id !== id)); notificar("Feirante excluído."); }
+    else notificar("Não consegui excluir: " + error.message, "erro");
   };
 
   const [feirasEspeciaisAdmin, setFeirasEspeciaisAdmin] = useState(null);
@@ -2197,6 +2229,22 @@ function AdminPanel() {
     else setStatusPrestador((s) => ({ ...s, [id]: error.message }));
   };
 
+  // Bloquear/desbloquear e excluir prestador — FASE 25.
+  const alternarBloqueioPrestador = async (p) => {
+    const novoStatus = p.status === "bloqueado" ? "aprovado" : "bloqueado";
+    const { error } = await supabase.from("prestadores").update({ status: novoStatus }).eq("id", p.id);
+    if (!error) {
+      setPrestadoresAdmin((atual) => atual.map((x) => (x.id === p.id ? { ...x, status: novoStatus } : x)));
+      notificar(novoStatus === "bloqueado" ? "Prestador bloqueado." : "Prestador desbloqueado.", novoStatus === "bloqueado" ? "aviso" : "sucesso");
+    } else notificar("Não consegui atualizar: " + error.message, "erro");
+  };
+
+  const removerPrestadorAdmin = async (id) => {
+    const { error } = await supabase.from("prestadores").delete().eq("id", id);
+    if (!error) { setPrestadoresAdmin((atual) => atual.filter((p) => p.id !== id)); notificar("Prestador excluído."); }
+    else notificar("Não consegui excluir: " + error.message, "erro");
+  };
+
   const iniciarEdicaoPrestador = (p) => {
     setEditandoPrestador(p.id);
     setFormPrestador({ nome: p.nome, servico: p.servico, endereco: p.endereco || "", whatsapp: p.whatsapp || "", instagram: p.instagram || "", email: p.email || "", cpf: p.cpf || "", cnpj: p.cnpj || "" });
@@ -2357,7 +2405,7 @@ function AdminPanel() {
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("perfis").select("id, nome, email, tipo, telefone, criado_em").order("criado_em", { ascending: false })
+    supabase.from("perfis").select("id, nome, email, tipo, telefone, instagram, cpf, cnpj, bloqueado, criado_em").order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setTodosUsuariosAdmin(data || []); });
   }, []);
 
@@ -2385,6 +2433,59 @@ function AdminPanel() {
   );
 
   const rotuloTipoUsuario = (tipo) => ({ cliente: "Cliente", empresario: "Empresário", prestador: "Prestador", admin: "Administrador" }[tipo] || tipo || "—");
+
+  // Editar/bloquear/apagar usuário — FASE 25.
+  const [editandoUsuarioAdmin, setEditandoUsuarioAdmin] = useState(null);
+  const [formUsuarioAdmin, setFormUsuarioAdmin] = useState({ nome: "", telefone: "", instagram: "", cpf: "", cnpj: "" });
+  const [processandoUsuarioAdmin, setProcessandoUsuarioAdmin] = useState(null);
+
+  const iniciarEdicaoUsuarioAdmin = (u) => {
+    setEditandoUsuarioAdmin(u.id);
+    setFormUsuarioAdmin({ nome: u.nome || "", telefone: u.telefone || "", instagram: u.instagram || "", cpf: u.cpf || "", cnpj: u.cnpj || "" });
+  };
+
+  const salvarEdicaoUsuarioAdmin = async (id) => {
+    const { error } = await supabase.from("perfis").update(formUsuarioAdmin).eq("id", id);
+    if (!error) {
+      setTodosUsuariosAdmin((atual) => atual.map((u) => (u.id === id ? { ...u, ...formUsuarioAdmin } : u)));
+      notificar("Usuário atualizado.");
+    } else {
+      notificar("Não consegui salvar: " + error.message, "erro");
+    }
+    setEditandoUsuarioAdmin(null);
+  };
+
+  const alternarBloqueioUsuarioAdmin = async (u) => {
+    const novoValor = !u.bloqueado;
+    const { error } = await supabase.from("perfis").update({ bloqueado: novoValor }).eq("id", u.id);
+    if (!error) {
+      setTodosUsuariosAdmin((atual) => atual.map((x) => (x.id === u.id ? { ...x, bloqueado: novoValor } : x)));
+      notificar(novoValor ? "Usuário bloqueado." : "Usuário desbloqueado.", novoValor ? "aviso" : "sucesso");
+    } else {
+      notificar("Não consegui atualizar: " + error.message, "erro");
+    }
+  };
+
+  const apagarUsuarioAdmin = async (id) => {
+    setProcessandoUsuarioAdmin(id);
+    try {
+      const { data: sessaoAtual } = await supabase.auth.getSession();
+      const token = sessaoAtual?.session?.access_token;
+      const resp = await fetch("/api/admin-excluir-usuario", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id }),
+      });
+      const dados = await resp.json();
+      if (!resp.ok) throw new Error(dados.error || "Não foi possível excluir.");
+      setTodosUsuariosAdmin((atual) => atual.filter((u) => u.id !== id));
+      notificar("Usuário excluído.");
+    } catch (err) {
+      notificar(err.message || "Erro ao excluir usuário.", "erro");
+    } finally {
+      setProcessandoUsuarioAdmin(null);
+    }
+  };
 
   const exportarUsuariosExcel = () => {
     const cabecalho = ["Nome", "E-mail", "Perfil", "Data de cadastro"];
@@ -2894,32 +2995,77 @@ function AdminPanel() {
             </div>
 
             <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
-              <table className="w-full text-left border-collapse min-w-[560px]">
+              <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
                     <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Nome</th>
                     <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>E-mail</th>
                     <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Perfil</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>WhatsApp</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Instagram</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>CPF</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>CNPJ</th>
                     <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Cadastro</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Status</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {!todosUsuariosAdmin && [0, 1, 2, 3].map((i) => (
                     <tr key={`sk-${i}`} style={{ borderBottom: `1px solid ${C.line}` }}>
-                      <td className="px-3 py-2.5"><Skeleton className="w-28 h-3.5" /></td>
-                      <td className="px-3 py-2.5"><Skeleton className="w-36 h-3.5" /></td>
-                      <td className="px-3 py-2.5"><Skeleton className="w-20 h-5 rounded-full" /></td>
-                      <td className="px-3 py-2.5"><Skeleton className="w-16 h-3.5" /></td>
+                      {Array.from({ length: 9 }).map((_, j) => <td key={j} className="px-3 py-2.5"><Skeleton className="w-20 h-3.5" /></td>)}
                     </tr>
                   ))}
                   {usuariosPaginaAtualAdmin.map((u) => (
-                    <tr key={u.id} style={{ borderBottom: `1px solid ${C.line}` }}>
-                      <td className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{u.nome || "—"}</td>
-                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.email || "—"}</td>
-                      <td className="px-3 py-2.5">
-                        <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
-                      </td>
-                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                    <tr key={u.id} style={{ borderBottom: `1px solid ${C.line}`, opacity: u.bloqueado ? 0.55 : 1 }}>
+                      {editandoUsuarioAdmin === u.id ? (
+                        <>
+                          <td className="px-3 py-2"><input value={formUsuarioAdmin.nome} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, nome: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-28" style={{ borderColor: C.line }} /></td>
+                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.email || "—"}</td>
+                          <td className="px-3 py-2.5">
+                            <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
+                          </td>
+                          <td className="px-3 py-2"><input value={formUsuarioAdmin.telefone} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, telefone: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
+                          <td className="px-3 py-2"><input value={formUsuarioAdmin.instagram} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, instagram: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
+                          <td className="px-3 py-2"><input value={formUsuarioAdmin.cpf} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, cpf: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
+                          <td className="px-3 py-2"><input value={formUsuarioAdmin.cnpj} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, cnpj: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
+                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td className="px-3 py-2.5">{u.bloqueado ? "Bloqueado" : "Ativo"}</td>
+                          <td className="px-3 py-2.5">
+                            <button onClick={() => salvarEdicaoUsuarioAdmin(u.id)} className="font-body text-xs font-bold" style={{ color: C.blue }}>Salvar</button>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{u.nome || "—"}</td>
+                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.email || "—"}</td>
+                          <td className="px-3 py-2.5">
+                            <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
+                          </td>
+                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.telefone || "—"}</td>
+                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.instagram || "—"}</td>
+                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.cpf || "—"}</td>
+                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.cnpj || "—"}</td>
+                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td className="px-3 py-2.5">
+                            <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: u.bloqueado ? "#FBEAE5" : "#E7F6EE", color: u.bloqueado ? "#B4462F" : "#1E8E5A" }}>
+                              {u.bloqueado ? "Bloqueado" : "Ativo"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <button onClick={() => iniciarEdicaoUsuarioAdmin(u)} title="Editar" style={{ color: "#425A70" }}><Pencil size={14} /></button>
+                              <button onClick={() => alternarBloqueioUsuarioAdmin(u)} title={u.bloqueado ? "Desbloquear" : "Bloquear"} style={{ color: u.bloqueado ? "#1E8E5A" : "#C6811F" }}>
+                                <ShieldCheck size={14} />
+                              </button>
+                              <button onClick={() => { if (confirmarExclusao("Excluir esse usuário? A conta de login também será removida. Essa ação não pode ser desfeita.")) apagarUsuarioAdmin(u.id); }}
+                                disabled={processandoUsuarioAdmin === u.id} title="Excluir" style={{ color: "#B4462F" }}>
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -3131,6 +3277,11 @@ function AdminPanel() {
                         <button onClick={() => mudarStatusEmpresa(p.id, "recusada")} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Recusar</button>
                       )}
                       <button onClick={() => iniciarEdicaoEmpresa(p)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
+                      <button onClick={() => alternarBloqueioEmpresa(p)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: p.status === "bloqueada" ? "#1E8E5A" : "#C6811F" }}>
+                        {p.status === "bloqueada" ? "Desbloquear" : "Bloquear"}
+                      </button>
+                      <button onClick={() => { if (confirmarExclusao("Excluir essa empresa? Essa ação não pode ser desfeita.")) removerEmpresaAdmin(p.id); }}
+                        className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Excluir</button>
                     </>
                   )}
                 </div>
@@ -3197,6 +3348,11 @@ function AdminPanel() {
                         <button onClick={() => mudarStatusPrestador(p.id, "recusado")} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Recusar</button>
                       )}
                       <button onClick={() => iniciarEdicaoPrestador(p)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
+                      <button onClick={() => alternarBloqueioPrestador(p)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: p.status === "bloqueado" ? "#1E8E5A" : "#C6811F" }}>
+                        {p.status === "bloqueado" ? "Desbloquear" : "Bloquear"}
+                      </button>
+                      <button onClick={() => { if (confirmarExclusao("Excluir esse prestador? Essa ação não pode ser desfeita.")) removerPrestadorAdmin(p.id); }}
+                        className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Excluir</button>
                     </>
                   )}
                 </div>
@@ -3451,6 +3607,11 @@ function AdminPanel() {
                       {f.status !== "recusado" && (
                         <button onClick={() => mudarStatusFeirante(f.id, "recusado")} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Recusar</button>
                       )}
+                      <button onClick={() => alternarBloqueioFeirante(f)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: f.status === "bloqueado" ? "#1E8E5A" : "#C6811F" }}>
+                        {f.status === "bloqueado" ? "Desbloquear" : "Bloquear"}
+                      </button>
+                      <button onClick={() => { if (confirmarExclusao("Excluir esse feirante? Essa ação não pode ser desfeita.")) removerFeiranteAdmin(f.id); }}
+                        className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Excluir</button>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <input value={editando.local} onChange={(e) => setEditandoLocalFeirante((s) => ({ ...s, [f.id]: { ...editando, local: e.target.value } }))}
@@ -7334,11 +7495,37 @@ export default function ConectaComercio() {
   }, []);
 
   // Busca o perfil (tipo: cliente/empresario/admin) assim que há sessão.
+  const [contaBloqueada, setContaBloqueada] = useState(false);
   useEffect(() => {
     if (!supabaseConfigurado || !sessao) { setPerfil(null); return; }
-    supabase.from("perfis").select("tipo, nome").eq("id", sessao.user.id).single()
-      .then(({ data }) => setPerfil(data ?? null));
+    supabase.from("perfis").select("tipo, nome, bloqueado").eq("id", sessao.user.id).single()
+      .then(({ data }) => {
+        if (data?.bloqueado) {
+          setContaBloqueada(true);
+          setPerfil(null);
+          supabase.auth.signOut();
+          return;
+        }
+        setPerfil(data ?? null);
+      });
   }, [sessao]);
+
+  if (contaBloqueada) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6" style={{ background: C.bg }}>
+        <div className="max-w-sm w-full text-center rounded-2xl border p-8" style={{ borderColor: C.line, background: "#fff" }}>
+          <ShieldCheck size={32} style={{ color: "#B4462F", margin: "0 auto 12px" }} />
+          <h1 className="font-display text-lg font-bold mb-2" style={{ color: C.ink }}>Conta bloqueada</h1>
+          <p className="font-body text-sm mb-4" style={{ color: "#5C7186" }}>
+            Sua conta foi bloqueada pela administração. Entre em contato para mais informações.
+          </p>
+          <button onClick={() => setContaBloqueada(false)} className="font-body text-sm font-bold px-4 py-2 rounded-xl" style={{ background: C.blue, color: "#fff" }}>
+            Voltar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const modos = [
     { id: "site", label: "Site", icon: Store },
