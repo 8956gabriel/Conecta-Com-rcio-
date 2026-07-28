@@ -2125,6 +2125,7 @@ function AdminPanel() {
     fomento_whatsapp: "", fomento_agente_nome: "Gabriel Oliveira",
     agencia_ativo: false, agencia_texto: "", agencia_endereco: "", agencia_whatsapp: "", agencia_horario: "",
     sala_horario: "", sala_servicos: "",
+    turismo_ativo: false, historia_cidade: "", historia_foto_url: "",
   };
 
   useEffect(() => {
@@ -2154,6 +2155,74 @@ function AdminPanel() {
         setSiteConfigAdmin((v) => ({ ...v, fomento_foto_url: pub.publicUrl }));
       }
     });
+  };
+
+  const enviarFotoHistoriaCidade = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setSiteConfigAdmin((v) => ({ ...v, historia_foto_url: URL.createObjectURL(arquivo) })); return; }
+    const caminho = `historia/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      if (!error) {
+        const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+        setSiteConfigAdmin((v) => ({ ...v, historia_foto_url: pub.publicUrl }));
+      }
+    });
+  };
+
+  // -------------------------------------------------------------------------
+  // Pontos turísticos — a ordem escolhida também define a sequência do
+  // roteiro sugerido mostrado no site. FASE 42.
+  // -------------------------------------------------------------------------
+  const [pontosTuristicosAdmin, setPontosTuristicosAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("pontos_turisticos").select("*").order("ordem").then(({ data, error }) => {
+      if (!error) setPontosTuristicosAdmin(data || []);
+    });
+  }, []);
+  const pontoTuristicoVazio = { nome: "", categoria: "", descricao: "", endereco: "", foto_url: "", google_maps_url: "", ordem: 0 };
+  const [novoPontoTuristico, setNovoPontoTuristico] = useState(pontoTuristicoVazio);
+  const [enviandoFotoPontoTuristico, setEnviandoFotoPontoTuristico] = useState(false);
+  const [publicandoPontoTuristico, setPublicandoPontoTuristico] = useState(false);
+  const [statusPontoTuristico, setStatusPontoTuristico] = useState("");
+
+  const enviarFotoPontoTuristico = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setNovoPontoTuristico((v) => ({ ...v, foto_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoFotoPontoTuristico(true);
+    const caminho = `turismo/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoPontoTuristico(false);
+      if (error) { setStatusPontoTuristico(error.message); return; }
+      const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+      setNovoPontoTuristico((v) => ({ ...v, foto_url: pub.publicUrl }));
+    });
+  };
+
+  const publicarPontoTuristico = async (e) => {
+    e.preventDefault();
+    setStatusPontoTuristico("");
+    if (!novoPontoTuristico.nome.trim()) { setStatusPontoTuristico("Informe o nome do ponto turístico."); return; }
+    setPublicandoPontoTuristico(true);
+    try {
+      const registro = { ...novoPontoTuristico, ordem: Number(novoPontoTuristico.ordem) || 0 };
+      const { data, error } = await supabase.from("pontos_turisticos").insert(registro).select().single();
+      if (error) throw error;
+      setPontosTuristicosAdmin((atual) => [...(atual ?? []), data].sort((a, b) => a.ordem - b.ordem));
+      setNovoPontoTuristico(pontoTuristicoVazio);
+      setStatusPontoTuristico("ok");
+    } catch (err) {
+      setStatusPontoTuristico(err.message || "Erro ao publicar.");
+    } finally {
+      setPublicandoPontoTuristico(false);
+    }
+  };
+
+  const removerPontoTuristico = async (id) => {
+    const { error } = await supabase.from("pontos_turisticos").delete().eq("id", id);
+    if (!error) { setPontosTuristicosAdmin((atual) => atual.filter((p) => p.id !== id)); notificar("Ponto turístico excluído."); }
   };
 
   const enviarLogoSite = (e) => {
@@ -2199,6 +2268,9 @@ function AdminPanel() {
         agencia_horario: siteConfigAdmin.agencia_horario || null,
         sala_horario: siteConfigAdmin.sala_horario || null,
         sala_servicos: siteConfigAdmin.sala_servicos || null,
+        turismo_ativo: !!siteConfigAdmin.turismo_ativo,
+        historia_cidade: siteConfigAdmin.historia_cidade || null,
+        historia_foto_url: siteConfigAdmin.historia_foto_url || null,
       });
       if (error) throw error;
       setStatusIdentidade("ok");
@@ -3394,6 +3466,7 @@ function AdminPanel() {
     { id: "cursos", label: "Cursos", icon: GraduationCap },
     { id: "servicos", label: "Serviços do Empreendedor", icon: Landmark },
     { id: "licitacoes", label: "Editais e Licitações", icon: FileText },
+    { id: "turismo", label: "Turismo", icon: MapPinned },
     { id: "enquetes", label: "Enquetes", icon: Vote },
     { id: "cupons", label: "Cupons de desconto", icon: Tag },
     { id: "combos", label: "Combos e promoções", icon: HandCoins },
@@ -4955,6 +5028,73 @@ function AdminPanel() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {tab === "turismo" && (
+          <div>
+            <SectionHeader eyebrow="Cidade" title="História da cidade" sub="Aparece no topo da aba Turismo do site" />
+            <form onSubmit={salvarIdentidade} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg mb-8" style={{ borderColor: C.line }}>
+              <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={!!siteConfigAdmin?.turismo_ativo} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, turismo_ativo: e.target.checked }))} />
+                Mostrar a aba Turismo no menu do site
+              </label>
+              <label className="font-body text-xs font-bold mt-1" style={{ color: C.ink }}>Foto</label>
+              <div className="flex items-center gap-3">
+                {siteConfigAdmin?.historia_foto_url ? (
+                  <img loading="lazy" decoding="async" src={siteConfigAdmin.historia_foto_url} alt="" className="w-16 h-16 rounded-xl object-cover border" style={{ borderColor: C.line }} />
+                ) : (
+                  <span className="w-16 h-16 rounded-xl flex items-center justify-center border" style={{ borderColor: C.line, background: C.blueTint }}>
+                    <MapPinned size={22} color={C.blue} />
+                  </span>
+                )}
+                <label className="font-body text-xs font-bold cursor-pointer" style={{ color: C.blue }}>
+                  Enviar foto
+                  <input type="file" accept="image/*" className="hidden" onChange={enviarFotoHistoriaCidade} />
+                </label>
+              </div>
+              <label className="font-body text-xs font-bold mt-1" style={{ color: C.ink }}>Texto sobre a história da cidade</label>
+              <textarea value={siteConfigAdmin?.historia_cidade || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, historia_cidade: e.target.value }))}
+                rows={5} placeholder="Conte a história e as origens da cidade..." className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <button type="submit" disabled={salvandoIdentidade || !siteConfigAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 mt-1 disabled:opacity-60" style={{ background: C.blue }}>
+                {salvandoIdentidade ? "Salvando..." : "Salvar história da cidade"}
+              </button>
+            </form>
+
+            <SectionHeader eyebrow="Roteiro" title="Pontos turísticos" sub="A ordem definida aqui é a sequência do roteiro sugerido no site" />
+            <form onSubmit={publicarPontoTuristico} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <input value={novoPontoTuristico.nome} onChange={(e) => setNovoPontoTuristico((v) => ({ ...v, nome: e.target.value }))} placeholder="Nome do ponto turístico" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <div className="grid sm:grid-cols-2 gap-3">
+                <input value={novoPontoTuristico.categoria} onChange={(e) => setNovoPontoTuristico((v) => ({ ...v, categoria: e.target.value }))} placeholder="Categoria (ex: Praça, Igreja, Mirante)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={novoPontoTuristico.ordem} onChange={(e) => setNovoPontoTuristico((v) => ({ ...v, ordem: e.target.value }))} type="number" placeholder="Ordem no roteiro (0, 1, 2...)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </div>
+              <textarea value={novoPontoTuristico.descricao} onChange={(e) => setNovoPontoTuristico((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novoPontoTuristico.endereco} onChange={(e) => setNovoPontoTuristico((v) => ({ ...v, endereco: e.target.value }))} placeholder="Endereço" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novoPontoTuristico.google_maps_url} onChange={(e) => setNovoPontoTuristico((v) => ({ ...v, google_maps_url: e.target.value }))} placeholder="Link do Google Maps (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <label className="font-body text-xs font-bold cursor-pointer flex items-center gap-2" style={{ color: C.blue }}>
+                <Camera size={14} /> {enviandoFotoPontoTuristico ? "Enviando..." : novoPontoTuristico.foto_url ? "Foto anexada — trocar" : "Anexar foto"}
+                <input type="file" accept="image/*" className="hidden" onChange={enviarFotoPontoTuristico} />
+              </label>
+              {statusPontoTuristico && statusPontoTuristico !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusPontoTuristico}</p>}
+              {statusPontoTuristico === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Publicado!</p>}
+              <button type="submit" disabled={publicandoPontoTuristico} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+                {publicandoPontoTuristico ? "Publicando..." : "Adicionar ao roteiro"}
+              </button>
+            </form>
+            <div className="flex flex-col gap-3 max-w-lg">
+              {(pontosTuristicosAdmin ?? []).map((p, i) => (
+                <div key={p.id} className="rounded-2xl border p-4 flex items-center gap-3" style={{ borderColor: C.line }}>
+                  <span className="w-7 h-7 rounded-full flex items-center justify-center font-display font-bold text-xs shrink-0" style={{ background: C.blueTint, color: C.blue }}>{i + 1}</span>
+                  {p.foto_url && <img loading="lazy" decoding="async" src={p.foto_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{p.nome}</p>
+                    <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{p.categoria}{p.endereco ? ` · ${p.endereco}` : ""}</p>
+                  </div>
+                  <button onClick={() => { if (confirmarExclusao("Excluir esse ponto turístico?")) removerPontoTuristico(p.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                </div>
+              ))}
+              {(pontosTuristicosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum ponto turístico cadastrado ainda.</p>}
+            </div>
           </div>
         )}
 
@@ -9968,16 +10108,100 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
   if (h.startsWith("#/admin")) return "admin";
   if (h.startsWith("#/estatisticas") || h.startsWith("#/numeros")) return "estatisticas";
+  if (h.startsWith("#/turismo")) return "turismo";
   if (h.startsWith("#/empresa") || h.startsWith("#/vendedor")) return "empresario";
   if (h.startsWith("#/cadastro")) return "cadastro-conta";
   if (h.startsWith("#/entrar") || h.startsWith("#/conta")) return "conta";
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Aba Turismo — história da cidade + roteiro sugerido pelos pontos
+// turísticos, na ordem definida pelo admin. FASE 42.
+// ---------------------------------------------------------------------------
+function PaginaTurismo({ siteConfig }) {
+  const [pontos, setPontos] = useState(null);
+
+  useEffect(() => {
+    document.title = "Turismo — Conecta Comércio";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute("content", "Conheça a história e os pontos turísticos de Ivatuba - PR, com um roteiro sugerido pela cidade.");
+    return () => {
+      document.title = "Conecta Comércio · Ivatuba - PR";
+      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) { setPontos([]); return; }
+    supabase.from("pontos_turisticos").select("*").eq("ativo", true).order("ordem").then(({ data, error }) => {
+      setPontos(error ? [] : data || []);
+    });
+  }, []);
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 md:px-6 py-10">
+      <SectionHeader eyebrow="Conheça a cidade" title="Turismo" sub="A história e os melhores pontos de Ivatuba - PR" />
+
+      {(siteConfig?.historia_cidade || siteConfig?.historia_foto_url) && (
+        <div className="rounded-3xl overflow-hidden border mt-6 grid md:grid-cols-[1fr_1.2fr]" style={{ borderColor: C.line }}>
+          <div className="h-48 md:h-full relative flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.blueDeep}, ${C.blue})` }}>
+            {siteConfig?.historia_foto_url ? (
+              <img loading="lazy" decoding="async" src={siteConfig.historia_foto_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <MapPinned size={44} className="text-white/90" />
+            )}
+          </div>
+          <div className="p-6 md:p-8">
+            <h2 className="font-display font-extrabold text-lg" style={{ color: C.ink }}>Um pouco da nossa história</h2>
+            <p className="font-body text-sm mt-2 whitespace-pre-line" style={{ color: "#5C7186" }}>{siteConfig?.historia_cidade}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-10">
+        <h2 className="font-display font-extrabold text-lg mb-5" style={{ color: C.ink }}>Roteiro sugerido</h2>
+        {pontos === null && (
+          <div className="flex flex-col gap-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
+        )}
+        {pontos && pontos.length === 0 && (
+          <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum ponto turístico cadastrado ainda.</p>
+        )}
+        <div className="flex flex-col gap-4">
+          {(pontos || []).map((p, i) => (
+            <div key={p.id} className="flex gap-4">
+              <div className="flex flex-col items-center shrink-0">
+                <span className="w-8 h-8 rounded-full flex items-center justify-center font-display font-bold text-xs text-white" style={{ background: C.blue }}>{i + 1}</span>
+                {i < pontos.length - 1 && <div className="w-0.5 flex-1 mt-1" style={{ background: C.line }} />}
+              </div>
+              <div className="rounded-2xl border p-4 bg-white flex-1 mb-2 flex gap-3" style={{ borderColor: C.line }}>
+                {p.foto_url && <img loading="lazy" decoding="async" src={p.foto_url} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />}
+                <div className="min-w-0">
+                  <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
+                  {p.categoria && <p className="font-body text-[11px] font-semibold" style={{ color: C.blue }}>{p.categoria}</p>}
+                  {p.descricao && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{p.descricao}</p>}
+                  <div className="flex flex-wrap gap-3 mt-1.5">
+                    {p.endereco && <span className="font-body text-[11px] flex items-center gap-1" style={{ color: "#8896A6" }}><MapPin size={11} /> {p.endereco}</span>}
+                    {p.google_maps_url && (
+                      <a href={p.google_maps_url} target="_blank" rel="noopener noreferrer" className="font-body text-[11px] font-bold flex items-center gap-1" style={{ color: C.blue }}>
+                        <ExternalLink size={11} /> Ver no mapa
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -10269,6 +10493,7 @@ export default function ConectaComercio() {
 
   const modos = [
     { id: "site", label: "Site", icon: Store },
+    ...(siteConfig?.turismo_ativo ? [{ id: "turismo", label: "Turismo", icon: MapPinned }] : []),
     { id: "estatisticas", label: "Números", icon: TrendingUp },
     { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
@@ -10377,6 +10602,7 @@ export default function ConectaComercio() {
 
       {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} siteConfig={siteConfig} sessao={sessao} perfil={perfil} />}
       {modo === "estatisticas" && <EstatisticasPublicas />}
+      {modo === "turismo" && <PaginaTurismo siteConfig={siteConfig} />}
       {modo === "conta" && (sessao && perfil ? <MinhaConta perfil={perfil} sessao={sessao} /> : <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />)}
 
       {modo === "admin" && (
