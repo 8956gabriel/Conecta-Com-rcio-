@@ -542,9 +542,9 @@ function EmpresaCard({ e, fav, onFav }) {
           <MapPin size={11} /> {e.bairro}, {e.cidade}
         </p>
         <p className="font-body text-xs" style={{ color: "#5C7186" }}>{e.itens} {e.itens === 1 ? "item ativo" : "itens ativos"}</p>
-        {e.cartaoServidor && (
+        {(e.cartaoServidor || e.aceita_cartao_servidor) && (
           <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5" style={{ background: C.blueTint, color: C.blue }}>
-            <BadgeCheck size={11} /> Aceita Cartão Servidor
+            <BadgeCheck size={11} /> Aceita Cartão do Servidor
           </span>
         )}
         {(e.facebook || e.site) && (
@@ -1049,7 +1049,7 @@ function AdminPanel() {
   const [empresasPend, setEmpresasPend] = useState(null); // null = carregando/indisponível
   const [statusEmpresa, setStatusEmpresa] = useState({});
   const [editandoEmpresa, setEditandoEmpresa] = useState(null);
-  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "" });
+  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false });
   const [enviandoLogoEmpresa, setEnviandoLogoEmpresa] = useState(false);
   const [enviandoBannerEmpresa, setEnviandoBannerEmpresa] = useState(false);
   const [enviandoFotoGaleria, setEnviandoFotoGaleria] = useState(false);
@@ -1103,7 +1103,7 @@ function AdminPanel() {
       banner_url: e.banner_url || "", facebook: e.facebook || "", site: e.site || "",
       destaque: !!e.destaque, fotos_urls: e.fotos_urls || [],
       email: e.email || "", whatsapp: e.whatsapp || "", instagram: e.instagram || "",
-      cpf: e.cpf || "", cnpj: e.cnpj || "",
+      cpf: e.cpf || "", cnpj: e.cnpj || "", aceita_cartao_servidor: !!e.aceita_cartao_servidor,
     });
   };
 
@@ -1168,6 +1168,7 @@ function AdminPanel() {
       destaque: formEmpresa.destaque, fotos_urls: formEmpresa.fotos_urls,
       email: formEmpresa.email || null, whatsapp: formEmpresa.whatsapp || null, instagram: formEmpresa.instagram || null,
       cpf: formEmpresa.cpf || null, cnpj: formEmpresa.cnpj || null,
+      aceita_cartao_servidor: formEmpresa.aceita_cartao_servidor,
     }).eq("id", id);
     if (!error) setEmpresasPend((atual) => atual.map((e) => (e.id === id ? { ...e, ...formEmpresa } : e)));
     setEditandoEmpresa(null);
@@ -1591,7 +1592,7 @@ function AdminPanel() {
   // serviço, porque criar conta de outra pessoa exige privilégio de admin
   // que não pode ficar no navegador.
   // -------------------------------------------------------------------------
-  const [novoUsuarioAdmin, setNovoUsuarioAdmin] = useState({ nome: "", email: "", senha: "", tipo: "cliente", cpf: "", cnpj: "", empresaNome: "", empresaCategoria: "", empresaWhatsapp: "", empresaInstagram: "", empresaEndereco: "", empresaGoogleMaps: "", prestadorServico: "", prestadorWhatsapp: "", prestadorInstagram: "", prestadorEndereco: "", prestadorGoogleMaps: "" });
+  const [novoUsuarioAdmin, setNovoUsuarioAdmin] = useState({ nome: "", email: "", senha: "", tipo: "cliente", cpf: "", cnpj: "", empresaNome: "", empresaCategoria: "", empresaWhatsapp: "", empresaInstagram: "", empresaEndereco: "", empresaGoogleMaps: "", empresaAceitaCartaoServidor: false, prestadorServico: "", prestadorWhatsapp: "", prestadorInstagram: "", prestadorEndereco: "", prestadorGoogleMaps: "" });
   const [criandoUsuarioAdmin, setCriandoUsuarioAdmin] = useState(false);
   const [statusUsuarioAdmin, setStatusUsuarioAdmin] = useState("");
 
@@ -1614,7 +1615,7 @@ function AdminPanel() {
       const dados = await resp.json();
       if (!resp.ok) throw new Error(dados.error || "Não foi possível criar o usuário agora.");
       setStatusUsuarioAdmin("ok");
-      setNovoUsuarioAdmin({ nome: "", email: "", senha: "", tipo: "cliente", empresaNome: "", empresaCategoria: "", empresaWhatsapp: "", empresaInstagram: "", empresaEndereco: "", empresaGoogleMaps: "", prestadorServico: "", prestadorWhatsapp: "", prestadorInstagram: "", prestadorEndereco: "", prestadorGoogleMaps: "" });
+      setNovoUsuarioAdmin({ nome: "", email: "", senha: "", tipo: "cliente", empresaNome: "", empresaCategoria: "", empresaWhatsapp: "", empresaInstagram: "", empresaEndereco: "", empresaGoogleMaps: "", empresaAceitaCartaoServidor: false, prestadorServico: "", prestadorWhatsapp: "", prestadorInstagram: "", prestadorEndereco: "", prestadorGoogleMaps: "" });
     } catch (err) {
       setStatusUsuarioAdmin(err.message || "Erro ao criar usuário.");
     } finally {
@@ -1630,12 +1631,42 @@ function AdminPanel() {
   const [salvandoIdentidade, setSalvandoIdentidade] = useState(false);
   const [statusIdentidade, setStatusIdentidade] = useState("");
 
+  const siteConfigVazio = {
+    cor_principal: "#0A5AA8", logo_url: null, frase: "",
+    telefone: "", whatsapp_contato: "", instagram_contato: "", endereco_sala_empreendedor: "",
+    fomento_ativo: false, fomento_foto_url: "", fomento_texto: "",
+    fomento_link: "https://www.fomento.pr.gov.br/Linhas-de-Credito",
+    fomento_whatsapp: "", fomento_agente_nome: "Gabriel Oliveira",
+  };
+
   useEffect(() => {
-    if (!supabaseConfigurado) { setSiteConfigAdmin({ cor_principal: "#0A5AA8", logo_url: null, frase: "" }); return; }
+    if (!supabaseConfigurado) { setSiteConfigAdmin(siteConfigVazio); return; }
     supabase.from("site_config").select("*").eq("id", 1).single().then(({ data }) => {
-      setSiteConfigAdmin(data || { cor_principal: "#0A5AA8", logo_url: null, frase: "" });
+      setSiteConfigAdmin(data ? { ...siteConfigVazio, ...data } : siteConfigVazio);
     });
   }, []);
+
+  // Cadastros de interessados na Fomento Paraná (leads).
+  const [fomentoLeadsAdmin, setFomentoLeadsAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("fomento_leads").select("*").order("criado_em", { ascending: false }).limit(50).then(({ data, error }) => {
+      if (!error) setFomentoLeadsAdmin(data || []);
+    });
+  }, []);
+
+  const enviarFotoFomento = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setSiteConfigAdmin((v) => ({ ...v, fomento_foto_url: URL.createObjectURL(arquivo) })); return; }
+    const caminho = `fomento/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      if (!error) {
+        const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+        setSiteConfigAdmin((v) => ({ ...v, fomento_foto_url: pub.publicUrl }));
+      }
+    });
+  };
 
   const enviarLogoSite = (e) => {
     const arquivo = e.target.files?.[0];
@@ -1663,6 +1694,16 @@ function AdminPanel() {
         cor_principal: siteConfigAdmin.cor_principal,
         logo_url: siteConfigAdmin.logo_url,
         frase: siteConfigAdmin.frase,
+        telefone: siteConfigAdmin.telefone || null,
+        whatsapp_contato: siteConfigAdmin.whatsapp_contato || null,
+        instagram_contato: siteConfigAdmin.instagram_contato || null,
+        endereco_sala_empreendedor: siteConfigAdmin.endereco_sala_empreendedor || null,
+        fomento_ativo: !!siteConfigAdmin.fomento_ativo,
+        fomento_foto_url: siteConfigAdmin.fomento_foto_url || null,
+        fomento_texto: siteConfigAdmin.fomento_texto || null,
+        fomento_link: siteConfigAdmin.fomento_link || null,
+        fomento_whatsapp: siteConfigAdmin.fomento_whatsapp || null,
+        fomento_agente_nome: siteConfigAdmin.fomento_agente_nome || null,
       });
       if (error) throw error;
       setStatusIdentidade("ok");
@@ -2960,6 +3001,11 @@ function AdminPanel() {
                     className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
                     style={{ borderColor: C.line }}
                   />
+                  <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                    <input type="checkbox" checked={novoUsuarioAdmin.empresaAceitaCartaoServidor || false}
+                      onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, empresaAceitaCartaoServidor: e.target.checked }))} />
+                    Aceita Cartão do Servidor
+                  </label>
                 </div>
               )}
               {novoUsuarioAdmin.tipo === "prestador" && (
@@ -3024,7 +3070,13 @@ function AdminPanel() {
 
         {tab === "todos-usuarios" && (
           <div>
-            <SectionHeader eyebrow="Acesso" title="Usuários cadastrados" sub="Todo mundo que já se cadastrou na plataforma" />
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <SectionHeader eyebrow="Acesso" title="Usuários cadastrados" sub="Todo mundo que já se cadastrou na plataforma" />
+              <button onClick={() => { setNovoUsuarioAdmin((v) => ({ ...v, tipo: "cliente" })); setTab("usuarios"); }}
+                className="font-body text-xs font-bold text-white rounded-lg px-4 py-2.5 flex items-center gap-1.5 shrink-0" style={{ background: C.blue }}>
+                <PlusCircle size={14} /> Novo cadastro
+              </button>
+            </div>
             {!supabaseConfigurado && (
               <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
                 <BadgeCheck size={14} className="mt-0.5 shrink-0" />
@@ -3242,7 +3294,13 @@ function AdminPanel() {
 
         {tab === "empresas" && (
           <div>
-            <SectionHeader eyebrow="Moderação" title="Empresas aguardando aprovação" sub="Aprovar, recusar e editar já grava direto no banco" />
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <SectionHeader eyebrow="Moderação" title="Empresas aguardando aprovação" sub="Aprovar, recusar e editar já grava direto no banco" />
+              <button onClick={() => { setNovoUsuarioAdmin((v) => ({ ...v, tipo: "empresario" })); setTab("usuarios"); }}
+                className="font-body text-xs font-bold text-white rounded-lg px-4 py-2.5 flex items-center gap-1.5 shrink-0" style={{ background: C.blue }}>
+                <PlusCircle size={14} /> Cadastrar comerciante
+              </button>
+            </div>
             {!supabaseConfigurado && (
               <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
                 <BadgeCheck size={14} className="mt-0.5 shrink-0" />
@@ -3306,6 +3364,10 @@ function AdminPanel() {
                         <input type="checkbox" checked={formEmpresa.destaque} onChange={(e) => setFormEmpresa((f) => ({ ...f, destaque: e.target.checked }))} />
                         Mostrar em destaque na Vitrine Local
                       </label>
+                      <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                        <input type="checkbox" checked={formEmpresa.aceita_cartao_servidor} onChange={(e) => setFormEmpresa((f) => ({ ...f, aceita_cartao_servidor: e.target.checked }))} />
+                        Aceita Cartão do Servidor
+                      </label>
                       <div>
                         <p className="font-body text-xs font-bold mb-1.5" style={{ color: "#425A70" }}>Galeria de fotos</p>
                         <div className="flex flex-wrap gap-2">
@@ -3365,7 +3427,13 @@ function AdminPanel() {
 
         {tab === "prestadores" && (
           <div>
-            <SectionHeader eyebrow="Moderação" title="Prestadores de serviço" sub="Aprovar, recusar e editar já grava direto no banco" />
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <SectionHeader eyebrow="Moderação" title="Prestadores de serviço" sub="Aprovar, recusar e editar já grava direto no banco" />
+              <button onClick={() => { setNovoUsuarioAdmin((v) => ({ ...v, tipo: "prestador" })); setTab("usuarios"); }}
+                className="font-body text-xs font-bold text-white rounded-lg px-4 py-2.5 flex items-center gap-1.5 shrink-0" style={{ background: C.blue }}>
+                <PlusCircle size={14} /> Cadastrar prestador
+              </button>
+            </div>
             <div className="flex flex-col gap-3">
               {listaPrestadores.map((p) => (
                 <div key={p.id} className="rounded-2xl border p-4 flex items-center gap-4 flex-wrap" style={{ borderColor: C.line }}>
@@ -3822,7 +3890,18 @@ function AdminPanel() {
             </select>
 
             {!eventoCredenciaisSelecionado ? (
-              <p className="font-body text-sm" style={{ color: "#5C7186" }}>Escolha um evento do calendário acima pra ver e cadastrar as credenciais dele.</p>
+              listaEventos.length === 0 ? (
+                <div className="rounded-2xl border p-5 max-w-lg" style={{ borderColor: C.line }}>
+                  <p className="font-body text-sm mb-3" style={{ color: "#5C7186" }}>
+                    Ainda não há nenhum evento cadastrado. Para cadastrar credenciais (crachás com QR Code), primeiro crie um evento no Calendário.
+                  </p>
+                  <button onClick={() => setTab("calendario")} className="font-body text-xs font-bold text-white rounded-lg px-4 py-2.5 flex items-center gap-1.5 w-fit" style={{ background: C.blue }}>
+                    <PlusCircle size={14} /> Ir para Calendário de eventos
+                  </button>
+                </div>
+              ) : (
+                <p className="font-body text-sm" style={{ color: "#5C7186" }}>Escolha um evento acima pra ver e cadastrar as credenciais dele.</p>
+              )
             ) : (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
@@ -4129,7 +4208,7 @@ function AdminPanel() {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{d.nome}</p>
-                    <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{d.cargo}{d.empresa ? ` · ${d.empresa}` : ""} · {"★".repeat(d.avaliacao || 0)}</p>
+                    <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{d.papel || d.cargo}{d.empresa ? ` · ${d.empresa}` : ""} · {"★".repeat(d.avaliacao || 0)}</p>
                   </div>
                   <select value={d.status} onChange={(e) => mudarStatusDepoimento(d.id, e.target.value)}
                     className="font-body text-[11px] font-bold border rounded-lg px-2 py-1.5 outline-none shrink-0"
@@ -4511,12 +4590,97 @@ function AdminPanel() {
               <label className="font-body text-xs font-bold mt-2" style={{ color: C.ink }}>Frase de destaque (aparece na home)</label>
               <textarea value={siteConfigAdmin?.frase || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, frase: e.target.value }))} placeholder="Empresas, produtos, vagas e cursos da sua cidade..." rows={3} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
 
+              <label className="font-body text-xs font-bold mt-2" style={{ color: C.ink }}>Contato / Sala do Empreendedor (aparece no rodapé do site)</label>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <input value={siteConfigAdmin?.telefone || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, telefone: e.target.value }))} placeholder="Telefone fixo" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={siteConfigAdmin?.whatsapp_contato || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, whatsapp_contato: e.target.value }))} placeholder="WhatsApp" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <input value={siteConfigAdmin?.instagram_contato || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, instagram_contato: e.target.value }))} placeholder="Instagram (@usuario)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={siteConfigAdmin?.endereco_sala_empreendedor || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, endereco_sala_empreendedor: e.target.value }))} placeholder="Endereço da Sala do Empreendedor" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </div>
+
               {statusIdentidade && statusIdentidade !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusIdentidade}</p>}
               {statusIdentidade === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Salvo! Recarregue o site para ver tudo aplicado.</p>}
               <button type="submit" disabled={salvandoIdentidade || !siteConfigAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 mt-1 disabled:opacity-60" style={{ background: C.blue }}>
                 {salvandoIdentidade ? "Salvando..." : "Salvar identidade"}
               </button>
             </form>
+
+            <SectionHeader eyebrow="Crédito" title="Fomento Paraná" sub="Botão de linhas de crédito, com foto, link e WhatsApp do agente de crédito" />
+            <form onSubmit={salvarIdentidade} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg" style={{ borderColor: C.line }}>
+              <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={!!siteConfigAdmin?.fomento_ativo} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, fomento_ativo: e.target.checked }))} />
+                Mostrar o botão Fomento Paraná no site
+              </label>
+
+              <label className="font-body text-xs font-bold mt-1" style={{ color: C.ink }}>Foto</label>
+              <div className="flex items-center gap-3">
+                {siteConfigAdmin?.fomento_foto_url ? (
+                  <img loading="lazy" decoding="async" src={siteConfigAdmin.fomento_foto_url} alt="" className="w-16 h-16 rounded-xl object-cover border" style={{ borderColor: C.line }} />
+                ) : (
+                  <span className="w-16 h-16 rounded-xl flex items-center justify-center border" style={{ borderColor: C.line, background: C.blueTint }}>
+                    <Landmark size={22} color={C.blue} />
+                  </span>
+                )}
+                <label className="font-body text-xs font-bold cursor-pointer" style={{ color: C.blue }}>
+                  Enviar foto
+                  <input type="file" accept="image/*" className="hidden" onChange={enviarFotoFomento} />
+                </label>
+              </div>
+
+              <label className="font-body text-xs font-bold mt-1" style={{ color: C.ink }}>Texto de apresentação</label>
+              <textarea value={siteConfigAdmin?.fomento_texto || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, fomento_texto: e.target.value }))}
+                placeholder="Ex: Precisa de crédito para sua empresa? Conheça as linhas de crédito da Fomento Paraná com as melhores taxas do mercado."
+                rows={3} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+
+              <label className="font-body text-xs font-bold mt-1" style={{ color: C.ink }}>Link das linhas de crédito / simulação</label>
+              <input value={siteConfigAdmin?.fomento_link || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, fomento_link: e.target.value }))}
+                placeholder="https://www.fomento.pr.gov.br/Linhas-de-Credito" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  WhatsApp do agente de crédito
+                  <input value={siteConfigAdmin?.fomento_whatsapp || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, fomento_whatsapp: e.target.value }))}
+                    placeholder="(44) 90000-0000" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+                <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                  Nome do agente de crédito
+                  <input value={siteConfigAdmin?.fomento_agente_nome || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, fomento_agente_nome: e.target.value }))}
+                    placeholder="Gabriel Oliveira" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                </label>
+              </div>
+
+              <button type="submit" disabled={salvandoIdentidade || !siteConfigAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 mt-1 disabled:opacity-60" style={{ background: C.blue }}>
+                {salvandoIdentidade ? "Salvando..." : "Salvar Fomento Paraná"}
+              </button>
+            </form>
+
+            {fomentoLeadsAdmin && fomentoLeadsAdmin.length > 0 && (
+              <div className="mt-6 max-w-lg">
+                <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Pessoas interessadas ({fomentoLeadsAdmin.length})</p>
+                <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Nome</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>WhatsApp</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Data</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fomentoLeadsAdmin.map((l) => (
+                        <tr key={l.id} style={{ borderBottom: `1px solid ${C.line}` }}>
+                          <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{l.nome}</td>
+                          <td className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.whatsapp}</td>
+                          <td className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -5742,9 +5906,75 @@ function CalendarioEventos() {
   );
 }
 
-function SiteHome({ onAuth, logoUrl, frase }) {
+function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const categoriasReaisHome = useCategoriasReais();
+
+  // Cadastro de interessados na Fomento Paraná — nome + WhatsApp.
+  const [fomentoNome, setFomentoNome] = useState("");
+  const [fomentoWhatsapp, setFomentoWhatsapp] = useState("");
+  const [enviandoFomento, setEnviandoFomento] = useState(false);
+  const [fomentoEnviado, setFomentoEnviado] = useState(false);
+  const [erroFomento, setErroFomento] = useState("");
+
+  const cadastrarInteresseFomento = async (e) => {
+    e.preventDefault();
+    setErroFomento("");
+    if (!fomentoNome.trim() || !fomentoWhatsapp.trim()) { setErroFomento("Preencha nome e WhatsApp."); return; }
+    if (!supabaseConfigurado) { setFomentoEnviado(true); return; }
+    setEnviandoFomento(true);
+    try {
+      const { error } = await supabase.from("fomento_leads").insert({ nome: fomentoNome, whatsapp: fomentoWhatsapp });
+      if (error) throw error;
+      setFomentoEnviado(true);
+      setFomentoNome("");
+      setFomentoWhatsapp("");
+    } catch (err) {
+      setErroFomento(err.message || "Não consegui enviar agora. Tente de novo.");
+    } finally {
+      setEnviandoFomento(false);
+    }
+  };
+
+  const linkWhatsFomento = siteConfig?.fomento_whatsapp
+    ? `https://wa.me/55${String(siteConfig.fomento_whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Quero solicitar informações sobre as linhas de crédito da Fomento Paraná com o agente de crédito ${siteConfig?.fomento_agente_nome || "Gabriel Oliveira"}.`)}`
+    : null;
+
+  // Depoimento enviado pelo próprio usuário logado (cliente/empresário/
+  // prestador) — entra como "pendente" até o admin aprovar.
+  const [mostrarFormDepoimento, setMostrarFormDepoimento] = useState(false);
+  const [textoDepoimentoProprio, setTextoDepoimentoProprio] = useState("");
+  const [avaliacaoDepoimentoProprio, setAvaliacaoDepoimentoProprio] = useState(5);
+  const [enviandoDepoimentoProprio, setEnviandoDepoimentoProprio] = useState(false);
+  const [depoimentoProprioEnviado, setDepoimentoProprioEnviado] = useState(false);
+  const [erroDepoimentoProprio, setErroDepoimentoProprio] = useState("");
+
+  const rotuloPapelUsuario = { cliente: "Cliente", empresario: "Empresário(a)", prestador: "Prestador(a) de serviço" };
+
+  const enviarDepoimentoProprio = async (e) => {
+    e.preventDefault();
+    setErroDepoimentoProprio("");
+    if (!textoDepoimentoProprio.trim()) { setErroDepoimentoProprio("Escreva seu depoimento."); return; }
+    if (!supabaseConfigurado) { setDepoimentoProprioEnviado(true); return; }
+    setEnviandoDepoimentoProprio(true);
+    try {
+      const { error } = await supabase.from("depoimentos").insert({
+        nome: perfil?.nome || "Usuário",
+        papel: rotuloPapelUsuario[perfil?.tipo] || "",
+        texto: textoDepoimentoProprio,
+        avaliacao: avaliacaoDepoimentoProprio,
+        status: "pendente",
+      });
+      if (error) throw error;
+      setDepoimentoProprioEnviado(true);
+      setTextoDepoimentoProprio("");
+      setMostrarFormDepoimento(false);
+    } catch (err) {
+      setErroDepoimentoProprio(err.message || "Não consegui enviar agora. Tente de novo.");
+    } finally {
+      setEnviandoDepoimentoProprio(false);
+    }
+  };
 
   // Registra uma visita real (sem dado pessoal nenhum, só a hora) pra
   // alimentar o gráfico de "Acessos ao site" no dashboard do admin.
@@ -6348,6 +6578,74 @@ function SiteHome({ onAuth, logoUrl, frase }) {
         </div>
       </section>
 
+      {/* Fomento Paraná — linhas de crédito */}
+      {siteConfig?.fomento_ativo && (
+        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+          <Reveal>
+            <div className="rounded-3xl overflow-hidden relative border" style={{ borderColor: C.line }}>
+              <div className="grid md:grid-cols-[1fr_1.1fr]">
+                <div className="h-48 md:h-full relative flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.blueDeep}, ${C.blue})` }}>
+                  {siteConfig?.fomento_foto_url ? (
+                    <img loading="lazy" decoding="async" src={siteConfig.fomento_foto_url} alt="Fomento Paraná" className="w-full h-full object-cover" />
+                  ) : (
+                    <Landmark size={48} className="text-white/90" />
+                  )}
+                </div>
+                <div className="p-6 md:p-8 flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.blueTint, color: C.blue }}>
+                      <HandCoins size={16} />
+                    </span>
+                    <span className="font-display text-xs font-bold tracking-[0.16em] uppercase" style={{ color: C.blue }}>Crédito para o seu negócio</span>
+                  </div>
+                  <h2 className="font-display font-extrabold text-xl md:text-2xl" style={{ color: C.ink }}>Fomento Paraná</h2>
+                  <p className="font-body text-sm" style={{ color: "#5C7186" }}>
+                    {siteConfig?.fomento_texto || "Precisa de crédito para sua empresa? Conheça as linhas de crédito da Fomento Paraná, agência oficial do Governo do Paraná."}
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    {siteConfig?.fomento_link && (
+                      <a href={siteConfig.fomento_link} target="_blank" rel="noopener noreferrer"
+                        className="font-body text-xs font-bold rounded-lg px-4 py-2.5 border flex items-center gap-1.5" style={{ borderColor: C.line, color: C.blue }}>
+                        <ExternalLink size={13} /> Ver linhas de crédito e simulação
+                      </a>
+                    )}
+                    {linkWhatsFomento && (
+                      <a href={linkWhatsFomento} target="_blank" rel="noopener noreferrer"
+                        className="glow-btn font-body text-xs font-bold rounded-lg px-4 py-2.5 text-white flex items-center gap-1.5" style={{ background: "#25A85B" }}>
+                        <MessageCircle size={13} /> Solicite já com {siteConfig?.fomento_agente_nome || "nosso agente de crédito"}
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="mt-2 pt-4 border-t" style={{ borderColor: C.line }}>
+                    {fomentoEnviado ? (
+                      <p className="font-body text-sm font-semibold flex items-center gap-1.5" style={{ color: "#1E8E5A" }}>
+                        <CheckCircle2 size={15} /> Recebemos seu contato! Em breve alguém fala com você.
+                      </p>
+                    ) : (
+                      <form onSubmit={cadastrarInteresseFomento} className="flex flex-col gap-2">
+                        <p className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>Quer que a gente te ajude a solicitar? Deixe seu contato:</p>
+                        <div className="flex flex-wrap gap-2">
+                          <input value={fomentoNome} onChange={(e) => setFomentoNome(e.target.value)} placeholder="Seu nome"
+                            className="font-body text-sm border rounded-lg px-3 py-2 outline-none flex-1 min-w-[140px]" style={{ borderColor: C.line }} />
+                          <input value={fomentoWhatsapp} onChange={(e) => setFomentoWhatsapp(e.target.value)} placeholder="WhatsApp"
+                            className="font-body text-sm border rounded-lg px-3 py-2 outline-none flex-1 min-w-[140px]" style={{ borderColor: C.line }} />
+                          <button type="submit" disabled={enviandoFomento} className="font-body text-xs font-bold rounded-lg px-4 py-2 text-white disabled:opacity-60" style={{ background: C.blue }}>
+                            {enviandoFomento ? "Enviando..." : "Cadastrar"}
+                          </button>
+                        </div>
+                        {erroFomento && <p className="font-body text-[11px]" style={{ color: "#B4462F" }}>{erroFomento}</p>}
+                      </form>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+        </section>
+      )}
+
       {/* Feira do Empreendedor — em destaque */}
       <section ref={feiraSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
         <Reveal>
@@ -6707,6 +7005,46 @@ function SiteHome({ onAuth, logoUrl, frase }) {
             </div>
           </div>
         </Reveal>
+
+        {/* Deixar meu depoimento — só para quem está logado (cliente, empresário ou prestador) */}
+        {sessao && perfil && (
+          <Reveal>
+            <div className="max-w-2xl mt-5">
+              {depoimentoProprioEnviado ? (
+                <p className="font-body text-sm font-semibold flex items-center gap-1.5" style={{ color: "#1E8E5A" }}>
+                  <CheckCircle2 size={15} /> Obrigado! Seu depoimento foi enviado e vai aparecer aqui assim que for aprovado.
+                </p>
+              ) : !mostrarFormDepoimento ? (
+                <button onClick={() => setMostrarFormDepoimento(true)} className="font-body text-xs font-bold rounded-lg px-4 py-2.5 border flex items-center gap-1.5" style={{ borderColor: C.line, color: C.blue }}>
+                  <Star size={13} /> Deixar meu depoimento
+                </button>
+              ) : (
+                <form onSubmit={enviarDepoimentoProprio} className="rounded-2xl border p-4 flex flex-col gap-2.5" style={{ borderColor: C.line, background: "#fff" }}>
+                  <p className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>Sua avaliação</p>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button key={n} type="button" onClick={() => setAvaliacaoDepoimentoProprio(n)} aria-label={`${n} estrelas`}>
+                        <Star size={20} fill={n <= avaliacaoDepoimentoProprio ? C.amberDark : "none"} color={C.amberDark} />
+                      </button>
+                    ))}
+                  </div>
+                  <textarea value={textoDepoimentoProprio} onChange={(e) => setTextoDepoimentoProprio(e.target.value)} rows={3}
+                    placeholder="Conte como foi sua experiência com o Conecta Comércio..."
+                    className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  {erroDepoimentoProprio && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{erroDepoimentoProprio}</p>}
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={enviandoDepoimentoProprio} className="font-body text-xs font-bold rounded-lg px-4 py-2.5 text-white disabled:opacity-60" style={{ background: C.blue }}>
+                      {enviandoDepoimentoProprio ? "Enviando..." : "Enviar depoimento"}
+                    </button>
+                    <button type="button" onClick={() => setMostrarFormDepoimento(false)} className="font-body text-xs font-bold rounded-lg px-4 py-2.5 border" style={{ borderColor: C.line, color: "#425A70" }}>
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </Reveal>
+        )}
       </section>
 
       {/* FAQ */}
@@ -6795,8 +7133,18 @@ function SiteHome({ onAuth, logoUrl, frase }) {
               Plataforma independente para fortalecer o comércio e o empreendedorismo de Ivatuba - PR.
             </p>
             <div className="flex gap-2 mt-4">
-              <span className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"><Instagram size={14} /></span>
-              <span className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"><MessageCircle size={14} /></span>
+              {siteConfig?.instagram_contato ? (
+                <a href={`https://instagram.com/${String(siteConfig.instagram_contato).replace(/^@/, "")}`} target="_blank" rel="noreferrer"
+                  className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20"><Instagram size={14} /></a>
+              ) : (
+                <span className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"><Instagram size={14} /></span>
+              )}
+              {siteConfig?.whatsapp_contato ? (
+                <a href={`https://wa.me/55${String(siteConfig.whatsapp_contato).replace(/\D/g, "")}`} target="_blank" rel="noreferrer"
+                  className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20"><MessageCircle size={14} /></a>
+              ) : (
+                <span className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"><MessageCircle size={14} /></span>
+              )}
             </div>
           </div>
           <div>
@@ -6812,7 +7160,12 @@ function SiteHome({ onAuth, logoUrl, frase }) {
             <ul className="font-body text-white/60 text-xs space-y-2">
               <li>Abrir um MEI</li>
               <li>Cursos e capacitações</li>
-              <li>Atendimento presencial</li>
+              {siteConfig?.endereco_sala_empreendedor ? (
+                <li className="flex items-start gap-1"><MapPin size={12} className="mt-0.5 shrink-0" /> {siteConfig.endereco_sala_empreendedor}</li>
+              ) : (
+                <li>Atendimento presencial</li>
+              )}
+              {siteConfig?.telefone && <li>Tel: {siteConfig.telefone}</li>}
             </ul>
           </div>
           <div>
@@ -6898,6 +7251,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
             email: form.get("email") || null,
             cpf: form.get("cpf") || null,
             cnpj: form.get("cnpj") || null,
+            aceita_cartao_servidor: form.get("aceitaCartaoServidor") === "on",
             logo_url: logoUrl,
             // Cadastro de empresa aprovado automaticamente — já aparece no
             // site assim que o empresário termina o cadastro.
@@ -7195,6 +7549,12 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                   <input name="cnpj" placeholder="00.000.000/0000-00" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 </label>
               </div>
+              <label className="flex items-start gap-2 mt-1 rounded-xl border p-3" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                <input name="aceitaCartaoServidor" type="checkbox" className="mt-0.5" />
+                <span className="font-body text-xs" style={{ color: "#425A70" }}>
+                  <strong>Aceito o Cartão do Servidor</strong> como forma de pagamento/desconto — vai aparecer um selo na sua empresa no site.
+                </span>
+              </label>
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                   Senha
@@ -7515,6 +7875,51 @@ function CredencialDigital({ codigo }) {
     );
   }
 
+  const imprimirCracha = () => {
+    const janela = window.open("", "_blank");
+    if (!janela) return;
+    const qr = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(String(credencial.codigo))}`;
+    janela.document.write(`
+      <html><head><title>Crachá — ${credencial.nome}</title>
+      <style>
+        @page { size: 10cm 14cm; margin: 0; }
+        * { box-sizing: border-box; }
+        body{font-family:Arial,sans-serif;margin:0;padding:0;display:flex;justify-content:center;background:#fff}
+        .cracha{width:10cm;height:14cm;border:1px solid #DCE7F2;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;align-items:center;padding:0 0 20px}
+        .furo{width:26px;height:8px;background:#DCE7F2;border-radius:6px;margin:12px auto 0}
+        .topo{width:100%;background:linear-gradient(120deg,#052A4D,#0A5AA8);color:#fff;text-align:center;padding:20px 12px 26px;margin-top:14px}
+        .topo p.evento{font-weight:800;font-size:16px;margin:4px 0 0}
+        .topo p.data{font-size:11px;opacity:.8;margin:2px 0 0}
+        .topo p.eyebrow{font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.75;margin:0}
+        .foto{width:96px;height:96px;border-radius:50%;object-fit:cover;border:4px solid #fff;margin-top:-48px;background:#fff}
+        .nome{font-weight:800;font-size:20px;color:#0E2233;margin:14px 0 2px;text-align:center;padding:0 12px}
+        .tipo{font-size:12px;font-weight:700;color:#0A5AA8;background:#EAF2FB;padding:3px 12px;border-radius:999px;margin-top:4px}
+        .qr{width:150px;height:150px;margin-top:18px}
+        .codigo{font-size:9px;color:#5C7186;margin-top:6px;word-break:break-all;padding:0 20px;text-align:center}
+        .rodape{font-size:9px;color:#B7C6D6;margin-top:auto;padding-top:10px}
+      </style></head>
+      <body>
+        <div class="cracha">
+          <div class="furo"></div>
+          <div class="topo">
+            <p class="eyebrow">Credencial digital</p>
+            <p class="evento">${evento?.titulo || "Evento"}</p>
+            ${evento?.data_inicio ? `<p class="data">${evento.data_inicio}</p>` : ""}
+          </div>
+          ${credencial.foto_url ? `<img class="foto" src="${credencial.foto_url}" />` : `<div class="foto" style="display:flex;align-items:center;justify-content:center;color:#0A5AA8;font-weight:800;font-size:28px">${(credencial.nome || "?").charAt(0).toUpperCase()}</div>`}
+          <p class="nome">${credencial.nome || ""}</p>
+          <span class="tipo">${credencial.tipo || "Participante"}</span>
+          <img class="qr" src="${qr}" />
+          <p class="codigo">${credencial.codigo}</p>
+          <p class="rodape">Conecta Comércio</p>
+        </div>
+      </body></html>
+    `);
+    janela.document.close();
+    janela.focus();
+    setTimeout(() => janela.print(), 400);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10" style={{ background: C.blueTint2 }}>
       <div className="w-full max-w-sm rounded-3xl overflow-hidden border bg-white" style={{ borderColor: C.line }}>
@@ -7547,6 +7952,9 @@ function CredencialDigital({ codigo }) {
               Check-in feito{credencial.checkin_em ? ` em ${new Date(credencial.checkin_em).toLocaleString("pt-BR")}` : ""}
             </p>
           )}
+          <button onClick={imprimirCracha} className="font-body text-xs font-bold rounded-lg px-4 py-2.5 border flex items-center gap-1.5 w-full justify-center" style={{ borderColor: C.line, color: C.blue }}>
+            <FileText size={13} /> Imprimir crachá
+          </button>
         </div>
       </div>
     </div>
@@ -7730,7 +8138,7 @@ export default function ConectaComercio() {
         </div>
       </div>
 
-      {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} />}
+      {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} siteConfig={siteConfig} sessao={sessao} perfil={perfil} />}
       {modo === "conta" && <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />}
 
       {modo === "admin" && (
