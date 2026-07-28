@@ -606,10 +606,12 @@ function PrestadorCard({ p }) {
   );
 }
 
-function ProdutoCard({ p }) {
+function ProdutoCard({ p, onAdicionarCarrinho }) {
   const esgotado = p.estoque != null && Number(p.estoque) <= 0;
   const poucoEstoque = p.estoque != null && Number(p.estoque) > 0 && Number(p.estoque) <= 3;
   const linkWhats = p.whatsapp ? `https://wa.me/55${(p.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vi o produto "${p.nome}" no Conecta Comércio e queria saber mais.`)}` : null;
+  const precoCarrinho = p.precoPromocionalNumerico ?? p.precoNumerico;
+  const podeAdicionar = !esgotado && onAdicionarCarrinho && p.empresaId && precoCarrinho != null;
   return (
     <div className="glow-card rounded-2xl border bg-white overflow-hidden flex flex-col" style={{ borderColor: C.line }}>
       <div className="h-28 flex items-center justify-center relative overflow-hidden" style={{ background: C.blueTint }}>
@@ -631,6 +633,16 @@ function ProdutoCard({ p }) {
           </div>
         ) : (
           <p className="font-display font-extrabold text-base mt-1" style={{ color: C.blue }}>{p.preco}</p>
+        )}
+        {podeAdicionar && (
+          <button type="button" onClick={() => onAdicionarCarrinho({
+            itemId: p.id, nome: p.nome, preco: precoCarrinho, foto_url: p.foto_url,
+            empresaId: p.empresaId, empresaNome: p.empresa, empresaWhatsapp: p.whatsapp,
+          })}
+            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold font-body text-white glow-btn"
+            style={{ background: C.blue }}>
+            <ShoppingBag size={13} /> Adicionar ao carrinho
+          </button>
         )}
         {linkWhats ? (
           <a href={linkWhats} target="_blank" rel="noopener noreferrer"
@@ -5940,6 +5952,92 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     ? `https://wa.me/55${String(siteConfig.fomento_whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Quero solicitar informações sobre as linhas de crédito da Fomento Paraná com o agente de crédito ${siteConfig?.fomento_agente_nome || "Gabriel Oliveira"}.`)}`
     : null;
 
+  // ---------------------------------------------------------------------
+  // Carrinho de compras — separado por comerciante (não mistura empresas
+  // diferentes no mesmo pedido), salvo no navegador (localStorage), sem
+  // exigir login. Finalização é sempre feita pelo WhatsApp do comerciante.
+  // ---------------------------------------------------------------------
+  const [carrinho, setCarrinho] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("cc_carrinho") || "{}"); } catch { return {}; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("cc_carrinho", JSON.stringify(carrinho)); } catch {}
+  }, [carrinho]);
+  const [carrinhoAberto, setCarrinhoAberto] = useState(false);
+  const [nomeClienteCarrinho, setNomeClienteCarrinho] = useState("");
+  const [enderecoClienteCarrinho, setEnderecoClienteCarrinho] = useState("");
+
+  const adicionarAoCarrinho = (produto) => {
+    if (!produto?.empresaId || produto.preco == null) return;
+    setCarrinho((atual) => {
+      const grupoAtual = atual[produto.empresaId] || { empresaNome: produto.empresaNome, empresaWhatsapp: produto.empresaWhatsapp, itens: {} };
+      const itemAtual = grupoAtual.itens[produto.itemId];
+      const novoItem = itemAtual
+        ? { ...itemAtual, quantidade: itemAtual.quantidade + 1 }
+        : { nome: produto.nome, preco: produto.preco, foto_url: produto.foto_url || null, quantidade: 1 };
+      return { ...atual, [produto.empresaId]: { ...grupoAtual, itens: { ...grupoAtual.itens, [produto.itemId]: novoItem } } };
+    });
+    setCarrinhoAberto(true);
+  };
+
+  const alterarQuantidadeCarrinho = (empresaId, itemId, delta) => {
+    setCarrinho((atual) => {
+      const grupo = atual[empresaId];
+      if (!grupo || !grupo.itens[itemId]) return atual;
+      const novaQtd = grupo.itens[itemId].quantidade + delta;
+      const novosItens = { ...grupo.itens };
+      if (novaQtd <= 0) delete novosItens[itemId];
+      else novosItens[itemId] = { ...novosItens[itemId], quantidade: novaQtd };
+      if (Object.keys(novosItens).length === 0) {
+        const { [empresaId]: _removido, ...resto } = atual;
+        return resto;
+      }
+      return { ...atual, [empresaId]: { ...grupo, itens: novosItens } };
+    });
+  };
+
+  const removerItemCarrinho = (empresaId, itemId) => {
+    setCarrinho((atual) => {
+      const grupo = atual[empresaId];
+      if (!grupo) return atual;
+      const novosItens = { ...grupo.itens };
+      delete novosItens[itemId];
+      if (Object.keys(novosItens).length === 0) {
+        const { [empresaId]: _removido, ...resto } = atual;
+        return resto;
+      }
+      return { ...atual, [empresaId]: { ...grupo, itens: novosItens } };
+    });
+  };
+
+  const esvaziarCarrinhoEmpresa = (empresaId) => {
+    setCarrinho((atual) => {
+      const { [empresaId]: _removido, ...resto } = atual;
+      return resto;
+    });
+  };
+
+  const gruposCarrinho = Object.entries(carrinho).map(([empresaId, grupo]) => ({
+    empresaId, ...grupo, itensLista: Object.entries(grupo.itens).map(([itemId, item]) => ({ itemId, ...item })),
+  }));
+  const totalItensCarrinho = gruposCarrinho.reduce((soma, g) => soma + g.itensLista.reduce((s, i) => s + i.quantidade, 0), 0);
+
+  const finalizarPeloWhatsapp = (empresaId) => {
+    const grupo = carrinho[empresaId];
+    if (!grupo) return;
+    const itens = Object.values(grupo.itens);
+    const subtotal = itens.reduce((s, i) => s + i.preco * i.quantidade, 0);
+    let msg = `Olá! Gostaria de fazer um pedido pelo Conecta Comércio:\n\n*${grupo.empresaNome}*\n\n`;
+    itens.forEach((i) => {
+      msg += `• ${i.quantidade}x ${i.nome} — R$ ${(i.preco * i.quantidade).toFixed(2).replace(".", ",")}\n`;
+    });
+    msg += `\n*Total: R$ ${subtotal.toFixed(2).replace(".", ",")}*\n`;
+    if (nomeClienteCarrinho.trim()) msg += `\nNome: ${nomeClienteCarrinho.trim()}`;
+    if (enderecoClienteCarrinho.trim()) msg += `\nEndereço para entrega: ${enderecoClienteCarrinho.trim()}`;
+    const link = `https://wa.me/55${String(grupo.empresaWhatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`;
+    window.open(link, "_blank", "noopener,noreferrer");
+  };
+
   // Depoimento enviado pelo próprio usuário logado (cliente/empresário/
   // prestador) — entra como "pendente" até o admin aprovar.
   const [mostrarFormDepoimento, setMostrarFormDepoimento] = useState(false);
@@ -6194,21 +6292,25 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (!supabaseConfigurado) return;
     supabase
       .from("produtos")
-      .select("nome, preco, preco_promocional, estoque, foto_url, categoria, empresas(nome, whatsapp)")
+      .select("id, nome, preco, preco_promocional, estoque, foto_url, categoria, empresa_id, empresas(id, nome, whatsapp)")
       .eq("ativo", true)
       .order("criado_em", { ascending: false })
       .limit(40)
       .then(({ data, error }) => {
         if (!error) {
-          setProdutosReais((data || []).map((d) => ({
+          setProdutosReais((data || []).map((d, i) => ({
+            id: d.id || `demo-produto-${i}`,
             nome: d.nome,
             cat: d.categoria,
             empresa: d.empresas?.nome || "",
+            empresaId: d.empresas?.id || d.empresa_id || null,
             whatsapp: d.empresas?.whatsapp || "",
             foto_url: d.foto_url,
             estoque: d.estoque,
             preco: d.preco != null ? `R$ ${Number(d.preco).toFixed(2).replace(".", ",")}` : "Consulte",
+            precoNumerico: d.preco != null ? Number(d.preco) : null,
             precoPromocional: d.preco_promocional != null ? `R$ ${Number(d.preco_promocional).toFixed(2).replace(".", ",")}` : null,
+            precoPromocionalNumerico: d.preco_promocional != null ? Number(d.preco_promocional) : null,
           })));
         }
       });
@@ -6804,7 +6906,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           )}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {produtosFiltrados.slice(0, qtdProdutosVisiveis).map((p, i) => <Reveal key={`${p.nome}-${i}`} delay={i * 70}><ProdutoCard p={p} /></Reveal>)}
+          {produtosFiltrados.slice(0, qtdProdutosVisiveis).map((p, i) => <Reveal key={`${p.nome}-${i}`} delay={i * 70}><ProdutoCard p={p} onAdicionarCarrinho={adicionarAoCarrinho} /></Reveal>)}
           {(produtosReais ?? []).length === 0 && (
             <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhum produto cadastrado ainda. Assim que um empresário publicar, aparece aqui.</p>
           )}
@@ -7188,6 +7290,96 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           <p className="font-body text-white/40 text-xs">Feito para fortalecer quem move a economia local</p>
         </div>
       </footer>
+
+      {/* Carrinho de compras — ícone fixo com contador, finalização por WhatsApp */}
+      {totalItensCarrinho > 0 && (
+        <button onClick={() => setCarrinhoAberto(true)} aria-label="Abrir carrinho de compras"
+          className="glow-btn fixed bottom-5 left-5 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl text-white"
+          style={{ background: C.blue }}>
+          <ShoppingBag size={22} />
+          <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full flex items-center justify-center font-body text-[11px] font-bold text-white" style={{ background: "#B4462F" }}>
+            {totalItensCarrinho}
+          </span>
+        </button>
+      )}
+
+      {carrinhoAberto && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.55)" }} onClick={() => setCarrinhoAberto(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl max-h-[88vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white flex items-center justify-between px-5 pt-5 pb-3 border-b z-10" style={{ borderColor: C.line }}>
+              <div className="flex items-center gap-2">
+                <span className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: C.blueTint, color: C.blue }}>
+                  <ShoppingBag size={17} />
+                </span>
+                <p className="font-display font-bold text-base" style={{ color: C.ink }}>Meu carrinho</p>
+              </div>
+              <button onClick={() => setCarrinhoAberto(false)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: C.blueTint2 }} aria-label="Fechar">
+                <X size={16} color="#425A70" />
+              </button>
+            </div>
+
+            <div className="p-5 flex flex-col gap-5">
+              {gruposCarrinho.length === 0 && (
+                <p className="font-body text-sm text-center py-6" style={{ color: "#5C7186" }}>Seu carrinho está vazio.</p>
+              )}
+
+              {gruposCarrinho.length > 0 && (
+                <div className="grid gap-2">
+                  <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                    Seu nome (opcional)
+                    <input value={nomeClienteCarrinho} onChange={(e) => setNomeClienteCarrinho(e.target.value)} placeholder="Nome"
+                      className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  </label>
+                  <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                    Endereço para entrega (opcional)
+                    <input value={enderecoClienteCarrinho} onChange={(e) => setEnderecoClienteCarrinho(e.target.value)} placeholder="Rua, número, bairro"
+                      className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  </label>
+                </div>
+              )}
+
+              {gruposCarrinho.map((grupo) => {
+                const subtotal = grupo.itensLista.reduce((s, i) => s + i.preco * i.quantidade, 0);
+                return (
+                  <div key={grupo.empresaId} className="rounded-2xl border p-3.5 flex flex-col gap-2.5" style={{ borderColor: C.line }}>
+                    <div className="flex items-center justify-between">
+                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{grupo.empresaNome}</p>
+                      <button onClick={() => esvaziarCarrinhoEmpresa(grupo.empresaId)} className="font-body text-[11px] font-bold" style={{ color: "#B4462F" }}>Esvaziar</button>
+                    </div>
+                    {grupo.itensLista.map((item) => (
+                      <div key={item.itemId} className="flex items-center gap-2.5">
+                        {item.foto_url ? (
+                          <img loading="lazy" decoding="async" src={item.foto_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                        ) : (
+                          <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}><ShoppingBag size={15} /></span>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-body text-xs font-semibold truncate" style={{ color: C.ink }}>{item.nome}</p>
+                          <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>R$ {item.preco.toFixed(2).replace(".", ",")} cada</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button onClick={() => alterarQuantidadeCarrinho(grupo.empresaId, item.itemId, -1)} className="w-6 h-6 rounded-full border flex items-center justify-center font-body text-xs font-bold" style={{ borderColor: C.line, color: "#425A70" }}>–</button>
+                          <span className="font-body text-xs font-bold w-4 text-center" style={{ color: C.ink }}>{item.quantidade}</span>
+                          <button onClick={() => alterarQuantidadeCarrinho(grupo.empresaId, item.itemId, 1)} className="w-6 h-6 rounded-full border flex items-center justify-center font-body text-xs font-bold" style={{ borderColor: C.line, color: "#425A70" }}>+</button>
+                        </div>
+                        <button onClick={() => removerItemCarrinho(grupo.empresaId, item.itemId)} aria-label="Remover item" style={{ color: "#B4462F" }}><X size={14} /></button>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: C.line }}>
+                      <p className="font-body text-xs font-bold" style={{ color: "#425A70" }}>Total</p>
+                      <p className="font-display font-extrabold text-sm" style={{ color: C.blue }}>R$ {subtotal.toFixed(2).replace(".", ",")}</p>
+                    </div>
+                    <button onClick={() => finalizarPeloWhatsapp(grupo.empresaId)}
+                      className="glow-btn w-full flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-bold font-body text-white" style={{ background: "#25A85B" }}>
+                      <MessageCircle size={14} /> Finalizar pelo WhatsApp
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
