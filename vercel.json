@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/ivatuba", "destination": "/" },
+    { "source": "/ivatuba/(.*)", "destination": "/" }
+  ]
+}
