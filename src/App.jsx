@@ -8745,10 +8745,29 @@ function baixarLembreteEvento(ev) {
 function CalendarioEventos() {
   const [eventos, setEventos] = useState(null); // null = carregando/indisponível
 
+  // Cursos ficam numa tabela separada (cadastro próprio, na aba Cursos), mas
+  // precisam aparecer aqui no calendário também, sem o admin precisar
+  // cadastrar o mesmo curso duas vezes — por isso buscamos os dois e
+  // juntamos numa lista só, no mesmo formato usado pelo calendário.
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("eventos_calendario").select("*").order("data_inicio").then(({ data, error }) => {
-      if (!error && data) setEventos(data);
+    Promise.all([
+      supabase.from("eventos_calendario").select("*").order("data_inicio"),
+      supabase.from("cursos").select("*").order("data_inicio"),
+    ]).then(([{ data: eventosData, error: erroEventos }, { data: cursosData, error: erroCursos }]) => {
+      const listaEventos = !erroEventos && eventosData ? eventosData : [];
+      const listaCursos = !erroCursos && cursosData
+        ? cursosData.map((c) => ({
+            id: `curso-${c.id}`,
+            titulo: c.titulo,
+            data_inicio: c.data_inicio,
+            local: c.local || c.instituicao || "",
+            tipo: "curso",
+            link_inscricao: c.link_inscricao || null,
+            banner_url: c.banner_url || null,
+          }))
+        : [];
+      if (!erroEventos || !erroCursos) setEventos([...listaEventos, ...listaCursos]);
     });
   }, []);
 
@@ -8850,7 +8869,7 @@ function CalendarioEventos() {
   const listaVisivel = eventosDoDia ?? proximosEventos;
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    const ids = listaVisivel.map((ev) => ev.id).filter((id) => typeof id === "string" && !id.startsWith("d"));
+    const ids = listaVisivel.map((ev) => ev.id).filter((id) => typeof id === "string" && !id.startsWith("d") && !id.startsWith("curso-"));
     if (ids.length > 0) carregarContagemPresenca(ids);
   }, [listaVisivel.map((e) => e.id).join(",")]);
 
@@ -8949,7 +8968,7 @@ function CalendarioEventos() {
                       <CalendarDays size={10} /> Lembrete
                     </button>
                   )}
-                  {ev.status !== "cancelado" && supabaseConfigurado && (
+                  {ev.status !== "cancelado" && ev.tipo !== "curso" && supabaseConfigurado && (
                     confirmados[ev.id] ? (
                       <span className="font-body text-[10px] font-bold flex items-center gap-1" style={{ color: "#1E8E5A" }}>
                         <CheckCircle2 size={10} /> Presença confirmada
@@ -11641,6 +11660,7 @@ const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario:
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
+  if (!h || h === "#" || h === "#/") return "site";
   if (h.startsWith("#/admin")) return "admin";
   if (h.startsWith("#/estatisticas") || h.startsWith("#/numeros")) return "estatisticas";
   if (h.startsWith("#/turismo")) return "turismo";
