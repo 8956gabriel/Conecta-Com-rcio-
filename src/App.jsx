@@ -313,8 +313,11 @@ textarea:focus-visible, [tabindex]:focus-visible {
 @keyframes price-pop { 0% { transform: scale(0.85); opacity: 0; } 60% { transform: scale(1.06); opacity: 1; } 100% { transform: scale(1); } }
 .price-pop { animation: price-pop .5s cubic-bezier(.2,.8,.2,1) both; }
 
+@keyframes page-transition-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.page-transition { animation: page-transition-in .35s cubic-bezier(.2,.8,.2,1) both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .blob, .marquee-track, .reveal, .pulse-dot, .ring-pulse, .grad-text, .stamp, .promo-slide, .tech-grid, .scan-line, .price-pop, .hero-in-left, .hero-in-right { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
+  .blob, .marquee-track, .reveal, .pulse-dot, .ring-pulse, .grad-text, .stamp, .promo-slide, .tech-grid, .scan-line, .price-pop, .hero-in-left, .hero-in-right, .page-transition { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
 }
 `;
 
@@ -502,21 +505,6 @@ const faqItens = [
   },
 ];
 
-const comerciantesPublicidade = [
-  {
-    nome: "Mercado Bom Preço",
-    categoria: "Mercado & Varejo",
-    bairro: "Jardim Primavera",
-    chamada: "Ofertas da semana com até 30% de desconto em mais de 50 produtos.",
-  },
-  {
-    nome: "Materiais Const. Rocha",
-    categoria: "Construção",
-    bairro: "Vila Nova",
-    chamada: "Tudo para sua reforma com entrega grátis em Ivatuba.",
-  },
-];
-
 const promocoesDestaque = [
   { empresa: "Padaria Pão Nosso", produto: "Cesta de pães artesanais", precoOriginal: 32.9, precoPromo: 24.9, validoAte: "31/07" },
   { empresa: "Mercado Bom Preço", produto: "Combo churrasco (2kg carne + carvão)", precoOriginal: 89.9, precoPromo: 69.9, validoAte: "28/07" },
@@ -622,7 +610,7 @@ function Eyebrow({ children }) {
   );
 }
 
-function SectionHeader({ eyebrow, title, sub, linkLabel }) {
+function SectionHeader({ eyebrow, title, sub, linkLabel, onLinkClick }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
       <div>
@@ -631,7 +619,7 @@ function SectionHeader({ eyebrow, title, sub, linkLabel }) {
         {sub && <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>{sub}</p>}
       </div>
       {linkLabel && (
-        <button className="font-body flex items-center gap-1 text-sm font-semibold shrink-0" style={{ color: C.blue }}>
+        <button type="button" onClick={onLinkClick} className="font-body flex items-center gap-1 text-sm font-semibold shrink-0" style={{ color: C.blue }}>
           {linkLabel} <ChevronRight size={16} />
         </button>
       )}
@@ -668,11 +656,11 @@ function ToastStack({ toasts }) {
   );
 }
 
-function CategoryCard({ cat }) {
+function CategoryCard({ cat, onClick }) {
   const Icon = cat.icon || resolverIconeCategoria(cat.icone);
   const cor = cat.cor || C.blue;
   return (
-    <button className="glow-card group flex flex-col items-start gap-3 p-4 rounded-2xl border text-left"
+    <button type="button" onClick={onClick} className="glow-card group flex flex-col items-start gap-3 p-4 rounded-2xl border text-left"
       style={{ borderColor: C.line, background: "#fff" }}>
       <span className="flex items-center justify-center w-11 h-11 rounded-xl transition-colors"
         style={{ background: `${cor}1a`, color: cor }}>
@@ -725,6 +713,9 @@ function EmpresaCard({ e, fav, onFav, onAbrir }) {
         </p>
         <p className="font-body text-xs" style={{ color: "#5C7186" }}>{e.itens} {e.itens === 1 ? "item ativo" : "itens ativos"}</p>
         <div className="flex flex-wrap gap-1.5">
+          <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5" style={{ background: e.regiao === "bairro_refugio" ? "#F3E8FF" : C.blueTint, color: e.regiao === "bairro_refugio" ? "#7C3AED" : C.blue }}>
+            <MapPin size={11} /> {e.regiao === "bairro_refugio" ? "Bairro do Refúgio" : "Ivatuba"}
+          </span>
           {planoPremiumAtivo(e) && (
             <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5 text-white" style={{ background: "linear-gradient(120deg, #C6811F, #E8A23D)" }}>
               <Sparkles size={11} /> Premium
@@ -751,6 +742,18 @@ function EmpresaCard({ e, fav, onFav, onAbrir }) {
             </span>
           )}
         </div>
+        {e.instagram && (
+          <a
+            href={`https://instagram.com/${String(e.instagram).replace(/^@/, "")}`}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(ev) => ev.stopPropagation()}
+            className="w-fit flex items-center gap-1.5 rounded-full pl-1.5 pr-2.5 py-1 text-[11px] font-bold font-body mt-0.5 text-white"
+            style={{ background: "linear-gradient(135deg, #833AB4, #E1306C, #F77737)" }}
+          >
+            <Instagram size={12} /> Vitrine no Instagram
+          </a>
+        )}
         {(e.facebook || e.site) && (
           <div className="flex gap-2 mt-0.5">
             {e.facebook && <a href={e.facebook} target="_blank" rel="noreferrer" className="font-body text-[11px] font-semibold" style={{ color: C.blue }}>Facebook</a>}
@@ -759,7 +762,7 @@ function EmpresaCard({ e, fav, onFav, onAbrir }) {
         )}
         <div className="mt-auto flex gap-2 pt-2">
           <a href={linkWhats || "#"} target={linkWhats ? "_blank" : undefined} rel="noreferrer" className="glow-btn flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold font-body text-white"
-            style={{ background: "#25A85B" }}>
+            style={{ background: "#25A85B", opacity: linkWhats ? 1 : 0.5 }}>
             <MessageCircle size={14} /> WhatsApp
           </a>
           <a href={e.google_maps_url || "#"} target={e.google_maps_url ? "_blank" : undefined} rel="noreferrer"
@@ -1820,14 +1823,14 @@ function AdminPanel() {
   const [empresasPend, setEmpresasPend] = useState(null); // null = carregando/indisponível
   const [statusEmpresa, setStatusEmpresa] = useState({});
   const [editandoEmpresa, setEditandoEmpresa] = useState(null);
-  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, patrocinado_ate: "", fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false, possui_mei: false, horario_funcionamento: null, chave_pix: "", plano_premium: false, plano_premium_ate: "" });
+  const [formEmpresa, setFormEmpresa] = useState({ nome: "", categoria: "", regiao: "ivatuba", logo_url: "", banner_url: "", facebook: "", site: "", destaque: false, patrocinado: false, patrocinado_ate: "", fotos_urls: [], email: "", whatsapp: "", instagram: "", cpf: "", cnpj: "", aceita_cartao_servidor: false, possui_mei: false, horario_funcionamento: null, chave_pix: "", plano_premium: false, plano_premium_ate: "" });
   const [enviandoLogoEmpresa, setEnviandoLogoEmpresa] = useState(false);
   const [enviandoBannerEmpresa, setEnviandoBannerEmpresa] = useState(false);
   const [enviandoFotoGaleria, setEnviandoFotoGaleria] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("empresas").select("id, nome, categoria, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em, email, whatsapp, instagram, cpf, cnpj, possui_mei, horario_funcionamento, chave_pix, plano_premium, plano_premium_ate").order("criado_em", { ascending: false })
+    supabase.from("empresas").select("id, nome, categoria, regiao, status, logo_url, banner_url, facebook, site, destaque, fotos_urls, criado_em, email, whatsapp, instagram, cpf, cnpj, possui_mei, horario_funcionamento, chave_pix, plano_premium, plano_premium_ate").order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setEmpresasPend(data || []); });
   }, []);
 
@@ -1870,7 +1873,7 @@ function AdminPanel() {
   const iniciarEdicaoEmpresa = (e) => {
     setEditandoEmpresa(e.id);
     setFormEmpresa({
-      nome: e.nome, categoria: e.categoria, logo_url: e.logo_url || "",
+      nome: e.nome, categoria: e.categoria, regiao: e.regiao || "ivatuba", logo_url: e.logo_url || "",
       banner_url: e.banner_url || "", facebook: e.facebook || "", site: e.site || "",
       destaque: !!e.destaque, fotos_urls: e.fotos_urls || [],
       email: e.email || "", whatsapp: e.whatsapp || "", instagram: e.instagram || "",
@@ -1939,7 +1942,7 @@ function AdminPanel() {
       return;
     }
     const { error } = await supabase.from("empresas").update({
-      nome: formEmpresa.nome, categoria: formEmpresa.categoria, logo_url: formEmpresa.logo_url,
+      nome: formEmpresa.nome, categoria: formEmpresa.categoria, regiao: formEmpresa.regiao, logo_url: formEmpresa.logo_url,
       banner_url: formEmpresa.banner_url, facebook: formEmpresa.facebook, site: formEmpresa.site,
       destaque: formEmpresa.destaque, fotos_urls: formEmpresa.fotos_urls,
       email: formEmpresa.email || null, whatsapp: formEmpresa.whatsapp || null, instagram: formEmpresa.instagram || null,
@@ -2413,6 +2416,23 @@ function AdminPanel() {
   const [criandoUsuarioAdmin, setCriandoUsuarioAdmin] = useState(false);
   const [statusUsuarioAdmin, setStatusUsuarioAdmin] = useState("");
 
+  // Permite reaproveitar um perfil já cadastrado (ex: alguém que já criou
+  // conta de cliente) em vez de sempre criar uma conta nova do zero — o
+  // email/nome vêm preenchidos automaticamente do perfil escolhido.
+  const [buscaUsuarioExistente, setBuscaUsuarioExistente] = useState("");
+  const [usuarioExistenteSelecionado, setUsuarioExistenteSelecionado] = useState(null);
+
+  const selecionarUsuarioExistente = (u) => {
+    setUsuarioExistenteSelecionado(u);
+    setBuscaUsuarioExistente("");
+    setNovoUsuarioAdmin((v) => ({ ...v, nome: u.nome || "", email: u.email || "", cpf: u.cpf || v.cpf, cnpj: u.cnpj || v.cnpj }));
+  };
+
+  const limparUsuarioExistente = () => {
+    setUsuarioExistenteSelecionado(null);
+    setNovoUsuarioAdmin((v) => ({ ...v, nome: "", email: "" }));
+  };
+
   const criarUsuarioAdmin = async (e) => {
     e.preventDefault();
     setStatusUsuarioAdmin("");
@@ -2422,6 +2442,54 @@ function AdminPanel() {
     }
     setCriandoUsuarioAdmin(true);
     try {
+      // Reaproveitando um perfil já existente: não cria conta nova, só
+      // ajusta o tipo do perfil e cadastra a empresa/prestador vinculados.
+      if (usuarioExistenteSelecionado) {
+        const v = novoUsuarioAdmin;
+        if (v.tipo !== usuarioExistenteSelecionado.tipo) {
+          const { error: erroTipo } = await supabase.from("perfis").update({ tipo: v.tipo }).eq("id", usuarioExistenteSelecionado.id);
+          if (erroTipo) throw new Error("Não consegui atualizar o tipo do usuário: " + erroTipo.message);
+        }
+        if (v.tipo === "empresario" && v.empresaNome) {
+          const { error: erroEmpresa } = await supabase.from("empresas").insert({
+            dono_id: usuarioExistenteSelecionado.id,
+            nome: v.empresaNome,
+            categoria: v.empresaCategoria || "Outros",
+            whatsapp: v.empresaWhatsapp || null,
+            instagram: v.empresaInstagram || null,
+            endereco: v.empresaEndereco || null,
+            google_maps_url: v.empresaGoogleMaps || null,
+            email: v.email || null,
+            cpf: v.cpf || null,
+            cnpj: v.cnpj || null,
+            aceita_cartao_servidor: !!v.empresaAceitaCartaoServidor,
+            status: "aprovada",
+          });
+          if (erroEmpresa) throw new Error("Usuário atualizado, mas a empresa não pôde ser cadastrada: " + erroEmpresa.message);
+        }
+        if (v.tipo === "prestador") {
+          const { error: erroPrestador } = await supabase.from("prestadores").insert({
+            dono_id: usuarioExistenteSelecionado.id,
+            nome: v.nome,
+            servico: v.prestadorServico,
+            whatsapp: v.prestadorWhatsapp || null,
+            instagram: v.prestadorInstagram || null,
+            endereco: v.prestadorEndereco || null,
+            google_maps_url: v.prestadorGoogleMaps || null,
+            email: v.email || null,
+            cpf: v.cpf || null,
+            cnpj: v.cnpj || null,
+            status: "aprovado",
+          });
+          if (erroPrestador) throw new Error("Usuário atualizado, mas o prestador não pôde ser cadastrado: " + erroPrestador.message);
+        }
+        setStatusUsuarioAdmin("ok");
+        limparUsuarioExistente();
+        setNovoUsuarioAdmin({ nome: "", email: "", senha: "", tipo: "cliente", cpf: "", cnpj: "", empresaNome: "", empresaCategoria: "", empresaWhatsapp: "", empresaInstagram: "", empresaEndereco: "", empresaGoogleMaps: "", empresaAceitaCartaoServidor: false, prestadorServico: "", prestadorWhatsapp: "", prestadorInstagram: "", prestadorEndereco: "", prestadorGoogleMaps: "" });
+        carregarTodosUsuariosAdmin();
+        return;
+      }
+
       const { data: sessaoAtual } = await supabase.auth.getSession();
       const token = sessaoAtual?.session?.access_token;
       const resp = await fetch("/api/admin-criar-usuario", {
@@ -2518,7 +2586,7 @@ function AdminPanel() {
       if (!error) setPontosTuristicosAdmin(data || []);
     });
   }, []);
-  const pontoTuristicoVazio = { nome: "", categoria: "", descricao: "", endereco: "", foto_url: "", google_maps_url: "", ordem: 0 };
+  const pontoTuristicoVazio = { nome: "", categoria: "", descricao: "", endereco: "", foto_url: "", google_maps_url: "", ordem: 0, destaque: false };
   const [novoPontoTuristico, setNovoPontoTuristico] = useState(pontoTuristicoVazio);
   const [enviandoFotoPontoTuristico, setEnviandoFotoPontoTuristico] = useState(false);
   const [publicandoPontoTuristico, setPublicandoPontoTuristico] = useState(false);
@@ -2560,6 +2628,11 @@ function AdminPanel() {
   const removerPontoTuristico = async (id) => {
     const { error } = await supabase.from("pontos_turisticos").delete().eq("id", id);
     if (!error) { setPontosTuristicosAdmin((atual) => atual.filter((p) => p.id !== id)); notificar("Ponto turístico excluído."); }
+  };
+
+  const alternarDestaquePontoTuristico = async (p) => {
+    const { error } = await supabase.from("pontos_turisticos").update({ destaque: !p.destaque }).eq("id", p.id);
+    if (!error) setPontosTuristicosAdmin((atual) => atual.map((x) => (x.id === p.id ? { ...x, destaque: !p.destaque } : x)));
   };
 
   const enviarLogoSite = (e) => {
@@ -3540,7 +3613,7 @@ function AdminPanel() {
   const [avaliacoesAdmin, setAvaliacoesAdmin] = useState(null);
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("avaliacoes").select("*, empresas(nome)").order("criado_em", { ascending: false }).then(({ data, error }) => {
+    supabase.from("avaliacoes").select("*, empresas(nome), pontos_turisticos(nome)").order("criado_em", { ascending: false }).then(({ data, error }) => {
       if (!error) setAvaliacoesAdmin(data || []);
     });
   }, []);
@@ -3880,6 +3953,19 @@ function AdminPanel() {
   // exportar em Excel (CSV) / PDF (impressão do navegador).
   // -------------------------------------------------------------------------
   const [todosUsuariosAdmin, setTodosUsuariosAdmin] = useState(null);
+
+  const resultadosUsuarioExistente = useMemo(() => {
+    const termo = buscaUsuarioExistente.trim().toLowerCase();
+    if (!termo || !todosUsuariosAdmin) return [];
+    return todosUsuariosAdmin
+      .filter((u) =>
+        u.nome?.toLowerCase().includes(termo) ||
+        u.telefone?.toLowerCase().includes(termo) ||
+        u.email?.toLowerCase().includes(termo)
+      )
+      .slice(0, 8);
+  }, [buscaUsuarioExistente, todosUsuariosAdmin]);
+
   const [buscaTodosUsuariosAdmin, setBuscaTodosUsuariosAdmin] = useState("");
   const [filtroTipoTodosUsuariosAdmin, setFiltroTipoTodosUsuariosAdmin] = useState("");
   const [ordenacaoTodosUsuariosAdmin, setOrdenacaoTodosUsuariosAdmin] = useState("recentes");
@@ -4348,33 +4434,81 @@ function AdminPanel() {
           <div>
             <SectionHeader eyebrow="Acesso" title="Cadastrar usuário direto pelo painel" sub="Cria a conta de login e o perfil (cliente, empresário ou admin) sem precisar de auto-cadastro" />
             <form onSubmit={criarUsuarioAdmin} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg" style={{ borderColor: C.line }}>
+              <div className="rounded-xl border p-3" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                <p className="font-body text-xs font-bold" style={{ color: C.ink }}>
+                  Já tem conta? Busque em vez de criar do zero
+                </p>
+                {usuarioExistenteSelecionado ? (
+                  <div className="mt-2 flex items-center justify-between rounded-lg bg-white border px-3 py-2" style={{ borderColor: C.line }}>
+                    <div>
+                      <p className="font-body text-sm font-bold" style={{ color: C.ink }}>{usuarioExistenteSelecionado.nome}</p>
+                      <p className="font-body text-xs" style={{ color: "#5C7186" }}>{usuarioExistenteSelecionado.email || "sem e-mail"}</p>
+                    </div>
+                    <button type="button" onClick={limparUsuarioExistente} className="font-body text-xs font-bold" style={{ color: C.blue }}>
+                      Trocar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative mt-2">
+                    <input
+                      value={buscaUsuarioExistente}
+                      onChange={(e) => setBuscaUsuarioExistente(e.target.value)}
+                      placeholder="Buscar por nome, telefone ou e-mail..."
+                      className="w-full font-body text-sm border rounded-lg px-3 py-2 outline-none bg-white"
+                      style={{ borderColor: C.line }}
+                    />
+                    {resultadosUsuarioExistente.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full rounded-lg border bg-white shadow-lg overflow-hidden" style={{ borderColor: C.line }}>
+                        {resultadosUsuarioExistente.map((u) => (
+                          <button
+                            type="button"
+                            key={u.id}
+                            onClick={() => selecionarUsuarioExistente(u)}
+                            className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-gray-50 border-b last:border-b-0"
+                            style={{ borderColor: C.line }}
+                          >
+                            <span className="font-body text-sm" style={{ color: C.ink }}>{u.nome}</span>
+                            <span className="font-body text-xs" style={{ color: "#5C7186" }}>
+                              {u.email} · {u.tipo}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <input
                 required
+                disabled={!!usuarioExistenteSelecionado}
                 value={novoUsuarioAdmin.nome}
                 onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, nome: e.target.value }))}
                 placeholder="Nome completo"
-                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none disabled:bg-gray-100"
                 style={{ borderColor: C.line }}
               />
               <input
                 required
+                disabled={!!usuarioExistenteSelecionado}
                 type="email"
                 value={novoUsuarioAdmin.email}
                 onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, email: e.target.value }))}
                 placeholder="E-mail"
-                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none disabled:bg-gray-100"
                 style={{ borderColor: C.line }}
               />
-              <input
-                required
-                type="password"
-                minLength={6}
-                value={novoUsuarioAdmin.senha}
-                onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, senha: e.target.value }))}
-                placeholder="Senha provisória (mín. 6 caracteres)"
-                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
-                style={{ borderColor: C.line }}
-              />
+              {!usuarioExistenteSelecionado && (
+                <input
+                  required
+                  type="password"
+                  minLength={6}
+                  value={novoUsuarioAdmin.senha}
+                  onChange={(e) => setNovoUsuarioAdmin((v) => ({ ...v, senha: e.target.value }))}
+                  placeholder="Senha provisória (mín. 6 caracteres)"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none"
+                  style={{ borderColor: C.line }}
+                />
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <input
                   value={novoUsuarioAdmin.cpf}
@@ -4504,7 +4638,7 @@ function AdminPanel() {
                 <p className="font-body text-xs" style={{ color: "#D64545" }}>{statusUsuarioAdmin}</p>
               )}
               {statusUsuarioAdmin === "ok" && (
-                <p className="font-body text-xs" style={{ color: "#3AA76D" }}>Usuário criado com sucesso!</p>
+                <p className="font-body text-xs" style={{ color: "#3AA76D" }}>Pronto! Usuário criado/vinculado com sucesso.</p>
               )}
               <button
                 type="submit"
@@ -4512,7 +4646,8 @@ function AdminPanel() {
                 className="font-body text-sm font-bold text-white rounded-lg py-2.5 flex items-center justify-center gap-2"
                 style={{ background: C.blue, opacity: criandoUsuarioAdmin ? 0.7 : 1 }}
               >
-                <UserCircle2 size={14} /> {criandoUsuarioAdmin ? "Criando..." : "Criar usuário"}
+                <UserCircle2 size={14} />
+                {criandoUsuarioAdmin ? "Enviando..." : usuarioExistenteSelecionado ? "Vincular usuário" : "Criar usuário"}
               </button>
             </form>
           </div>
@@ -4784,6 +4919,11 @@ function AdminPanel() {
                           className="w-36 font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none bg-white" style={{ borderColor: C.line }}>
                           <option value="">Categoria</option>
                           {(categoriasReaisAdmin ?? categorias).map((cat) => <option key={cat.nome} value={cat.nome}>{cat.nome}</option>)}
+                        </select>
+                        <select value={formEmpresa.regiao} onChange={(e) => setFormEmpresa((f) => ({ ...f, regiao: e.target.value }))}
+                          className="w-36 font-body text-sm border rounded-lg px-2.5 py-1.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                          <option value="ivatuba">Ivatuba (Centro)</option>
+                          <option value="bairro_refugio">Bairro do Refúgio</option>
                         </select>
                       </div>
                       <div className="flex flex-wrap gap-3">
@@ -5912,6 +6052,10 @@ function AdminPanel() {
                 <Camera size={14} /> {enviandoFotoPontoTuristico ? "Enviando..." : novoPontoTuristico.foto_url ? "Foto anexada — trocar" : "Anexar foto"}
                 <input type="file" accept="image/*" className="hidden" onChange={enviarFotoPontoTuristico} />
               </label>
+              <label className="font-body text-xs font-bold flex items-center gap-2 cursor-pointer" style={{ color: C.ink }}>
+                <input type="checkbox" checked={novoPontoTuristico.destaque} onChange={(e) => setNovoPontoTuristico((v) => ({ ...v, destaque: e.target.checked }))} />
+                Mostrar em destaque no roteiro de Turismo
+              </label>
               {statusPontoTuristico && statusPontoTuristico !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusPontoTuristico}</p>}
               {statusPontoTuristico === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Publicado!</p>}
               <button type="submit" disabled={publicandoPontoTuristico} className="font-body text-sm font-bold text-white rounded-lg py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
@@ -5924,9 +6068,15 @@ function AdminPanel() {
                   <span className="w-7 h-7 rounded-full flex items-center justify-center font-display font-bold text-xs shrink-0" style={{ background: C.blueTint, color: C.blue }}>{i + 1}</span>
                   {p.foto_url && <img loading="lazy" decoding="async" src={p.foto_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
-                    <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{p.nome}</p>
+                    <p className="font-display font-bold text-sm truncate flex items-center gap-1.5" style={{ color: C.ink }}>
+                      {p.nome}
+                      {p.destaque && <Star size={12} fill={C.amber} color={C.amber} />}
+                    </p>
                     <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{p.categoria}{p.endereco ? ` · ${p.endereco}` : ""}</p>
                   </div>
+                  <button onClick={() => alternarDestaquePontoTuristico(p)} title={p.destaque ? "Remover destaque" : "Marcar como destaque"} style={{ color: p.destaque ? C.amber : "#B8C2CC" }}>
+                    <Star size={16} fill={p.destaque ? C.amber : "none"} />
+                  </button>
                   <button onClick={() => { if (confirmarExclusao("Excluir esse ponto turístico?")) removerPontoTuristico(p.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
@@ -6341,13 +6491,13 @@ function AdminPanel() {
 
         {tab === "avaliacoes" && (
           <div>
-            <SectionHeader eyebrow="Moderação" title="Avaliações das empresas" sub="O público avalia direto no site — apague comentário abusivo ou spam" />
+            <SectionHeader eyebrow="Moderação" title="Avaliações (empresas e turismo)" sub="O público avalia direto no site — apague comentário abusivo ou spam" />
             <div className="flex flex-col gap-3 max-w-2xl">
               {(avaliacoesAdmin ?? []).map((a) => (
                 <div key={a.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{a.nome} <span className="font-body text-xs font-normal" style={{ color: "#5C7186" }}>· {a.empresas?.nome || "empresa removida"}</span></p>
+                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{a.nome} <span className="font-body text-xs font-normal" style={{ color: "#5C7186" }}>· {a.ponto_turistico_id ? `Turismo: ${a.pontos_turisticos?.nome || "ponto removido"}` : (a.empresas?.nome || "empresa removida")}</span></p>
                       <div className="flex gap-0.5 mt-1">
                         {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={12} fill={n <= a.nota ? "#E8A23D" : "none"} color="#E8A23D" />)}
                       </div>
@@ -6897,6 +7047,7 @@ function AdminPanel() {
                         <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Nome</th>
                         <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>WhatsApp</th>
                         <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Data</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Documentos</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -6905,6 +7056,24 @@ function AdminPanel() {
                           <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{l.nome}</td>
                           <td className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.whatsapp}</td>
                           <td className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td className="font-body text-xs px-3 py-2" style={{ color: C.blue }}>
+                            {(l.documentos_urls || []).length === 0 ? (
+                              <span style={{ color: "#8896A6" }}>—</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="font-bold underline"
+                                onClick={async () => {
+                                  for (const caminho of l.documentos_urls) {
+                                    const { data, error } = await supabase.storage.from("documentos-fomento").createSignedUrl(caminho, 300);
+                                    if (!error && data?.signedUrl) window.open(data.signedUrl, "_blank");
+                                  }
+                                }}
+                              >
+                                Baixar ({l.documentos_urls.length})
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -8346,7 +8515,7 @@ function PublicidadeBanners() {
         const conteudo = (
           <picture>
             {b.imagem_mobile_url && <source media="(max-width: 640px)" srcSet={b.imagem_mobile_url} />}
-            <img loading="lazy" decoding="async" src={b.imagem_url} alt={b.titulo || "Publicidade"} className="w-full rounded-2xl object-cover" style={{ maxHeight: 180 }} />
+            <img loading="lazy" decoding="async" src={b.imagem_url} alt={b.titulo || "Publicidade"} className="w-full rounded-2xl object-cover h-44 sm:h-64 md:h-80 lg:h-96" />
           </picture>
         );
         return b.link_url ? (
@@ -8363,15 +8532,19 @@ function PublicidadeBanners() {
 // Capa de comerciante em destaque — espaço de publicidade paga, com rótulo
 // "Publicidade" visível (transparência com quem visita o site).
 // ---------------------------------------------------------------------------
-function CapaComercianteDestaque() {
+function CapaComercianteDestaque({ empresas, onAbrir }) {
   const [indice, setIndice] = useState(0);
+  const patrocinadas = (empresas || []).filter(patrocinadoAtivo);
 
   useEffect(() => {
-    const t = setInterval(() => setIndice((i) => (i + 1) % comerciantesPublicidade.length), 6000);
+    if (patrocinadas.length === 0) return;
+    const t = setInterval(() => setIndice((i) => (i + 1) % patrocinadas.length), 6000);
     return () => clearInterval(t);
-  }, []);
+  }, [patrocinadas.length]);
 
-  const c = comerciantesPublicidade[indice];
+  if (patrocinadas.length === 0) return null;
+  const c = patrocinadas[indice % patrocinadas.length];
+  const linkWhats = c.whatsapp ? `https://wa.me/55${String(c.whatsapp).replace(/\D/g, "")}` : null;
 
   return (
     <section className="max-w-6xl mx-auto px-4 md:px-6 py-4">
@@ -8393,38 +8566,46 @@ function CapaComercianteDestaque() {
               Publicidade
             </span>
 
-            <div className="w-24 h-24 rounded-2xl flex items-center justify-center shrink-0" style={{ background: "rgba(255,255,255,0.1)" }}>
-              <Building2 size={42} color="#fff" />
+            <div className="w-24 h-24 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+              {c.logo_url ? (
+                <img loading="lazy" decoding="async" src={c.logo_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <Building2 size={42} color="#fff" />
+              )}
             </div>
 
             <div className="flex-1 text-center sm:text-left">
               <div className="flex items-center gap-2 justify-center sm:justify-start mb-1">
                 <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.amber, color: C.blueDeep }}>
-                  {c.categoria}
+                  {c.cat}
                 </span>
-                <span className="font-body text-[11px] text-white/60">{c.bairro}, Ivatuba</span>
+                <span className="font-body text-[11px] text-white/60">{c.bairro ? `${c.bairro}, ` : ""}Ivatuba</span>
               </div>
               <p className="font-display font-extrabold text-white text-2xl md:text-3xl">{c.nome}</p>
-              <p className="font-body text-sm text-white/75 mt-1.5 max-w-md">{c.chamada}</p>
+              {c.endereco && <p className="font-body text-sm text-white/75 mt-1.5 max-w-md">{c.endereco}</p>}
             </div>
 
             <div className="flex sm:flex-col gap-2 shrink-0">
-              <button className="glow-btn font-body font-bold text-xs rounded-xl px-5 py-3 flex items-center justify-center gap-1.5 text-white" style={{ background: "#25A85B" }}>
+              <a href={linkWhats || "#"} target={linkWhats ? "_blank" : undefined} rel="noreferrer"
+                className="glow-btn font-body font-bold text-xs rounded-xl px-5 py-3 flex items-center justify-center gap-1.5 text-white"
+                style={{ background: "#25A85B", opacity: linkWhats ? 1 : 0.5 }}>
                 <MessageCircle size={14} /> WhatsApp
-              </button>
-              <button className="font-body font-bold text-xs rounded-xl px-5 py-3 flex items-center justify-center gap-1.5 border border-white/25 text-white">
+              </a>
+              <button onClick={() => onAbrir?.(c)} className="font-body font-bold text-xs rounded-xl px-5 py-3 flex items-center justify-center gap-1.5 border border-white/25 text-white">
                 Ver perfil
               </button>
             </div>
           </div>
 
-          <div className="relative flex justify-center gap-1.5 pb-4">
-            {comerciantesPublicidade.map((_, i) => (
-              <button key={i} onClick={() => setIndice(i)} aria-label={`Anunciante ${i + 1}`}
-                className="rounded-full transition-all"
-                style={{ width: i === indice ? 18 : 6, height: 6, background: i === indice ? C.amber : "rgba(255,255,255,0.3)" }} />
-            ))}
-          </div>
+          {patrocinadas.length > 1 && (
+            <div className="relative flex justify-center gap-1.5 pb-4">
+              {patrocinadas.map((_, i) => (
+                <button key={i} onClick={() => setIndice(i)} aria-label={`Anunciante ${i + 1}`}
+                  className="rounded-full transition-all"
+                  style={{ width: i === indice ? 18 : 6, height: 6, background: i === indice ? C.amber : "rgba(255,255,255,0.3)" }} />
+              ))}
+            </div>
+          )}
         </div>
       </Reveal>
     </section>
@@ -8493,7 +8674,7 @@ function BannerPromocoes() {
               <p className="font-body text-[11px] text-white/60 mt-1">Válida até {promo.validoAte}</p>
 
               <div className="flex items-center gap-3 mt-5">
-                <a href={linkWhats || "#"} target={linkWhats ? "_blank" : undefined} rel="noreferrer" className="glow-btn font-body font-bold text-sm rounded-xl px-5 py-2.5 flex items-center gap-2" style={{ background: "#25A85B", color: "#fff" }}>
+                <a href={linkWhats || "#"} target={linkWhats ? "_blank" : undefined} rel="noreferrer" className="glow-btn font-body font-bold text-sm rounded-xl px-5 py-2.5 flex items-center gap-2" style={{ background: "#25A85B", color: "#fff", opacity: linkWhats ? 1 : 0.5 }}>
                   <MessageCircle size={15} /> Chamar no WhatsApp
                 </a>
                 <div className="flex gap-1.5">
@@ -8783,6 +8964,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   // Cadastro de interessados na Fomento Paraná — nome + WhatsApp.
   const [fomentoNome, setFomentoNome] = useState("");
   const [fomentoWhatsapp, setFomentoWhatsapp] = useState("");
+  const [fomentoDocumentos, setFomentoDocumentos] = useState([]);
   const [enviandoFomento, setEnviandoFomento] = useState(false);
   const [fomentoEnviado, setFomentoEnviado] = useState(false);
   const [erroFomento, setErroFomento] = useState("");
@@ -8794,11 +8976,19 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (!supabaseConfigurado) { setFomentoEnviado(true); return; }
     setEnviandoFomento(true);
     try {
-      const { error } = await supabase.from("fomento_leads").insert({ nome: fomentoNome, whatsapp: fomentoWhatsapp });
+      const pastaEnvio = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const caminhos = [];
+      for (const arquivo of fomentoDocumentos) {
+        const caminho = `${pastaEnvio}/${arquivo.name}`;
+        const { error: erroUpload } = await supabase.storage.from("documentos-fomento").upload(caminho, arquivo);
+        if (!erroUpload) caminhos.push(caminho);
+      }
+      const { error } = await supabase.from("fomento_leads").insert({ nome: fomentoNome, whatsapp: fomentoWhatsapp, documentos_urls: caminhos });
       if (error) throw error;
       setFomentoEnviado(true);
       setFomentoNome("");
       setFomentoWhatsapp("");
+      setFomentoDocumentos([]);
     } catch (err) {
       setErroFomento(err.message || "Não consegui enviar agora. Tente de novo.");
     } finally {
@@ -8984,6 +9174,11 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   const [promptInstalacao, setPromptInstalacao] = useState(null);
   const [mostrarComoInstalarIOS, setMostrarComoInstalarIOS] = useState(false);
   const ehIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
+  // Navegador embutido do WhatsApp/Instagram/Facebook — nenhum deles suporta
+  // instalar PWA (independente da marca do celular). É a causa mais comum de
+  // "não consigo instalar": a pessoa abriu o link direto de dentro do app de
+  // mensagem, em vez de num navegador de verdade.
+  const ehWebviewEmbutido = typeof navigator !== "undefined" && /FBAN|FBAV|Instagram|WhatsApp|Line\//i.test(navigator.userAgent);
 
   useEffect(() => {
     const aoTerBeforeInstall = (e) => {
@@ -9223,7 +9418,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (!supabaseConfigurado) return;
     supabase
       .from("empresas")
-      .select("id, nome, categoria, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, logo_url, facebook, site, destaque, patrocinado, patrocinado_ate, whatsapp, instagram, endereco, google_maps_url, email, criado_em, fotos_urls, horario_funcionamento, plano_premium, plano_premium_ate")
+      .select("id, nome, categoria, regiao, bairro, cidade, rating, cartao_servidor:aceita_cartao_servidor, itens:visualizacoes, banner_url, logo_url, facebook, site, destaque, patrocinado, patrocinado_ate, whatsapp, instagram, endereco, google_maps_url, email, criado_em, fotos_urls, horario_funcionamento, plano_premium, plano_premium_ate")
       .eq("status", "aprovada")
       .order("destaque", { ascending: false })
       .order("visualizacoes", { ascending: false })
@@ -9231,7 +9426,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       .then(({ data, error }) => {
         if (!error && data && data.length > 0) {
           setEmpresasReais(data.map((d) => ({
-            id: d.id, nome: d.nome, cat: d.categoria, bairro: d.bairro, cidade: d.cidade,
+            id: d.id, nome: d.nome, cat: d.categoria, regiao: d.regiao || "ivatuba", bairro: d.bairro, cidade: d.cidade,
             rating: d.rating ?? "—", cartaoServidor: !!d.cartao_servidor, itens: d.itens ?? 0,
             banner_url: d.banner_url, logo_url: d.logo_url, facebook: d.facebook, site: d.site, destaque: d.destaque, patrocinado: !!d.patrocinado, patrocinado_ate: d.patrocinado_ate || null, whatsapp: d.whatsapp,
             instagram: d.instagram, endereco: d.endereco, google_maps_url: d.google_maps_url, email: d.email, criado_em: d.criado_em,
@@ -9638,7 +9833,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
 
       <PublicidadeBanners />
       <div ref={promocoesSecaoRef}><BannerPromocoes /></div>
-      <CapaComercianteDestaque />
+      <CapaComercianteDestaque empresas={listaBase} onAbrir={abrirEmpresa} />
 
       {/* Categorias */}
       <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
@@ -9647,7 +9842,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         </Reveal>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {(categoriasReaisHome ?? categorias).map((c, i) => (
-            <Reveal key={c.nome} delay={i * 60}><CategoryCard cat={c} /></Reveal>
+            <Reveal key={c.nome} delay={i * 60}><CategoryCard cat={c} onClick={() => irParaCategoria(c.nome)} /></Reveal>
           ))}
         </div>
       </section>
@@ -9726,6 +9921,43 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
                     {siteConfig?.fomento_texto || "Precisa de crédito para sua empresa? Conheça as linhas de crédito da Fomento Paraná, agência oficial do Governo do Paraná."}
                   </p>
 
+                  <details className="rounded-xl border" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                    <summary className="font-body text-xs font-bold px-3 py-2.5 cursor-pointer" style={{ color: C.blue }}>
+                      Quanto posso pedir e quais documentos preciso? (clique para ver)
+                    </summary>
+                    <div className="px-3 pb-3 flex flex-col gap-3">
+                      <div>
+                        <p className="font-body text-xs font-bold mb-1" style={{ color: C.ink }}>Quanto posso solicitar (regras gerais):</p>
+                        <ul className="font-body text-xs list-disc list-inside space-y-0.5" style={{ color: "#5C7186" }}>
+                          <li>Trabalha sem CNPJ (informal), há menos de 1 ano: até R$ 5 mil</li>
+                          <li>Trabalha sem CNPJ (informal), há mais de 1 ano: até R$ 10 mil (com avalista)</li>
+                          <li>MEI com menos de 1 ano de CNPJ: até R$ 5 mil</li>
+                          <li>MEI de 1 a 3 anos de CNPJ: até R$ 10 a R$ 20 mil (com avalista)</li>
+                          <li>MEI com mais de 3 anos de CNPJ: até R$ 6 mil no 1º empréstimo, até R$ 12,5 mil a partir do 2º</li>
+                          <li>Microempresa (fatura até R$ 360 mil/ano): faixas parecidas com as do MEI acima</li>
+                          <li>Empresa que fatura mais de R$ 130 mil/ano e quer pedir mais de R$ 20 mil: análise à parte, direto com o agente de crédito</li>
+                        </ul>
+                        <p className="font-body text-[10px] mt-1" style={{ color: "#8896A6" }}>
+                          Isso é um resumo geral — o valor exato aprovado depende da análise da Fomento Paraná. Fale com o agente de crédito para confirmar o seu caso.
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-body text-xs font-bold mb-1" style={{ color: C.ink }}>Documentos que costumam ser pedidos:</p>
+                        <ul className="font-body text-xs list-disc list-inside space-y-0.5" style={{ color: "#5C7186" }}>
+                          <li>Documento de identidade (RG, CNH) — seu e do cônjuge, se tiver</li>
+                          <li>Comprovante de endereço seu e da empresa (conta de luz, água, internet — vencida há no máximo 60 dias)</li>
+                          <li>Comprovante de renda (holerite, Imposto de Renda, DASN se for MEI, ou declaração de autônomo)</li>
+                          <li>Se tiver CNPJ: Certificado de MEI, Requerimento de Empresário ou Contrato Social</li>
+                          <li>Print ou extrato da conta bancária com nome, banco, agência e conta</li>
+                          <li>Se precisar de avalista: os mesmos documentos acima também dele/dela</li>
+                        </ul>
+                        <p className="font-body text-[10px] mt-1" style={{ color: "#8896A6" }}>
+                          A Fomento Paraná pode pedir outros documentos, conforme o seu caso. Você já pode anexar o que tiver no formulário abaixo.
+                        </p>
+                      </div>
+                    </div>
+                  </details>
+
                   <div className="flex flex-wrap gap-2">
                     {siteConfig?.fomento_link && (
                       <a href={siteConfig.fomento_link} target="_blank" rel="noopener noreferrer"
@@ -9758,6 +9990,15 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
                             {enviandoFomento ? "Enviando..." : "Cadastrar"}
                           </button>
                         </div>
+                        <label className="font-body text-xs font-semibold flex items-center gap-2 cursor-pointer w-fit" style={{ color: C.blue }}>
+                          <FileText size={14} />
+                          {fomentoDocumentos.length > 0 ? `${fomentoDocumentos.length} documento(s) anexado(s)` : "Anexar documentos (opcional)"}
+                          <input type="file" accept="application/pdf,image/*" multiple hidden
+                            onChange={(e) => setFomentoDocumentos(Array.from(e.target.files || []))} />
+                        </label>
+                        <p className="font-body text-[10px]" style={{ color: "#8896A6" }}>
+                          Seus documentos ficam guardados só para a Fomento Paraná analisar — não aparecem publicamente no site.
+                        </p>
                         {erroFomento && <p className="font-body text-[11px]" style={{ color: "#B4462F" }}>{erroFomento}</p>}
                       </form>
                     )}
@@ -10001,7 +10242,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       <section ref={empresasSecaoRef} className="py-12" style={{ background: C.blueTint2 }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="flex items-end justify-between gap-3 flex-wrap">
-            <Reveal><SectionHeader eyebrow="Vitrine local" title="Empresas em destaque" linkLabel="Ver mapa de empresas" /></Reveal>
+            <Reveal><SectionHeader eyebrow="Vitrine local" title="Empresas em destaque" linkLabel="Ver mapa de empresas" onLinkClick={() => window.open("https://www.google.com/maps/search/com%C3%A9rcio+Ivatuba+PR", "_blank")} /></Reveal>
             <select value={ordenacaoEmpresas} onChange={(e) => setOrdenacaoEmpresas(e.target.value)}
               className="font-body text-xs border rounded-lg px-3 py-2 outline-none bg-white mb-1" style={{ borderColor: C.line, color: "#425A70" }}>
               <option value="recentes">Mais recentes</option>
@@ -10035,7 +10276,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       {/* Produtos em destaque */}
       <section ref={produtosSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
         <div className="flex items-end justify-between gap-3 flex-wrap">
-          <Reveal><SectionHeader eyebrow="Ofertas" title="Produtos em destaque" linkLabel="Ver todos" /></Reveal>
+          <Reveal><SectionHeader eyebrow="Ofertas" title="Produtos em destaque" linkLabel="Ver todos" onLinkClick={() => setQtdProdutosVisiveis(produtosFiltrados.length)} /></Reveal>
           {(produtosReais ?? []).length > 0 && (
             <div className="flex items-center gap-2 mb-1">
               <input value={queryProdutos} onChange={(e) => setQueryProdutos(e.target.value)} placeholder="Buscar produto..."
@@ -10078,7 +10319,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       <section ref={vagasSecaoRef} className="py-12" style={{ background: C.blueTint2 }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="flex items-end justify-between gap-3 flex-wrap">
-            <Reveal><SectionHeader eyebrow="Trabalhe em Ivatuba" title="Vagas de emprego" linkLabel="Ver todas as vagas" /></Reveal>
+            <Reveal><SectionHeader eyebrow="Trabalhe em Ivatuba" title="Vagas de emprego" linkLabel="Ver todas as vagas" onLinkClick={() => setQtdVagasVisiveis(vagasFiltradas.length)} /></Reveal>
             {(vagasReais ?? []).length > 0 && (
               <div className="flex items-center gap-2 mb-1">
                 <input value={queryVagas} onChange={(e) => setQueryVagas(e.target.value)} placeholder="Buscar cargo ou cidade..."
@@ -10356,18 +10597,34 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.55)" }} onClick={() => setMostrarComoInstalarIOS(false)}>
           <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl p-6">
             <p className="font-display font-bold text-base" style={{ color: C.ink }}>Como instalar no seu celular</p>
-            {ehIOS ? (
+            {ehWebviewEmbutido ? (
+              <>
+                <p className="font-body text-xs mt-2 rounded-lg p-2.5" style={{ background: "#FBEAE5", color: "#B4462F" }}>
+                  Você abriu esse link direto pelo WhatsApp/Instagram — esses aplicativos não deixam instalar. Abra no navegador de verdade primeiro.
+                </p>
+                <ol className="font-body text-sm mt-3 flex flex-col gap-2 list-decimal list-inside" style={{ color: "#425A70" }}>
+                  <li>Toque nos <strong>três pontinhos</strong> (⋮) no canto superior da tela.</li>
+                  <li>Escolha <strong>"Abrir no navegador"</strong> ou <strong>"Abrir no Chrome"</strong>.</li>
+                  <li>Lá, toque em "Instalar aplicativo" de novo.</li>
+                </ol>
+              </>
+            ) : ehIOS ? (
               <ol className="font-body text-sm mt-3 flex flex-col gap-2 list-decimal list-inside" style={{ color: "#425A70" }}>
                 <li>Toque no ícone de <strong>compartilhar</strong> (quadrado com seta) na barra do Safari.</li>
                 <li>Role e toque em <strong>"Adicionar à Tela de Início"</strong>.</li>
                 <li>Toque em <strong>"Adicionar"</strong> no canto superior direito.</li>
               </ol>
             ) : (
-              <ol className="font-body text-sm mt-3 flex flex-col gap-2 list-decimal list-inside" style={{ color: "#425A70" }}>
-                <li>Abra o menu do seu navegador (geralmente os três pontinhos, no canto superior).</li>
-                <li>Procure a opção <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</li>
-                <li>Confirme — o ícone aparece na sua tela como um app normal.</li>
-              </ol>
+              <>
+                <ol className="font-body text-sm mt-3 flex flex-col gap-2 list-decimal list-inside" style={{ color: "#425A70" }}>
+                  <li>Abra o menu do seu navegador (geralmente os três pontinhos, no canto superior).</li>
+                  <li>Procure a opção <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</li>
+                  <li>Confirme — o ícone aparece na sua tela como um app normal.</li>
+                </ol>
+                <p className="font-body text-[11px] mt-2" style={{ color: "#8896A6" }}>
+                  Não achou essa opção? Alguns celulares (ex: Xiaomi/MIUI) bloqueiam isso no navegador de fábrica — abra o link no <strong>Google Chrome</strong> e tente de novo.
+                </p>
+              </>
             )}
             <button onClick={() => setMostrarComoInstalarIOS(false)} className="glow-btn font-body font-bold text-sm text-white rounded-xl py-2.5 mt-5 w-full" style={{ background: C.blue }}>
               Entendi
@@ -10712,6 +10969,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
             whatsapp: form.get("whatsapp"),
             instagram: form.get("instagram") || null,
             endereco: form.get("endereco") || null,
+            regiao: form.get("regiao") || "ivatuba",
             google_maps_url: form.get("googleMaps") || null,
             email: form.get("email") || null,
             cpf: form.get("cpf") || null,
@@ -10979,6 +11237,13 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                 Endereço
                 <input name="endereco" placeholder="Rua, número, bairro" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                Região
+                <select name="regiao" defaultValue="ivatuba" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                  <option value="ivatuba">Ivatuba (Centro)</option>
+                  <option value="bairro_refugio">Bairro do Refúgio</option>
+                </select>
               </label>
               <label className="font-body text-xs font-semibold flex items-center gap-2 cursor-pointer" style={{ color: C.blue }}>
                 <Camera size={14} /> {logoEmpresa ? `Logo: ${logoEmpresa.name}` : "Enviar logo da empresa (opcional)"}
@@ -11500,8 +11765,70 @@ function PaginaMural({ perfil }) {
 // Aba Turismo — história da cidade + roteiro sugerido pelos pontos
 // turísticos, na ordem definida pelo admin. FASE 42.
 // ---------------------------------------------------------------------------
+// Formulário de avaliação de um ponto turístico — nome, nota em estrelas e
+// comentário opcional. Igual ao padrão já usado para empresas, mas ligado a
+// `ponto_turistico_id` em vez de `empresa_id`.
+function AvaliacaoTurismoForm({ pontoId, onEnviado }) {
+  const [aberto, setAberto] = useState(false);
+  const [nome, setNome] = useState("");
+  const [nota, setNota] = useState(5);
+  const [comentario, setComentario] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    setErro("");
+    if (!nome.trim()) { setErro("Diga seu nome."); return; }
+    setEnviando(true);
+    const { error } = await supabase.from("avaliacoes").insert({
+      ponto_turistico_id: pontoId,
+      nome: nome.trim(),
+      nota,
+      comentario: comentario.trim() || null,
+      status: "aprovado",
+    });
+    setEnviando(false);
+    if (error) { setErro(error.message || "Não consegui enviar agora."); return; }
+    setNome(""); setNota(5); setComentario(""); setAberto(false);
+    onEnviado?.();
+  };
+
+  if (!aberto) {
+    return (
+      <button type="button" onClick={() => setAberto(true)} className="font-body text-[11px] font-bold flex items-center gap-1 mt-2" style={{ color: C.blue }}>
+        <Star size={11} /> Avaliar / deixar depoimento
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={enviar} className="mt-2 rounded-xl border p-3 flex flex-col gap-2" style={{ borderColor: C.line, background: C.blueTint2 }}>
+      <div className="flex items-center gap-2">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" onClick={() => setNota(n)}>
+            <Star size={16} fill={n <= nota ? "#E8A23D" : "none"} color="#E8A23D" />
+          </button>
+        ))}
+      </div>
+      <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" className="font-body text-xs border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+      <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} placeholder="Conte sua experiência (opcional)" rows={2} className="font-body text-xs border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+      {erro && <p className="font-body text-[11px]" style={{ color: "#B4462F" }}>{erro}</p>}
+      <div className="flex gap-2">
+        <button type="submit" disabled={enviando} className="font-body text-xs font-bold rounded-lg px-4 py-2 text-white disabled:opacity-60" style={{ background: C.blue }}>
+          {enviando ? "Enviando..." : "Enviar"}
+        </button>
+        <button type="button" onClick={() => setAberto(false)} className="font-body text-xs font-bold rounded-lg px-4 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function PaginaTurismo({ siteConfig }) {
   const [pontos, setPontos] = useState(null);
+  const [avaliacoesPorPonto, setAvaliacoesPorPonto] = useState({});
 
   useEffect(() => {
     document.title = "Turismo — Conecta Comércio";
@@ -11519,6 +11846,21 @@ function PaginaTurismo({ siteConfig }) {
       setPontos(error ? [] : data || []);
     });
   }, []);
+
+  const carregarAvaliacoesTurismo = () => {
+    if (!supabaseConfigurado) return;
+    supabase.from("avaliacoes").select("*").not("ponto_turistico_id", "is", null).order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (error) return;
+      const porPonto = {};
+      (data || []).forEach((a) => {
+        if (!porPonto[a.ponto_turistico_id]) porPonto[a.ponto_turistico_id] = [];
+        porPonto[a.ponto_turistico_id].push(a);
+      });
+      setAvaliacoesPorPonto(porPonto);
+    });
+  };
+
+  useEffect(() => { carregarAvaliacoesTurismo(); }, []);
 
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-6 py-10">
@@ -11558,7 +11900,14 @@ function PaginaTurismo({ siteConfig }) {
               <div className="rounded-2xl border p-4 bg-white flex-1 mb-2 flex gap-3" style={{ borderColor: C.line }}>
                 {p.foto_url && <img loading="lazy" decoding="async" src={p.foto_url} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />}
                 <div className="min-w-0">
-                  <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
+                  <p className="font-display font-bold text-sm flex items-center gap-1.5" style={{ color: C.ink }}>
+                    {p.nome}
+                    {p.destaque && (
+                      <span className="flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ background: C.amber, color: C.blueDeep }}>
+                        <Star size={10} fill={C.blueDeep} /> Destaque
+                      </span>
+                    )}
+                  </p>
                   {p.categoria && <p className="font-body text-[11px] font-semibold" style={{ color: C.blue }}>{p.categoria}</p>}
                   {p.descricao && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{p.descricao}</p>}
                   <div className="flex flex-wrap gap-3 mt-1.5">
@@ -11569,6 +11918,29 @@ function PaginaTurismo({ siteConfig }) {
                       </a>
                     )}
                   </div>
+
+                  {(avaliacoesPorPonto[p.id]?.length ?? 0) > 0 && (
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((n) => {
+                          const media = avaliacoesPorPonto[p.id].reduce((s, a) => s + a.nota, 0) / avaliacoesPorPonto[p.id].length;
+                          return <Star key={n} size={11} fill={n <= Math.round(media) ? "#E8A23D" : "none"} color="#E8A23D" />;
+                        })}
+                      </div>
+                      <span className="font-body text-[11px]" style={{ color: "#8896A6" }}>
+                        ({avaliacoesPorPonto[p.id].length} {avaliacoesPorPonto[p.id].length === 1 ? "avaliação" : "avaliações"})
+                      </span>
+                    </div>
+                  )}
+
+                  {(avaliacoesPorPonto[p.id] || []).slice(0, 3).map((a) => (
+                    <div key={a.id} className="mt-1.5 pl-2 border-l-2" style={{ borderColor: C.line }}>
+                      <p className="font-body text-[11px] font-bold" style={{ color: C.ink }}>{a.nome}</p>
+                      {a.comentario && <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{a.comentario}</p>}
+                    </div>
+                  ))}
+
+                  <AvaliacaoTurismoForm pontoId={p.id} onEnviado={carregarAvaliacoesTurismo} />
                 </div>
               </div>
             </div>
@@ -12368,6 +12740,7 @@ export default function ConectaComercio() {
         </div>
       </div>
 
+      <div key={modo} className="page-transition">
       {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} siteConfig={siteConfig} sessao={sessao} perfil={perfil} />}
       {modo === "estatisticas" && <EstatisticasPublicas />}
       {modo === "turismo" && <PaginaTurismo siteConfig={siteConfig} />}
@@ -12404,6 +12777,7 @@ export default function ConectaComercio() {
           <AcessoRestrito tipo="empresario" onEntrar={() => irPara(modos.find((m) => m.id === "empresario"))} />
         )
       )}
+      </div>
 
       <BotaoCompartilhar />
       <ChatWidget />
