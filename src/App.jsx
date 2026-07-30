@@ -1422,7 +1422,12 @@ function CursoCard({ c }) {
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.titulo}</p>
+        <p className="font-display font-bold text-sm flex items-center gap-1.5" style={{ color: C.ink }}>
+          {c.titulo}
+          {c.data_inicio && c.data_inicio < new Date().toISOString().slice(0, 10) && (
+            <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#EAF0F7", color: "#5C7186" }}>Já aconteceu</span>
+          )}
+        </p>
         <p className="font-body text-xs mt-1 flex items-center gap-1" style={{ color: "#5C7186" }}>
           <MapPin size={11} /> {local}{c.professor ? ` · ${c.professor}` : ""}{c.carga_horaria ? ` · ${c.carga_horaria}` : ""}
         </p>
@@ -8827,9 +8832,16 @@ function CalendarioEventos() {
   const eventosDoDia = diaSelecionado ? (porDia[chaveDia(diaSelecionado)] || []) : null;
 
   const proximosEventos = [...lista]
-    .filter((ev) => ev.data_inicio)
+    .filter((ev) => ev.data_inicio && ev.data_inicio >= hojeChave)
     .sort((a, b) => a.data_inicio.localeCompare(b.data_inicio))
     .slice(0, 5);
+
+  const eventosPassados = [...lista]
+    .filter((ev) => ev.data_inicio && ev.data_inicio < hojeChave)
+    .sort((a, b) => b.data_inicio.localeCompare(a.data_inicio))
+    .slice(0, 5);
+
+  const [mostrarPassados, setMostrarPassados] = useState(false);
 
   const rotuloTipo = { feira: "Feira", curso: "Curso", institucional: "Institucional", outro: "Evento" };
   const corTipo = { feira: C.amberDark, curso: C.blue, institucional: C.blueDeep, outro: "#5C7186" };
@@ -8886,14 +8898,23 @@ function CalendarioEventos() {
       </div>
 
       <div className="mt-4 pt-4 border-t" style={{ borderColor: C.line }}>
-        <p className="font-body text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#5C7186" }}>
-          {eventosDoDia ? `Eventos do dia ${diaSelecionado}` : "Próximos eventos"}
-        </p>
-        <div className="flex flex-col gap-2.5">
-          {(eventosDoDia ?? proximosEventos).length === 0 && (
-            <p className="font-body text-xs" style={{ color: "#B7C6D6" }}>Nenhum evento nessa data.</p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="font-body text-[11px] font-bold uppercase tracking-wide" style={{ color: "#5C7186" }}>
+            {eventosDoDia ? `Eventos do dia ${diaSelecionado}` : mostrarPassados ? "Eventos que já aconteceram" : "Próximos eventos"}
+          </p>
+          {!eventosDoDia && (
+            <button type="button" onClick={() => setMostrarPassados((v) => !v)} className="font-body text-[10px] font-bold" style={{ color: C.blue }}>
+              {mostrarPassados ? "Ver próximos" : "Ver já aconteceram"}
+            </button>
           )}
-          {(eventosDoDia ?? proximosEventos).map((ev) => (
+        </div>
+        <div className="flex flex-col gap-2.5">
+          {(eventosDoDia ?? (mostrarPassados ? eventosPassados : proximosEventos)).length === 0 && (
+            <p className="font-body text-xs" style={{ color: "#B7C6D6" }}>
+              {mostrarPassados && !eventosDoDia ? "Nenhum evento passado registrado." : "Nenhum evento nessa data."}
+            </p>
+          )}
+          {(eventosDoDia ?? (mostrarPassados ? eventosPassados : proximosEventos)).map((ev) => (
             <div key={ev.id} className="flex items-start gap-2.5">
               {ev.banner_url ? (
                 <img loading="lazy" decoding="async" src={ev.banner_url} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
@@ -8903,6 +8924,9 @@ function CalendarioEventos() {
               <div className="min-w-0 flex-1">
                 <p className="font-body text-xs font-semibold truncate flex items-center gap-1.5" style={{ color: C.ink }}>
                   {ev.titulo}
+                  {ev.data_inicio && ev.data_inicio < hojeChave && (
+                    <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#EAF0F7", color: "#5C7186" }}>Já aconteceu</span>
+                  )}
                   {ev.status === "cancelado" && <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FBEAE5", color: "#B4462F" }}>Cancelado</span>}
                   {ev.status === "adiado" && <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FFF6E9", color: "#8A5A12" }}>Adiado</span>}
                 </p>
