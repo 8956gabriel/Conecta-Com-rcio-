@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "br.app.conectacomercio.twa",
+        "sha256_cert_fingerprints": ["97:42:6D:EB:92:A4:4B:49:E1:76:FB:4D:5D:20:72:A3:97:15:2D:CB:CD:C4:CF:33:01:D4:25:C7:01:B4:77:8A"]
+      }
+    }]
