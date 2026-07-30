@@ -316,8 +316,16 @@ textarea:focus-visible, [tabindex]:focus-visible {
 @keyframes page-transition-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .page-transition { animation: page-transition-in .35s cubic-bezier(.2,.8,.2,1) both; }
 
+.nav-link { position: relative; transition: color .2s ease; }
+.nav-link::after { content: ""; position: absolute; left: 0; bottom: -4px; width: 0; height: 2px; border-radius: 2px; background: currentColor; transition: width .25s cubic-bezier(.2,.8,.2,1); }
+.nav-link:hover { color: #0A5AA8 !important; }
+.nav-link:hover::after { width: 100%; }
+
+@keyframes mobile-menu-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+.mobile-menu-in { animation: mobile-menu-in .25s cubic-bezier(.2,.8,.2,1) both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .blob, .marquee-track, .reveal, .pulse-dot, .ring-pulse, .grad-text, .stamp, .promo-slide, .tech-grid, .scan-line, .price-pop, .hero-in-left, .hero-in-right, .page-transition { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
+  .blob, .marquee-track, .reveal, .pulse-dot, .ring-pulse, .grad-text, .stamp, .promo-slide, .tech-grid, .scan-line, .price-pop, .hero-in-left, .hero-in-right, .page-transition, .nav-link::after, .mobile-menu-in { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
 }
 `;
 
@@ -662,7 +670,7 @@ function CategoryCard({ cat, onClick }) {
   return (
     <button type="button" onClick={onClick} className="glow-card group flex flex-col items-start gap-3 p-4 rounded-2xl border text-left"
       style={{ borderColor: C.line, background: "#fff" }}>
-      <span className="flex items-center justify-center w-11 h-11 rounded-xl transition-colors"
+      <span className="flex items-center justify-center w-11 h-11 rounded-xl transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110"
         style={{ background: `${cor}1a`, color: cor }}>
         <Icon size={20} />
       </span>
@@ -1129,7 +1137,7 @@ function PrestadorCard({ p }) {
             <MapPin size={11} /> {p.endereco}
           </p>
         )}
-        <button type="button" onClick={() => setAgendaAberta(true)} className="font-body text-xs font-bold flex items-center justify-center gap-1.5 rounded-lg py-2 border mt-1" style={{ borderColor: C.line, color: C.blue }}>
+        <button type="button" onClick={() => setAgendaAberta(true)} className="glow-btn font-body text-xs font-bold flex items-center justify-center gap-1.5 rounded-lg py-2 border mt-1" style={{ borderColor: C.line, color: C.blue }}>
           <Clock size={13} /> Agendar horário
         </button>
         <div className="mt-auto flex gap-2 pt-2">
@@ -1290,7 +1298,7 @@ function ProdutoCard({ p, onAdicionarCarrinho, fav, onFav }) {
         )}
         {linkWhats ? (
           <a href={linkWhats} target="_blank" rel="noopener noreferrer"
-            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold font-body"
+            className="glow-btn mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold font-body"
             style={{ background: C.blueTint, color: C.blue }}>
             <MessageCircle size={13} /> Chamar no WhatsApp
           </a>
@@ -1324,7 +1332,7 @@ function VagaCard({ v }) {
       {v.beneficios && <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{v.beneficios}</p>}
       {prazoFormatado && <p className="font-body text-[11px] font-semibold" style={{ color: "#B4462F" }}>Inscrições até {prazoFormatado}</p>}
       {linkWhats ? (
-        <a href={linkWhats} target="_blank" rel="noopener noreferrer" className="mt-1 w-full text-center rounded-lg py-2 text-xs font-bold font-body text-white" style={{ background: C.blue }}>
+        <a href={linkWhats} target="_blank" rel="noopener noreferrer" className="glow-btn mt-1 w-full text-center rounded-lg py-2 text-xs font-bold font-body text-white" style={{ background: C.blue }}>
           Candidatar-se
         </a>
       ) : (
@@ -9627,7 +9635,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
 
           <nav className="hidden md:flex items-center gap-6 ml-4">
             {nav.map((n) => (
-              <a key={n} href="#" onClick={(e) => { e.preventDefault(); irParaSecaoNav(n); }} className="font-body text-sm font-semibold cursor-pointer" style={{ color: "#425A70" }}>{n}</a>
+              <a key={n} href="#" onClick={(e) => { e.preventDefault(); irParaSecaoNav(n); }} className="nav-link font-body text-sm font-semibold cursor-pointer" style={{ color: "#425A70" }}>{n}</a>
             ))}
           </nav>
 
@@ -9661,7 +9669,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             </div>
 
             <div className="hidden md:flex items-center gap-3">
-              <button onClick={() => onAuth?.("entrar")} className="font-body text-sm font-semibold px-4 py-2 rounded-lg border" style={{ borderColor: C.blue, color: C.blue }}>
+              <button onClick={() => onAuth?.("entrar")} className="glow-btn font-body text-sm font-semibold px-4 py-2 rounded-lg border" style={{ borderColor: C.blue, color: C.blue }}>
                 Entrar
               </button>
               <button onClick={() => onAuth?.("cadastro")} className="glow-btn font-body text-sm font-bold px-4 py-2 rounded-lg text-white" style={{ background: C.blue }}>
@@ -9676,9 +9684,9 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         </div>
 
         {menuOpen && (
-          <div className="md:hidden border-t px-4 py-3 flex flex-col gap-3" style={{ borderColor: C.line }}>
+          <div className="mobile-menu-in md:hidden border-t px-4 py-3 flex flex-col gap-3" style={{ borderColor: C.line }}>
             {nav.map((n) => (
-              <a key={n} href="#" onClick={(e) => { e.preventDefault(); irParaSecaoNav(n); }} className="font-body text-sm font-semibold cursor-pointer" style={{ color: "#425A70" }}>{n}</a>
+              <a key={n} href="#" onClick={(e) => { e.preventDefault(); irParaSecaoNav(n); }} className="nav-link font-body text-sm font-semibold cursor-pointer" style={{ color: "#425A70" }}>{n}</a>
             ))}
             <button onClick={() => onAuth?.("cadastro")} className="font-body text-sm font-bold px-4 py-2 rounded-lg text-white text-center" style={{ background: C.blue }}>
               Cadastrar empresa
