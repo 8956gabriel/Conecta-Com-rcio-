@@ -1255,7 +1255,53 @@ function ModalAgendarHorario({ prestador, onFechar }) {
   );
 }
 
+function ModalDetalheProduto({ p, onFechar, onAdicionarCarrinho, podeAdicionar, precoCarrinho, linkWhats }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.55)" }} onClick={onFechar}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl max-h-[88vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white flex items-center justify-between px-5 pt-5 pb-3 border-b" style={{ borderColor: C.line }}>
+          <p className="font-display font-bold text-base truncate pr-2" style={{ color: C.ink }}>{p.nome}</p>
+          <button onClick={onFechar} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: C.blueTint2 }} aria-label="Fechar"><X size={16} color="#425A70" /></button>
+        </div>
+        <div className="p-5">
+          <div className="h-44 rounded-2xl flex items-center justify-center overflow-hidden mb-4" style={{ background: C.blueTint }}>
+            {p.foto_url ? <img loading="lazy" decoding="async" src={p.foto_url} alt={p.nome} className="w-full h-full object-cover" /> : <ShoppingBag size={32} color={C.blue} />}
+          </div>
+          <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.empresa}</p>
+          {p.precoPromocional ? (
+            <div className="flex items-center gap-2 mt-1">
+              <p className="font-display font-extrabold text-xl" style={{ color: "#B4462F" }}>{p.precoPromocional}</p>
+              <p className="font-body text-sm line-through" style={{ color: "#B7C6D6" }}>{p.preco}</p>
+            </div>
+          ) : (
+            <p className="font-display font-extrabold text-xl mt-1" style={{ color: C.blue }}>{p.preco}</p>
+          )}
+          {p.descricao && <p className="font-body text-sm mt-3" style={{ color: "#425A70" }}>{p.descricao}</p>}
+          {podeAdicionar && (
+            <button type="button" onClick={() => { onAdicionarCarrinho({
+              itemId: p.id, nome: p.nome, preco: precoCarrinho, foto_url: p.foto_url,
+              empresaId: p.empresaId, empresaNome: p.empresa, empresaWhatsapp: p.whatsapp, empresaChavePix: p.chavePix,
+            }); onFechar(); }}
+              className="mt-4 w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold font-body text-white glow-btn"
+              style={{ background: C.blue }}>
+              <ShoppingBag size={15} /> Adicionar ao carrinho
+            </button>
+          )}
+          {linkWhats && (
+            <a href={linkWhats} target="_blank" rel="noopener noreferrer"
+              className="glow-btn mt-2.5 w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold font-body"
+              style={{ background: C.blueTint, color: C.blue }}>
+              <MessageCircle size={15} /> Chamar no WhatsApp
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProdutoCard({ p, onAdicionarCarrinho, fav, onFav }) {
+  const [aberto, setAberto] = useState(false);
   const esgotado = p.estoque != null && Number(p.estoque) <= 0;
   const poucoEstoque = p.estoque != null && Number(p.estoque) > 0 && Number(p.estoque) <= 3;
   const linkWhats = p.whatsapp ? `https://wa.me/55${(p.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vi o produto "${p.nome}" no Conecta Comércio e queria saber mais.`)}` : null;
@@ -1263,10 +1309,10 @@ function ProdutoCard({ p, onAdicionarCarrinho, fav, onFav }) {
   const podeAdicionar = !esgotado && onAdicionarCarrinho && p.empresaId && precoCarrinho != null;
   return (
     <div className="glow-card rounded-2xl border bg-white overflow-hidden flex flex-col" style={{ borderColor: C.line }}>
-      <div className="h-28 flex items-center justify-center relative overflow-hidden" style={{ background: C.blueTint }}>
+      <button type="button" onClick={() => setAberto(true)} className="h-28 flex items-center justify-center relative overflow-hidden w-full text-left" style={{ background: C.blueTint }}>
         {p.foto_url ? <img loading="lazy" decoding="async" src={p.foto_url} alt={p.nome} className="w-full h-full object-cover" /> : <ShoppingBag size={26} color={C.blue} />}
         {onFav && (
-          <button type="button" onClick={onFav} className="absolute top-2 left-2 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center" aria-label={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"} aria-pressed={fav}>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onFav(); }} className="absolute top-2 left-2 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center" aria-label={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"} aria-pressed={fav}>
             <Heart size={13} fill={fav ? C.amber : "none"} color={fav ? C.amber : C.blueDark} />
           </button>
         )}
@@ -1276,10 +1322,12 @@ function ProdutoCard({ p, onAdicionarCarrinho, fav, onFav }) {
         {!esgotado && poucoEstoque && (
           <span className="absolute top-2 right-2 font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#FFF6E9", color: "#8A5A12" }}>Últimas unidades</span>
         )}
-      </div>
+      </button>
       <div className="p-3.5 flex flex-col gap-1">
-        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
-        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.empresa}</p>
+        <button type="button" onClick={() => setAberto(true)} className="text-left">
+          <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
+          <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.empresa}</p>
+        </button>
         {p.precoPromocional ? (
           <div className="flex items-center gap-2 mt-1">
             <p className="font-display font-extrabold text-base" style={{ color: "#B4462F" }}>{p.precoPromocional}</p>
@@ -1311,28 +1359,73 @@ function ProdutoCard({ p, onAdicionarCarrinho, fav, onFav }) {
           </span>
         )}
       </div>
+      {aberto && (
+        <ModalDetalheProduto p={p} onFechar={() => setAberto(false)} onAdicionarCarrinho={onAdicionarCarrinho}
+          podeAdicionar={podeAdicionar} precoCarrinho={precoCarrinho} linkWhats={linkWhats} />
+      )}
+    </div>
+  );
+}
+
+function ModalDetalheVaga({ v, onFechar, linkWhats, prazoFormatado }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.55)" }} onClick={onFechar}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl max-h-[88vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white flex items-center justify-between px-5 pt-5 pb-3 border-b" style={{ borderColor: C.line }}>
+          <p className="font-display font-bold text-base truncate pr-2" style={{ color: C.ink }}>{v.cargo}</p>
+          <button onClick={onFechar} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: C.blueTint2 }} aria-label="Fechar"><X size={16} color="#425A70" /></button>
+        </div>
+        <div className="p-5 flex flex-col gap-2">
+          <p className="font-body text-sm" style={{ color: "#5C7186" }}>{v.empresa} · {v.cidade}</p>
+          <p className="font-body text-base font-bold" style={{ color: C.amberDark }}>{v.salario}</p>
+          {v.tipo && (
+            <span className="font-body text-[11px] font-bold px-2 py-1 rounded-full w-fit" style={{ background: C.blueTint2, color: "#425A70" }}>{v.tipo}</span>
+          )}
+          {v.requisitos && (
+            <div className="mt-2">
+              <p className="font-body text-xs font-bold" style={{ color: C.ink }}>Requisitos</p>
+              <p className="font-body text-sm" style={{ color: "#425A70" }}>{v.requisitos}</p>
+            </div>
+          )}
+          {v.beneficios && (
+            <div className="mt-1">
+              <p className="font-body text-xs font-bold" style={{ color: C.ink }}>Benefícios</p>
+              <p className="font-body text-sm" style={{ color: "#425A70" }}>{v.beneficios}</p>
+            </div>
+          )}
+          {prazoFormatado && <p className="font-body text-xs font-semibold mt-1" style={{ color: "#B4462F" }}>Inscrições até {prazoFormatado}</p>}
+          {linkWhats && (
+            <a href={linkWhats} target="_blank" rel="noopener noreferrer" className="glow-btn mt-3 w-full text-center rounded-xl py-3 text-sm font-bold font-body text-white" style={{ background: C.blue }}>
+              Candidatar-se
+            </a>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
 function VagaCard({ v }) {
+  const [aberto, setAberto] = useState(false);
   const linkWhats = v.whatsapp ? `https://wa.me/55${(v.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vi a vaga de "${v.cargo}" no Conecta Comércio e gostaria de me candidatar.`)}` : null;
   const prazoFormatado = v.prazo ? v.prazo.split("-").reverse().join("/") : null;
   return (
     <div className="glow-card rounded-2xl border bg-white p-4 flex flex-col gap-2" style={{ borderColor: C.line }}>
-      <div className="flex items-center justify-between">
-        <span className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: C.blueTint, color: C.blue }}>
-          <Briefcase size={16} />
-        </span>
-        {v.tipo && (
-          <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: C.blueTint2, color: "#425A70" }}>{v.tipo}</span>
-        )}
-      </div>
-      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
-      <p className="font-body text-xs" style={{ color: "#5C7186" }}>{v.empresa} · {v.cidade}</p>
-      <p className="font-body text-xs font-semibold" style={{ color: C.amberDark }}>{v.salario}</p>
-      {v.beneficios && <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{v.beneficios}</p>}
-      {prazoFormatado && <p className="font-body text-[11px] font-semibold" style={{ color: "#B4462F" }}>Inscrições até {prazoFormatado}</p>}
+      <button type="button" onClick={() => setAberto(true)} className="flex flex-col gap-2 text-left">
+        <div className="flex items-center justify-between">
+          <span className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: C.blueTint, color: C.blue }}>
+            <Briefcase size={16} />
+          </span>
+          {v.tipo && (
+            <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: C.blueTint2, color: "#425A70" }}>{v.tipo}</span>
+          )}
+        </div>
+        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
+        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{v.empresa} · {v.cidade}</p>
+        <p className="font-body text-xs font-semibold" style={{ color: C.amberDark }}>{v.salario}</p>
+        {v.beneficios && <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{v.beneficios}</p>}
+        {prazoFormatado && <p className="font-body text-[11px] font-semibold" style={{ color: "#B4462F" }}>Inscrições até {prazoFormatado}</p>}
+      </button>
       {linkWhats ? (
         <a href={linkWhats} target="_blank" rel="noopener noreferrer" className="glow-btn mt-1 w-full text-center rounded-lg py-2 text-xs font-bold font-body text-white" style={{ background: C.blue }}>
           Candidatar-se
@@ -1342,6 +1435,7 @@ function VagaCard({ v }) {
           Candidatar-se
         </span>
       )}
+      {aberto && <ModalDetalheVaga v={v} onFechar={() => setAberto(false)} linkWhats={linkWhats} prazoFormatado={prazoFormatado} />}
     </div>
   );
 }
@@ -9850,13 +9944,14 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     if (!supabaseConfigurado) return;
     supabase
       .from("vagas")
-      .select("cargo, salario, cidade, tipo, beneficios, prazo, empresas(nome, whatsapp)")
+      .select("id, cargo, salario, cidade, tipo, beneficios, requisitos, prazo, empresas(nome, whatsapp)")
       .eq("status", "aberta")
       .order("criado_em", { ascending: false })
       .limit(30)
       .then(({ data, error }) => {
         if (!error) {
-          setVagasReais((data || []).map((d) => ({
+          setVagasReais((data || []).map((d, i) => ({
+            id: d.id || `demo-vaga-${i}`,
             cargo: d.cargo,
             salario: d.salario || "A combinar",
             cidade: d.cidade || "Ivatuba - PR",
@@ -9864,6 +9959,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             whatsapp: d.empresas?.whatsapp || "",
             tipo: d.tipo,
             beneficios: d.beneficios,
+            requisitos: d.requisitos,
             prazo: d.prazo,
           })));
         }
