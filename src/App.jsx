@@ -1115,7 +1115,7 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
   );
 }
 
-function PrestadorCard({ p }) {
+function PrestadorCard({ p, agendamentoAtivo }) {
   const linkWhats = p.whatsapp ? `https://wa.me/55${String(p.whatsapp).replace(/\D/g, "")}` : null;
   const linkInsta = p.instagram ? `https://instagram.com/${String(p.instagram).replace(/^@/, "")}` : null;
   const [agendaAberta, setAgendaAberta] = useState(false);
@@ -1137,9 +1137,11 @@ function PrestadorCard({ p }) {
             <MapPin size={11} /> {p.endereco}
           </p>
         )}
-        <button type="button" onClick={() => setAgendaAberta(true)} className="glow-btn font-body text-xs font-bold flex items-center justify-center gap-1.5 rounded-lg py-2 border mt-1" style={{ borderColor: C.line, color: C.blue }}>
-          <Clock size={13} /> Agendar horário
-        </button>
+        {agendamentoAtivo && (
+          <button type="button" onClick={() => setAgendaAberta(true)} className="glow-btn font-body text-xs font-bold flex items-center justify-center gap-1.5 rounded-lg py-2 border mt-1" style={{ borderColor: C.line, color: C.blue }}>
+            <Clock size={13} /> Agendar horário
+          </button>
+        )}
         <div className="mt-auto flex gap-2 pt-2">
           {linkWhats && (
             <a href={linkWhats} target="_blank" rel="noreferrer" className="glow-btn flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold font-body text-white" style={{ background: "#25A85B" }}>
@@ -2276,6 +2278,47 @@ function AdminPanel() {
     if (!error) setEventosAdmin((atual) => atual.map((ev) => (ev.id === id ? { ...ev, status } : ev)));
   };
 
+  const [editandoEvento, setEditandoEvento] = useState(null);
+  const [formEvento, setFormEvento] = useState(eventoVazio);
+  const [enviandoBannerEdicaoEvento, setEnviandoBannerEdicaoEvento] = useState(false);
+
+  const iniciarEdicaoEvento = (ev) => {
+    setEditandoEvento(ev.id);
+    setFormEvento({
+      titulo: ev.titulo || "", descricao: ev.descricao || "", data_inicio: ev.data_inicio || "",
+      data_fim: ev.data_fim || "", hora: ev.hora || "", local: ev.local || "", tipo: ev.tipo || "outro",
+      banner_url: ev.banner_url || "", link_inscricao: ev.link_inscricao || "",
+      google_maps_url: ev.google_maps_url || "", status: ev.status || "confirmado",
+    });
+  };
+
+  const enviarBannerEdicaoEvento = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setFormEvento((f) => ({ ...f, banner_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoBannerEdicaoEvento(true);
+    const caminho = `eventos/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoBannerEdicaoEvento(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+        setFormEvento((f) => ({ ...f, banner_url: pub.publicUrl }));
+      }
+    });
+  };
+
+  const salvarEdicaoEvento = async (id) => {
+    const registro = { ...formEvento, data_fim: formEvento.data_fim || null };
+    if (!supabaseConfigurado) {
+      setEventosAdmin((atual) => (atual ?? []).map((ev) => (ev.id === id ? { ...ev, ...registro } : ev)));
+      setEditandoEvento(null);
+      return;
+    }
+    const { error } = await supabase.from("eventos_calendario").update(registro).eq("id", id);
+    if (!error) setEventosAdmin((atual) => atual.map((ev) => (ev.id === id ? { ...ev, ...registro } : ev)));
+    setEditandoEvento(null);
+  };
+
   // Quem confirmou presença em cada evento — carregado só quando o admin
   // clica em "Ver participantes" (evita buscar tudo de uma vez).
   const [participantesAbertos, setParticipantesAbertos] = useState(null); // id do evento aberto
@@ -2288,6 +2331,22 @@ function AdminPanel() {
         if (!error) setParticipantesPorEvento((atual) => ({ ...atual, [eventoId]: data || [] }));
       });
     }
+  };
+
+  // Cadastro manual de participante pelo admin — cobre quem esteve num
+  // evento (inclusive já passado) mas nunca confirmou presença pelo site,
+  // pra poder contar nos Critérios de participação.
+  const [novoParticipanteManual, setNovoParticipanteManual] = useState({}); // { [eventoId]: { nome, telefone } }
+  const adicionarParticipanteManual = async (eventoId) => {
+    const dados = novoParticipanteManual[eventoId];
+    if (!dados?.nome?.trim()) { notificar("Informe o nome.", "aviso"); return; }
+    const { data, error } = await supabase.from("evento_participantes").insert({
+      evento_id: eventoId, nome: dados.nome.trim(), telefone: dados.telefone?.trim() || null, compareceu: true,
+    }).select().single();
+    if (error) { notificar("Não consegui adicionar: " + error.message, "erro"); return; }
+    setParticipantesPorEvento((atual) => ({ ...atual, [eventoId]: [data, ...(atual[eventoId] || [])] }));
+    setNovoParticipanteManual((s) => ({ ...s, [eventoId]: { nome: "", telefone: "" } }));
+    notificar("Participante adicionado.");
   };
 
   // Marca quem realmente compareceu no dia (diferente de só ter confirmado
@@ -2544,6 +2603,8 @@ function AdminPanel() {
     utilidade_ativo: false,
     ouvidoria_ativo: false,
     classificados_ativo: false,
+    estatisticas_ativo: false,
+    agendamento_ativo: false,
   };
 
   useEffect(() => {
@@ -2648,6 +2709,45 @@ function AdminPanel() {
     if (!error) setPontosTuristicosAdmin((atual) => atual.map((x) => (x.id === p.id ? { ...x, destaque: !p.destaque } : x)));
   };
 
+  const [editandoPontoTuristico, setEditandoPontoTuristico] = useState(null);
+  const [formPontoTuristico, setFormPontoTuristico] = useState(pontoTuristicoVazio);
+  const [enviandoFotoEdicaoPontoTuristico, setEnviandoFotoEdicaoPontoTuristico] = useState(false);
+
+  const iniciarEdicaoPontoTuristico = (p) => {
+    setEditandoPontoTuristico(p.id);
+    setFormPontoTuristico({
+      nome: p.nome, categoria: p.categoria || "", descricao: p.descricao || "", endereco: p.endereco || "",
+      foto_url: p.foto_url || "", google_maps_url: p.google_maps_url || "", ordem: p.ordem ?? 0, destaque: !!p.destaque,
+    });
+  };
+
+  const enviarFotoEdicaoPontoTuristico = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setFormPontoTuristico((v) => ({ ...v, foto_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoFotoEdicaoPontoTuristico(true);
+    const caminho = `turismo/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoEdicaoPontoTuristico(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+        setFormPontoTuristico((v) => ({ ...v, foto_url: pub.publicUrl }));
+      }
+    });
+  };
+
+  const salvarEdicaoPontoTuristico = async (id) => {
+    const registro = { ...formPontoTuristico, ordem: Number(formPontoTuristico.ordem) || 0 };
+    if (!supabaseConfigurado) {
+      setPontosTuristicosAdmin((atual) => atual.map((p) => (p.id === id ? { ...p, ...registro } : p)));
+      setEditandoPontoTuristico(null);
+      return;
+    }
+    const { error } = await supabase.from("pontos_turisticos").update(registro).eq("id", id);
+    if (!error) setPontosTuristicosAdmin((atual) => atual.map((p) => (p.id === id ? { ...p, ...registro } : p)).sort((a, b) => a.ordem - b.ordem));
+    setEditandoPontoTuristico(null);
+  };
+
   const enviarLogoSite = (e) => {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
@@ -2700,6 +2800,8 @@ function AdminPanel() {
         utilidade_ativo: !!siteConfigAdmin.utilidade_ativo,
         ouvidoria_ativo: !!siteConfigAdmin.ouvidoria_ativo,
         classificados_ativo: !!siteConfigAdmin.classificados_ativo,
+        estatisticas_ativo: !!siteConfigAdmin.estatisticas_ativo,
+        agendamento_ativo: !!siteConfigAdmin.agendamento_ativo,
       });
       if (error) throw error;
       setStatusIdentidade("ok");
@@ -2883,6 +2985,45 @@ function AdminPanel() {
     if (!error) setCursosAdmin((atual) => atual.filter((c) => c.id !== id));
   };
 
+  const [editandoCurso, setEditandoCurso] = useState(null);
+  const [formCurso, setFormCurso] = useState(cursoVazio);
+  const [enviandoBannerEdicaoCurso, setEnviandoBannerEdicaoCurso] = useState(false);
+
+  const iniciarEdicaoCurso = (c) => {
+    setEditandoCurso(c.id);
+    setFormCurso({
+      titulo: c.titulo || "", instituicao: c.instituicao || "", descricao: c.descricao || "",
+      professor: c.professor || "", carga_horaria: c.carga_horaria || "", data_inicio: c.data_inicio || "",
+      link_inscricao: c.link_inscricao || "", certificado: !!c.certificado, banner_url: c.banner_url || "",
+    });
+  };
+
+  const enviarBannerEdicaoCurso = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setFormCurso((v) => ({ ...v, banner_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoBannerEdicaoCurso(true);
+    const caminho = `cursos/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoBannerEdicaoCurso(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+        setFormCurso((v) => ({ ...v, banner_url: pub.publicUrl }));
+      }
+    });
+  };
+
+  const salvarEdicaoCurso = async (id) => {
+    if (!supabaseConfigurado || String(id).startsWith("demo-")) {
+      setCursosAdmin((atual) => (atual ?? []).map((c) => (c.id === id ? { ...c, ...formCurso } : c)));
+      setEditandoCurso(null);
+      return;
+    }
+    const { error } = await supabase.from("cursos").update(formCurso).eq("id", id);
+    if (!error) setCursosAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ...formCurso } : c)));
+    setEditandoCurso(null);
+  };
+
   // Inscritos de cada curso — o admin confirma a presença de quem realmente
   // participou, o que libera o certificado pra essa pessoa baixar. FASE 38.
   const [inscritosAbertos, setInscritosAbertos] = useState(null);
@@ -2896,6 +3037,22 @@ function AdminPanel() {
       });
     }
   };
+  // Cadastro manual de inscrito pelo admin — cobre quem participou de um
+  // curso (inclusive já passado) mas nunca se inscreveu pelo site, pra
+  // poder contar nos Critérios de participação e liberar certificado.
+  const [novoInscritoManual, setNovoInscritoManual] = useState({}); // { [cursoId]: { nome, telefone } }
+  const adicionarInscritoManual = async (cursoId) => {
+    const dados = novoInscritoManual[cursoId];
+    if (!dados?.nome?.trim() || !dados?.telefone?.trim()) { notificar("Informe nome e telefone.", "aviso"); return; }
+    const { data, error } = await supabase.from("curso_inscricoes").insert({
+      curso_id: cursoId, nome: dados.nome.trim(), telefone: dados.telefone.trim().replace(/\D/g, ""), presenca_confirmada: true,
+    }).select().single();
+    if (error) { notificar("Não consegui adicionar: " + error.message, "erro"); return; }
+    setInscritosPorCurso((atual) => ({ ...atual, [cursoId]: [data, ...(atual[cursoId] || [])] }));
+    setNovoInscritoManual((s) => ({ ...s, [cursoId]: { nome: "", telefone: "" } }));
+    notificar("Inscrito adicionado.");
+  };
+
   const confirmarPresencaCurso = async (inscricaoId, cursoId, presenca) => {
     const { error } = await supabase.from("curso_inscricoes").update({ presenca_confirmada: presenca }).eq("id", inscricaoId);
     if (!error) {
@@ -3020,6 +3177,7 @@ function AdminPanel() {
   const [enviandoFeiranteAdmin, setEnviandoFeiranteAdmin] = useState(false);
   const [statusFeiranteAdmin, setStatusFeiranteAdmin] = useState("");
   const [editandoLocalFeirante, setEditandoLocalFeirante] = useState({}); // { [id]: { local, numero_estande } }
+  const [editandoPerfilFeirante, setEditandoPerfilFeirante] = useState(null); // id do feirante com o perfil completo aberto pra edição
 
   const cadastrarFeiranteAdmin = async (e) => {
     e.preventDefault();
@@ -5533,16 +5691,38 @@ function AdminPanel() {
               </form>
               <div className="flex flex-col gap-3">
                 {(feirantes ?? []).map((f) => {
-                  const editando = editandoLocalFeirante[f.id] ?? { local: f.local || "", numero_estande: f.numero_estande || "" };
+                  const editando = editandoLocalFeirante[f.id] ?? {
+                    local: f.local || "", numero_estande: f.numero_estande || "",
+                    nome: f.nome || "", produto: f.produto || "", categoria: f.categoria || "",
+                    whatsapp: f.whatsapp || "", instagram: f.instagram || "", descricao: f.descricao || "",
+                  };
                   const empresaVinculada = (empresasPend ?? []).find((emp) => emp.id === f.empresa_id);
+                  const editandoPerfil = editandoPerfilFeirante === f.id;
                   return (
                   <div key={f.id} className="rounded-2xl border p-4 flex flex-col gap-3" style={{ borderColor: C.line }}>
                     <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.nome}{f.categoria ? ` · ${f.categoria}` : ""}</p>
-                        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{f.produto} · {f.whatsapp}{f.instagram ? ` · ${f.instagram}` : ""}{empresaVinculada ? ` · Empresa: ${empresaVinculada.nome}` : ""}</p>
-                        {f.descricao && <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{f.descricao}</p>}
-                      </div>
+                      {editandoPerfil ? (
+                        <div className="flex-1 min-w-0 grid sm:grid-cols-2 gap-2">
+                          <input value={editando.nome} onChange={(e) => setEditandoLocalFeirante((s) => ({ ...s, [f.id]: { ...editando, nome: e.target.value } }))}
+                            placeholder="Nome" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                          <input value={editando.produto} onChange={(e) => setEditandoLocalFeirante((s) => ({ ...s, [f.id]: { ...editando, produto: e.target.value } }))}
+                            placeholder="Produto" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                          <input value={editando.categoria} onChange={(e) => setEditandoLocalFeirante((s) => ({ ...s, [f.id]: { ...editando, categoria: e.target.value } }))}
+                            placeholder="Categoria" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                          <input value={editando.whatsapp} onChange={(e) => setEditandoLocalFeirante((s) => ({ ...s, [f.id]: { ...editando, whatsapp: e.target.value } }))}
+                            placeholder="WhatsApp" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                          <input value={editando.instagram} onChange={(e) => setEditandoLocalFeirante((s) => ({ ...s, [f.id]: { ...editando, instagram: e.target.value } }))}
+                            placeholder="Instagram (opcional)" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                          <textarea value={editando.descricao} onChange={(e) => setEditandoLocalFeirante((s) => ({ ...s, [f.id]: { ...editando, descricao: e.target.value } }))}
+                            placeholder="Descrição (opcional)" rows={1} className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                        </div>
+                      ) : (
+                        <div className="flex-1 min-w-0">
+                          <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.nome}{f.categoria ? ` · ${f.categoria}` : ""}</p>
+                          <p className="font-body text-xs" style={{ color: "#5C7186" }}>{f.produto} · {f.whatsapp}{f.instagram ? ` · ${f.instagram}` : ""}{empresaVinculada ? ` · Empresa: ${empresaVinculada.nome}` : ""}</p>
+                          {f.descricao && <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{f.descricao}</p>}
+                        </div>
+                      )}
                       <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
                         style={{
                           background: f.status === "aprovado" ? "#E7F6EE" : f.status === "recusado" ? "#FBEAE5" : C.blueTint,
@@ -5550,6 +5730,14 @@ function AdminPanel() {
                         }}>
                         {f.status}
                       </span>
+                      {editandoPerfil ? (
+                        <>
+                          <button onClick={() => { salvarLocalFeirante(f.id); setEditandoPerfilFeirante(null); }} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: C.blue }}>Salvar perfil</button>
+                          <button onClick={() => setEditandoPerfilFeirante(null)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#5C7186" }}>Cancelar</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setEditandoPerfilFeirante(f.id)} title="Editar perfil" style={{ color: "#5C7186" }}><Pencil size={15} /></button>
+                      )}
                       {f.status !== "aprovado" && (
                         <button onClick={() => mudarStatusFeirante(f.id, "aprovado")} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: "#25A85B" }}>Aprovar</button>
                       )}
@@ -5670,6 +5858,56 @@ function AdminPanel() {
             <div className="flex flex-col gap-2 max-w-2xl">
               {listaEventos.map((ev) => (
                 <div key={ev.id} className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
+                {editandoEvento === ev.id ? (
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <input value={formEvento.titulo} onChange={(e) => setFormEvento((f) => ({ ...f, titulo: e.target.value }))} placeholder="Título do evento"
+                      className="font-body text-sm border rounded-lg px-3 py-2 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                    <textarea value={formEvento.descricao} onChange={(e) => setFormEvento((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descrição (opcional)" rows={2}
+                      className="font-body text-sm border rounded-lg px-3 py-2 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                    <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                      Data de início
+                      <input type="date" value={formEvento.data_inicio} onChange={(e) => setFormEvento((f) => ({ ...f, data_inicio: e.target.value }))}
+                        className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                    </label>
+                    <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                      Data final (opcional)
+                      <input type="date" value={formEvento.data_fim} onChange={(e) => setFormEvento((f) => ({ ...f, data_fim: e.target.value }))}
+                        className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                    </label>
+                    <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                      Horário (opcional)
+                      <input type="time" value={formEvento.hora} onChange={(e) => setFormEvento((f) => ({ ...f, hora: e.target.value }))}
+                        className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                    </label>
+                    <input value={formEvento.local} onChange={(e) => setFormEvento((f) => ({ ...f, local: e.target.value }))} placeholder="Local"
+                      className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                    <select value={formEvento.tipo} onChange={(e) => setFormEvento((f) => ({ ...f, tipo: e.target.value }))}
+                      className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }}>
+                      <option value="outro">Evento geral</option>
+                      <option value="feira">Feira</option>
+                      <option value="curso">Curso</option>
+                      <option value="institucional">Institucional</option>
+                    </select>
+                    <select value={formEvento.status} onChange={(e) => setFormEvento((f) => ({ ...f, status: e.target.value }))}
+                      className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }}>
+                      <option value="confirmado">Confirmado</option>
+                      <option value="adiado">Adiado</option>
+                      <option value="cancelado">Cancelado</option>
+                    </select>
+                    <input value={formEvento.link_inscricao} onChange={(e) => setFormEvento((f) => ({ ...f, link_inscricao: e.target.value }))} placeholder="Link de inscrição (opcional)"
+                      className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                    <input value={formEvento.google_maps_url} onChange={(e) => setFormEvento((f) => ({ ...f, google_maps_url: e.target.value }))} placeholder="Link do Google Maps (opcional)"
+                      className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                    <label className="font-body text-xs font-bold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: C.blue }}>
+                      <Camera size={14} /> {enviandoBannerEdicaoEvento ? "Enviando..." : "Trocar banner"}
+                      <input type="file" accept="image/*" className="hidden" onChange={enviarBannerEdicaoEvento} />
+                    </label>
+                    <div className="flex gap-2 sm:col-span-2">
+                      <button onClick={() => salvarEdicaoEvento(ev.id)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-2" style={{ background: C.blue }}>Salvar</button>
+                      <button onClick={() => setEditandoEvento(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>Cancelar</button>
+                    </div>
+                  </div>
+                ) : (
                 <div className="flex items-center gap-3 flex-wrap">
                   {ev.banner_url ? (
                     <img loading="lazy" decoding="async" src={ev.banner_url} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
@@ -5697,9 +5935,11 @@ function AdminPanel() {
                     <option value="adiado">Adiado</option>
                     <option value="cancelado">Cancelado</option>
                   </select>
+                  <button onClick={() => iniciarEdicaoEvento(ev)} title="Editar" style={{ color: "#5C7186" }}><Pencil size={15} /></button>
                   <button onClick={() => { if (confirmarExclusao()) { removerEvento(ev.id); notificar("Evento removido."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
-                {participantesAbertos === ev.id && (
+                )}
+                {editandoEvento !== ev.id && participantesAbertos === ev.id && (
                   <div className="mt-3 pt-3 border-t flex flex-col gap-1.5" style={{ borderColor: C.line }}>
                     {(participantesPorEvento[ev.id] ?? []).map((p) => (
                       <div key={p.id} className="flex items-center justify-between font-body text-[11px]" style={{ color: "#425A70" }}>
@@ -5713,6 +5953,17 @@ function AdminPanel() {
                     {(participantesPorEvento[ev.id] ?? []).length === 0 && (
                       <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>Ninguém confirmou presença ainda.</p>
                     )}
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1.5 mt-1 border-t" style={{ borderColor: C.line }}>
+                      <input value={novoParticipanteManual[ev.id]?.nome ?? ""}
+                        onChange={(e) => setNovoParticipanteManual((s) => ({ ...s, [ev.id]: { ...s[ev.id], nome: e.target.value } }))}
+                        placeholder="Nome de quem participou" className="font-body text-[11px] border rounded-lg px-2 py-1.5 outline-none flex-1 min-w-[120px]" style={{ borderColor: C.line }} />
+                      <input value={novoParticipanteManual[ev.id]?.telefone ?? ""}
+                        onChange={(e) => setNovoParticipanteManual((s) => ({ ...s, [ev.id]: { ...s[ev.id], telefone: e.target.value } }))}
+                        placeholder="Telefone (opcional)" className="font-body text-[11px] border rounded-lg px-2 py-1.5 outline-none w-32" style={{ borderColor: C.line }} />
+                      <button onClick={() => adicionarParticipanteManual(ev.id)} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg text-white" style={{ background: C.blue }}>
+                        Adicionar
+                      </button>
+                    </div>
                   </div>
                 )}
                 </div>
@@ -6077,20 +6328,47 @@ function AdminPanel() {
             </form>
             <div className="flex flex-col gap-3 max-w-lg">
               {(pontosTuristicosAdmin ?? []).map((p, i) => (
-                <div key={p.id} className="rounded-2xl border p-4 flex items-center gap-3" style={{ borderColor: C.line }}>
-                  <span className="w-7 h-7 rounded-full flex items-center justify-center font-display font-bold text-xs shrink-0" style={{ background: C.blueTint, color: C.blue }}>{i + 1}</span>
-                  {p.foto_url && <img loading="lazy" decoding="async" src={p.foto_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-bold text-sm truncate flex items-center gap-1.5" style={{ color: C.ink }}>
-                      {p.nome}
-                      {p.destaque && <Star size={12} fill={C.amber} color={C.amber} />}
-                    </p>
-                    <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{p.categoria}{p.endereco ? ` · ${p.endereco}` : ""}</p>
-                  </div>
-                  <button onClick={() => alternarDestaquePontoTuristico(p)} title={p.destaque ? "Remover destaque" : "Marcar como destaque"} style={{ color: p.destaque ? C.amber : "#B8C2CC" }}>
-                    <Star size={16} fill={p.destaque ? C.amber : "none"} />
-                  </button>
-                  <button onClick={() => { if (confirmarExclusao("Excluir esse ponto turístico?")) removerPontoTuristico(p.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                <div key={p.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  {editandoPontoTuristico === p.id ? (
+                    <div className="flex flex-col gap-2">
+                      <input value={formPontoTuristico.nome} onChange={(e) => setFormPontoTuristico((v) => ({ ...v, nome: e.target.value }))} placeholder="Nome" className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formPontoTuristico.categoria} onChange={(e) => setFormPontoTuristico((v) => ({ ...v, categoria: e.target.value }))} placeholder="Categoria" className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <textarea value={formPontoTuristico.descricao} onChange={(e) => setFormPontoTuristico((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição" rows={2} className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formPontoTuristico.endereco} onChange={(e) => setFormPontoTuristico((v) => ({ ...v, endereco: e.target.value }))} placeholder="Endereço" className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formPontoTuristico.google_maps_url} onChange={(e) => setFormPontoTuristico((v) => ({ ...v, google_maps_url: e.target.value }))} placeholder="Link do Google Maps (opcional)" className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <label className="font-body text-xs font-bold cursor-pointer flex items-center gap-2" style={{ color: C.blue }}>
+                        <Camera size={14} /> {enviandoFotoEdicaoPontoTuristico ? "Enviando..." : "Trocar foto"}
+                        <input type="file" accept="image/*" className="hidden" onChange={enviarFotoEdicaoPontoTuristico} />
+                      </label>
+                      <label className="font-body text-xs font-bold flex items-center gap-2 cursor-pointer" style={{ color: C.ink }}>
+                        <input type="checkbox" checked={formPontoTuristico.destaque} onChange={(e) => setFormPontoTuristico((v) => ({ ...v, destaque: e.target.checked }))} />
+                        Mostrar em destaque no roteiro de Turismo
+                      </label>
+                      <div className="flex gap-2 mt-1">
+                        <button onClick={() => salvarEdicaoPontoTuristico(p.id)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-2" style={{ background: C.blue }}>Salvar</button>
+                        <button onClick={() => setEditandoPontoTuristico(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <span className="w-7 h-7 rounded-full flex items-center justify-center font-display font-bold text-xs shrink-0" style={{ background: C.blueTint, color: C.blue }}>{i + 1}</span>
+                      {p.foto_url && <img loading="lazy" decoding="async" src={p.foto_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-display font-bold text-sm truncate flex items-center gap-1.5" style={{ color: C.ink }}>
+                          {p.nome}
+                          {p.destaque && <Star size={12} fill={C.amber} color={C.amber} />}
+                        </p>
+                        <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{p.categoria}{p.endereco ? ` · ${p.endereco}` : ""}</p>
+                      </div>
+                      <button onClick={() => iniciarEdicaoPontoTuristico(p)} title="Editar" style={{ color: "#5C7186" }}>
+                        <Pencil size={15} />
+                      </button>
+                      <button onClick={() => alternarDestaquePontoTuristico(p)} title={p.destaque ? "Remover destaque" : "Marcar como destaque"} style={{ color: p.destaque ? C.amber : "#B8C2CC" }}>
+                        <Star size={16} fill={p.destaque ? C.amber : "none"} />
+                      </button>
+                      <button onClick={() => { if (confirmarExclusao("Excluir esse ponto turístico?")) removerPontoTuristico(p.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
+                    </div>
+                  )}
                 </div>
               ))}
               {(pontosTuristicosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum ponto turístico cadastrado ainda.</p>}
@@ -6744,6 +7022,33 @@ function AdminPanel() {
             <div className="flex flex-col gap-3 max-w-lg">
               {(cursosAdmin ?? []).map((c) => (
                 <div key={c.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  {editandoCurso === c.id ? (
+                    <div className="flex flex-col gap-2">
+                      <input value={formCurso.titulo} onChange={(e) => setFormCurso((v) => ({ ...v, titulo: e.target.value }))} placeholder="Nome do curso" className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <input value={formCurso.instituicao} onChange={(e) => setFormCurso((v) => ({ ...v, instituicao: e.target.value }))} placeholder="Instituição" className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                        <input value={formCurso.professor} onChange={(e) => setFormCurso((v) => ({ ...v, professor: e.target.value }))} placeholder="Professor/instrutor" className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <input type="date" value={formCurso.data_inicio} onChange={(e) => setFormCurso((v) => ({ ...v, data_inicio: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                        <input value={formCurso.carga_horaria} onChange={(e) => setFormCurso((v) => ({ ...v, carga_horaria: e.target.value }))} placeholder="Carga horária (ex: 8h)" className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      </div>
+                      <textarea value={formCurso.descricao} onChange={(e) => setFormCurso((v) => ({ ...v, descricao: e.target.value }))} placeholder="Descrição" rows={2} className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formCurso.link_inscricao} onChange={(e) => setFormCurso((v) => ({ ...v, link_inscricao: e.target.value }))} placeholder="Link de inscrição (opcional)" className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <label className="font-body text-xs font-semibold flex items-center gap-2" style={{ color: "#425A70" }}>
+                        <input type="checkbox" checked={formCurso.certificado} onChange={(e) => setFormCurso((v) => ({ ...v, certificado: e.target.checked }))} />
+                        Emite certificado
+                      </label>
+                      <label className="font-body text-xs font-bold cursor-pointer flex items-center gap-2" style={{ color: C.blue }}>
+                        <Camera size={14} /> {enviandoBannerEdicaoCurso ? "Enviando..." : "Trocar banner"}
+                        <input type="file" accept="image/*" className="hidden" onChange={enviarBannerEdicaoCurso} />
+                      </label>
+                      <div className="flex gap-2 mt-1">
+                        <button onClick={() => salvarEdicaoCurso(c.id)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-2" style={{ background: C.blue }}>Salvar</button>
+                        <button onClick={() => setEditandoCurso(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="flex items-center gap-3">
                     {c.banner_url && <img loading="lazy" decoding="async" src={c.banner_url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />}
                     <div className="flex-1 min-w-0">
@@ -6753,9 +7058,11 @@ function AdminPanel() {
                     <button onClick={() => verInscritos(c.id)} className="font-body text-[11px] font-bold flex items-center gap-1 shrink-0" style={{ color: C.blue }}>
                       <Users size={12} /> Inscritos{inscritosPorCurso[c.id] ? ` (${inscritosPorCurso[c.id].length})` : ""}
                     </button>
+                    <button onClick={() => iniciarEdicaoCurso(c)} title="Editar" style={{ color: "#5C7186" }}><Pencil size={15} /></button>
                     <button onClick={() => { if (confirmarExclusao()) { removerCurso(c.id); notificar("Curso excluído."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                   </div>
-                  {inscritosAbertos === c.id && (
+                  )}
+                  {editandoCurso !== c.id && inscritosAbertos === c.id && (
                     <div className="mt-3 pt-3 border-t flex flex-col gap-1.5" style={{ borderColor: C.line }}>
                       {(inscritosPorCurso[c.id] ?? []).map((i) => (
                         <div key={i.id} className="flex items-center justify-between gap-2 font-body text-[11px]" style={{ color: "#425A70" }}>
@@ -6770,6 +7077,17 @@ function AdminPanel() {
                       {(inscritosPorCurso[c.id] ?? []).length === 0 && (
                         <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>Ninguém se inscreveu ainda.</p>
                       )}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-1.5 mt-1 border-t" style={{ borderColor: C.line }}>
+                        <input value={novoInscritoManual[c.id]?.nome ?? ""}
+                          onChange={(e) => setNovoInscritoManual((s) => ({ ...s, [c.id]: { ...s[c.id], nome: e.target.value } }))}
+                          placeholder="Nome de quem participou" className="font-body text-[11px] border rounded-lg px-2 py-1.5 outline-none flex-1 min-w-[120px]" style={{ borderColor: C.line }} />
+                        <input value={novoInscritoManual[c.id]?.telefone ?? ""}
+                          onChange={(e) => setNovoInscritoManual((s) => ({ ...s, [c.id]: { ...s[c.id], telefone: e.target.value } }))}
+                          placeholder="Telefone" className="font-body text-[11px] border rounded-lg px-2 py-1.5 outline-none w-32" style={{ borderColor: C.line }} />
+                        <button onClick={() => adicionarInscritoManual(c.id)} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg text-white" style={{ background: C.blue }}>
+                          Adicionar
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -6972,6 +7290,15 @@ function AdminPanel() {
 
               <label className="font-body text-xs font-bold mt-2" style={{ color: C.ink }}>Frase de destaque (aparece na home)</label>
               <textarea value={siteConfigAdmin?.frase || ""} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, frase: e.target.value }))} placeholder="Empresas, produtos, vagas e cursos da sua cidade..." rows={3} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+
+              <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer mt-2" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={!!siteConfigAdmin?.estatisticas_ativo} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, estatisticas_ativo: e.target.checked }))} />
+                Mostrar a aba Números no menu do site
+              </label>
+              <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={!!siteConfigAdmin?.agendamento_ativo} onChange={(e) => setSiteConfigAdmin((v) => ({ ...v, agendamento_ativo: e.target.checked }))} />
+                Permitir agendamento de horário com prestadores de serviço
+              </label>
 
               <label className="font-body text-xs font-bold mt-2" style={{ color: C.ink }}>Contato / Sala do Empreendedor (aparece no rodapé do site)</label>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -9550,6 +9877,23 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     });
   }, []);
 
+  // Ticker "ao vivo" — antes eram frases de exemplo fixas; agora reflete
+  // cadastros reais (empresa, promoção, vaga, curso, prestador) assim que
+  // existem, e só cai pro exemplo se a plataforma ainda estiver vazia.
+  const atividadesReais = useMemo(() => {
+    const itens = [];
+    (empresasReais ?? []).slice(0, 3).forEach((e) => itens.push(`✅ ${e.nome} está na vitrine do Conecta Comércio`));
+    (produtosReais ?? [])
+      .filter((p) => p.precoPromocionalNumerico != null)
+      .slice(0, 3)
+      .forEach((p) => itens.push(`🛍️ ${p.empresa || "Uma loja"} publicou uma promoção: ${p.nome}`));
+    (vagasReais ?? []).slice(0, 3).forEach((v) => itens.push(`💼 Nova vaga aberta: ${v.cargo}${v.empresa ? ` na ${v.empresa}` : ""}`));
+    (cursosReais ?? []).slice(0, 3).forEach((c) => itens.push(`🎓 Novo curso: ${c.titulo}`));
+    (prestadoresReais ?? []).slice(0, 3).forEach((p) => itens.push(`🛠️ ${p.nome} está oferecendo ${p.servico || "serviços"} em Ivatuba`));
+    return itens;
+  }, [empresasReais, produtosReais, vagasReais, cursosReais, prestadoresReais]);
+  const listaAtividades = atividadesReais.length > 0 ? atividadesReais : atividades;
+
   useEffect(() => {
     if (!supabaseConfigurado) return;
     supabase.from("noticias").select("*").order("publicada_em", { ascending: false }).limit(10).then(({ data, error }) => {
@@ -9841,7 +10185,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             </span>
             <div className="overflow-hidden flex-1">
               <div className="marquee-track flex items-center gap-10 whitespace-nowrap">
-                {[...atividades, ...atividades].map((a, i) => (
+                {[...listaAtividades, ...listaAtividades].map((a, i) => (
                   <span key={i} className="font-body text-xs text-white/75">{a}</span>
                 ))}
               </div>
@@ -10495,7 +10839,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
             {(prestadoresReais ?? []).map((p, i) => (
               <Reveal key={p.id} delay={i * 70}>
-                <PrestadorCard p={p} />
+                <PrestadorCard p={p} agendamentoAtivo={!!siteConfig?.agendamento_ativo} />
               </Reveal>
             ))}
           </div>
@@ -12686,7 +13030,7 @@ export default function ConectaComercio() {
     ...(siteConfig?.utilidade_ativo ? [{ id: "utilidade", label: "Utilidade pública", icon: Phone }] : []),
     ...(siteConfig?.ouvidoria_ativo ? [{ id: "ouvidoria", label: "Ouvidoria", icon: MessageCircle }] : []),
     ...(siteConfig?.classificados_ativo ? [{ id: "classificados", label: "Classificados", icon: Repeat }] : []),
-    { id: "estatisticas", label: "Números", icon: TrendingUp },
+    ...(siteConfig?.estatisticas_ativo ? [{ id: "estatisticas", label: "Números", icon: TrendingUp }] : []),
     { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
     { id: "empresario", label: "Painel Empresário", icon: Briefcase, restrito: "empresario" },
