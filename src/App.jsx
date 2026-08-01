@@ -2547,8 +2547,10 @@ function AdminPanel() {
     if (!supabaseConfigurado) { setStatusBanner((s) => ({ ...s, [banner.id]: "ok" })); return; }
     try {
       const registro = {
-        titulo: banner.titulo, imagem_url: banner.imagem_url, imagem_mobile_url: banner.imagem_mobile_url || null,
+        titulo: banner.titulo, descricao: banner.descricao || null, botao_texto: banner.botao_texto || null,
+        imagem_url: banner.imagem_url, imagem_mobile_url: banner.imagem_mobile_url || null,
         link_url: banner.link_url, ordem: banner.ordem ?? 0, ativo: banner.ativo !== false,
+        posicao: banner.posicao || "geral",
         data_inicio: banner.data_inicio || null, data_fim: banner.data_fim || null,
       };
       const ehNovo = String(banner.id).startsWith("demo-") || String(banner.id).startsWith("novo-");
@@ -7257,13 +7259,44 @@ function AdminPanel() {
                     className="font-body text-sm border rounded-lg px-3 py-2 outline-none"
                     style={{ borderColor: C.line }}
                   />
-                  <input
-                    value={b.link_url || ""}
-                    onChange={(e) => atualizarBanner(b.id, "link_url", e.target.value)}
-                    placeholder="Link ao clicar (opcional)"
+                  <textarea
+                    value={b.descricao || ""}
+                    onChange={(e) => atualizarBanner(b.id, "descricao", e.target.value)}
+                    placeholder="Descrição (opcional)"
+                    rows={2}
                     className="font-body text-sm border rounded-lg px-3 py-2 outline-none"
                     style={{ borderColor: C.line }}
                   />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={b.botao_texto || ""}
+                      onChange={(e) => atualizarBanner(b.id, "botao_texto", e.target.value)}
+                      placeholder="Texto do botão (opcional)"
+                      className="font-body text-sm border rounded-lg px-3 py-2 outline-none"
+                      style={{ borderColor: C.line }}
+                    />
+                    <input
+                      value={b.link_url || ""}
+                      onChange={(e) => atualizarBanner(b.id, "link_url", e.target.value)}
+                      placeholder="Link ao clicar"
+                      className="font-body text-sm border rounded-lg px-3 py-2 outline-none"
+                      style={{ borderColor: C.line }}
+                    />
+                  </div>
+                  <label className="font-body text-[11px] font-semibold" style={{ color: "#425A70" }}>
+                    Onde aparece
+                    <select value={b.posicao || "geral"} onChange={(e) => atualizarBanner(b.id, "posicao", e.target.value)}
+                      className="mt-1 w-full font-body text-xs border rounded-lg px-2 py-1.5 outline-none" style={{ borderColor: C.line }}>
+                      <option value="geral">Banner principal da home (padrão)</option>
+                      <option value="topo">Topo do site (acima de tudo)</option>
+                      <option value="apos_destaques">Após o comerciante em destaque</option>
+                      <option value="entre_categorias">Entre as categorias</option>
+                      <option value="entre_empresas">Entre as empresas</option>
+                      <option value="lateral">Lateral (perto da busca)</option>
+                      <option value="rodape">Rodapé (antes do fim da página)</option>
+                      <option value="paginas_internas">Páginas internas (Turismo, Mural, etc.)</option>
+                    </select>
+                  </label>
                   <div className="flex items-center gap-3">
                     <input
                       type="number"
@@ -7317,7 +7350,7 @@ function AdminPanel() {
                 </div>
               ))}
               <button
-                onClick={() => setBannersAdmin((atual) => [...(atual ?? listaBanners), { id: `novo-${Date.now()}`, titulo: "", imagem_url: null, imagem_mobile_url: null, link_url: "", ordem: (atual ?? listaBanners).length + 1, ativo: true, data_inicio: "", data_fim: "" }])}
+                onClick={() => setBannersAdmin((atual) => [...(atual ?? listaBanners), { id: `novo-${Date.now()}`, titulo: "", descricao: "", botao_texto: "", imagem_url: null, imagem_mobile_url: null, link_url: "", posicao: "geral", ordem: (atual ?? listaBanners).length + 1, ativo: true, data_inicio: "", data_fim: "" }])}
                 className="rounded-2xl border-2 border-dashed p-4 flex flex-col items-center justify-center gap-2 min-h-[180px]"
                 style={{ borderColor: C.line, color: C.blue }}
               >
@@ -8923,13 +8956,13 @@ function ModalCadastroFeirante({ onFechar }) {
 // mobile, com período de validade). Antes essa tabela existia mas nunca
 // era mostrada em lugar nenhum do site; agora aparece logo abaixo do Hero.
 // ---------------------------------------------------------------------------
-function PublicidadeBanners() {
+function PublicidadeBanners({ posicao = "geral", compacto = false }) {
   const [banners, setBanners] = useState(null);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
     const hoje = new Date().toISOString().slice(0, 10);
-    supabase.from("banners").select("*").eq("ativo", true).order("ordem")
+    supabase.from("banners").select("*").eq("ativo", true).eq("posicao", posicao).order("ordem")
       .then(({ data, error }) => {
         if (error) return;
         const validos = (data || []).filter((b) => {
@@ -8939,19 +8972,34 @@ function PublicidadeBanners() {
         });
         setBanners(validos);
       });
-  }, []);
+  }, [posicao]);
 
   if (!banners || banners.length === 0) return null;
 
   return (
-    <section className="max-w-6xl mx-auto px-4 md:px-6 py-4 flex flex-col gap-3">
+    <section className={compacto ? "flex flex-col gap-3" : "max-w-6xl mx-auto px-4 md:px-6 py-4 flex flex-col gap-3"}>
       {banners.map((b) => {
-        const conteudo = (
+        const imagem = (
           <picture>
             {b.imagem_mobile_url && <source media="(max-width: 640px)" srcSet={b.imagem_mobile_url} />}
-            <img loading="lazy" decoding="async" src={b.imagem_url} alt={b.titulo || "Publicidade"} className="w-full rounded-2xl object-cover h-44 sm:h-64 md:h-80 lg:h-96" />
+            <img loading="lazy" decoding="async" src={b.imagem_url} alt={b.titulo || "Publicidade"}
+              className={`w-full rounded-2xl object-cover ${compacto ? "h-28 sm:h-36" : "h-44 sm:h-64 md:h-80 lg:h-96"}`} />
           </picture>
         );
+        const conteudo = (b.descricao || b.botao_texto) ? (
+          <div className="relative rounded-2xl overflow-hidden">
+            {imagem}
+            <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-6" style={{ background: "linear-gradient(0deg, rgba(5,26,46,0.75), rgba(5,26,46,0.05) 60%)" }}>
+              {b.titulo && <p className="font-display font-bold text-white text-base sm:text-xl">{b.titulo}</p>}
+              {b.descricao && <p className="font-body text-white/85 text-xs sm:text-sm mt-1 max-w-md">{b.descricao}</p>}
+              {b.botao_texto && (
+                <span className="glow-btn mt-3 w-fit font-body text-xs font-bold text-white rounded-lg px-4 py-2" style={{ background: C.blue }}>
+                  {b.botao_texto}
+                </span>
+              )}
+            </div>
+          </div>
+        ) : imagem;
         return b.link_url ? (
           <a key={b.id} href={b.link_url} target="_blank" rel="noreferrer" className="block">{conteudo}</a>
         ) : (
@@ -10178,6 +10226,8 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         )}
       </header>
 
+      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="topo" compacto /></div>
+
       {/* Hero */}
       <section className="relative overflow-hidden" style={{ background: `linear-gradient(160deg, ${C.blue} 0%, ${C.blueDeep} 100%)` }}>
         {/* Blobs animados de fundo */}
@@ -10216,6 +10266,9 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
                 className="glow-btn font-body font-bold text-sm px-4 md:px-5 py-2.5 rounded-xl shrink-0" style={{ background: C.amber, color: C.blueDeep }}>
                 Buscar
               </button>
+            </div>
+            <div className="max-w-lg mt-3">
+              <PublicidadeBanners posicao="lateral" compacto />
             </div>
 
             {/* Atalhos rápidos — Serviços em destaque */}
@@ -10325,6 +10378,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       <PublicidadeBanners />
       <div ref={promocoesSecaoRef}><BannerPromocoes /></div>
       <CapaComercianteDestaque empresas={listaBase} onAbrir={abrirEmpresa} />
+      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="apos_destaques" compacto /></div>
 
       {/* Categorias */}
       <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
@@ -10337,6 +10391,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           ))}
         </div>
       </section>
+      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="entre_categorias" compacto /></div>
 
       {/* Serviços do Empreendedor — em destaque */}
       <section ref={servicosSecaoRef} className="relative overflow-hidden py-14" style={{ background: `linear-gradient(155deg, ${C.blueDeep} 0%, ${C.blue} 100%)` }}>
@@ -10763,6 +10818,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           )}
         </div>
       </section>
+      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="entre_empresas" compacto /></div>
 
       {/* Produtos em destaque */}
       <section ref={produtosSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
@@ -11123,6 +11179,8 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           </div>
         </div>
       )}
+
+      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="rodape" compacto /></div>
 
       {/* Footer */}
       <footer ref={contatoSecaoRef} className="mt-10 pt-12 pb-6 text-white" style={{ background: C.blueDeep }}>
@@ -12357,6 +12415,7 @@ function PaginaTurismo({ siteConfig }) {
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-6 py-10">
       <SectionHeader eyebrow="Conheça a cidade" title="Turismo" sub="A história e os melhores pontos de Ivatuba - PR" />
+      <PublicidadeBanners posicao="paginas_internas" compacto />
 
       {(siteConfig?.historia_cidade || siteConfig?.historia_foto_url) && (
         <div className="rounded-3xl overflow-hidden border mt-6 grid md:grid-cols-[1fr_1.2fr]" style={{ borderColor: C.line }}>
