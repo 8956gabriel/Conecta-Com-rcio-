@@ -1450,12 +1450,69 @@ function VagaCard({ v }) {
   );
 }
 
+function ModalDetalheCurso({ c, onFechar }) {
+  const dataFormatada = c.data_inicio ? c.data_inicio.split("-").reverse().join("/") : c.data || "";
+  const local = c.local || c.instituicao || "";
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.6)" }} onClick={onFechar}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl max-h-[90vh] overflow-y-auto">
+        <div className="h-44 relative overflow-hidden shrink-0" style={{ background: `linear-gradient(135deg, ${C.blueDeep}, ${C.blue})` }}>
+          {c.banner_url ? (
+            <img loading="lazy" decoding="async" src={c.banner_url} alt={c.titulo} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center"><GraduationCap size={40} className="text-white/90" /></div>
+          )}
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(5,26,46,0.75), rgba(5,26,46,0) 55%)" }} />
+          <button onClick={onFechar} className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center bg-white/90" aria-label="Fechar"><X size={16} color="#425A70" /></button>
+          <div className="absolute left-5 bottom-4 right-5">
+            {c.data_inicio && c.data_inicio < new Date().toISOString().slice(0, 10) && (
+              <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mb-1.5 inline-block" style={{ background: "#EAF0F7", color: "#425A70" }}>Já aconteceu</span>
+            )}
+            <p className="font-display font-extrabold text-lg text-white">{c.titulo}</p>
+          </div>
+        </div>
+        <div className="p-5">
+          <p className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}>
+            <MapPin size={12} /> {local}{c.professor ? ` · ${c.professor}` : ""}{c.carga_horaria ? ` · ${c.carga_horaria}` : ""}{dataFormatada ? ` · ${dataFormatada}` : ""}
+          </p>
+          {c.certificado && (
+            <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-2 inline-block" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>Com certificado</span>
+          )}
+          {c.descricao && <p className="font-body text-sm mt-3" style={{ color: "#425A70" }}>{c.descricao}</p>}
+
+          {c.relato && (
+            <div className="mt-3 rounded-lg p-3" style={{ background: C.blueTint2 }}>
+              <p className="font-body text-[10px] font-bold uppercase tracking-wide" style={{ color: C.blue }}>Como foi</p>
+              <p className="font-body text-xs mt-0.5" style={{ color: "#425A70" }}>{c.relato}</p>
+              {c.relato_fotos?.length > 0 && (
+                <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                  {c.relato_fotos.map((url, i) => (
+                    <img key={i} loading="lazy" decoding="async" src={url} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {c.link_inscricao && (
+            <a href={c.link_inscricao} target="_blank" rel="noopener noreferrer"
+              className="glow-btn mt-4 w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold font-body text-white" style={{ background: C.blue }}>
+              <ExternalLink size={15} /> Inscreva-se
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CursoCard({ c }) {
   // Aceita tanto os cursos de exemplo (data: "12 AGO", local: "...") quanto
   // os cursos reais cadastrados pelo admin (data_inicio ISO, instituição,
   // professor, carga horária, link de inscrição, certificado, banner).
   const [diaData, mesData] = c.data ? c.data.split(" ") : (c.data_inicio ? c.data_inicio.split("-").reverse() : ["--", ""]);
   const local = c.local || c.instituicao || "";
+  const [detalheAberto, setDetalheAberto] = useState(false);
 
   // Inscrição direta pela plataforma (além do link externo, se houver) e,
   // pra cursos com certificado, consulta se a presença já foi confirmada
@@ -1518,25 +1575,30 @@ function CursoCard({ c }) {
   };
 
   return (
+    <>
     <div className="rounded-2xl border bg-white p-4 flex gap-3 items-start overflow-hidden" style={{ borderColor: C.line }}>
-      {c.banner_url ? (
-        <img loading="lazy" decoding="async" src={c.banner_url} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0" />
-      ) : (
-        <div className="rounded-lg px-2.5 py-1.5 text-center shrink-0" style={{ background: C.blueDeep }}>
-          <p className="font-display text-[10px] font-bold text-white leading-none">{diaData}</p>
-          <p className="font-display text-[9px] text-white/70 leading-none mt-0.5">{mesData}</p>
-        </div>
-      )}
+      <button type="button" onClick={() => setDetalheAberto(true)} className="shrink-0">
+        {c.banner_url ? (
+          <img loading="lazy" decoding="async" src={c.banner_url} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0" />
+        ) : (
+          <div className="rounded-lg px-2.5 py-1.5 text-center shrink-0" style={{ background: C.blueDeep }}>
+            <p className="font-display text-[10px] font-bold text-white leading-none">{diaData}</p>
+            <p className="font-display text-[9px] text-white/70 leading-none mt-0.5">{mesData}</p>
+          </div>
+        )}
+      </button>
       <div className="min-w-0 flex-1">
-        <p className="font-display font-bold text-sm flex items-center gap-1.5" style={{ color: C.ink }}>
-          {c.titulo}
-          {c.data_inicio && c.data_inicio < new Date().toISOString().slice(0, 10) && (
-            <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#EAF0F7", color: "#5C7186" }}>Já aconteceu</span>
-          )}
-        </p>
-        <p className="font-body text-xs mt-1 flex items-center gap-1" style={{ color: "#5C7186" }}>
-          <MapPin size={11} /> {local}{c.professor ? ` · ${c.professor}` : ""}{c.carga_horaria ? ` · ${c.carga_horaria}` : ""}
-        </p>
+        <button type="button" onClick={() => setDetalheAberto(true)} className="text-left w-full">
+          <p className="font-display font-bold text-sm flex items-center gap-1.5" style={{ color: C.ink }}>
+            {c.titulo}
+            {c.data_inicio && c.data_inicio < new Date().toISOString().slice(0, 10) && (
+              <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#EAF0F7", color: "#5C7186" }}>Já aconteceu</span>
+            )}
+          </p>
+          <p className="font-body text-xs mt-1 flex items-center gap-1" style={{ color: "#5C7186" }}>
+            <MapPin size={11} /> {local}{c.professor ? ` · ${c.professor}` : ""}{c.carga_horaria ? ` · ${c.carga_horaria}` : ""}
+          </p>
+        </button>
         {c.certificado && (
           <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 inline-block" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>Com certificado</span>
         )}
@@ -1608,6 +1670,8 @@ function CursoCard({ c }) {
         )}
       </div>
     </div>
+    {detalheAberto && <ModalDetalheCurso c={c} onFechar={() => setDetalheAberto(false)} />}
+    </>
   );
 }
 
