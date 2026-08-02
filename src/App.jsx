@@ -11,6 +11,7 @@ import {
   Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 
 // ---------------------------------------------------------------------------
@@ -9811,6 +9812,71 @@ function CalendarioEventos() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Carrossel do Hero — o antigo carimbo estático "Compre em Ivatuba" agora
+// gira entre esse carimbo de boas-vindas e destaques reais (empresa em
+// destaque, produto em promoção), com troca suave via Framer Motion e
+// arraste no touch. Se não houver dados reais ainda, mostra só o carimbo.
+// ---------------------------------------------------------------------------
+function HeroCarousel({ slides }) {
+  const [indice, setIndice] = useState(0);
+  const [pausado, setPausado] = useState(false);
+
+  useEffect(() => { if (indice >= slides.length) setIndice(0); }, [slides.length, indice]);
+
+  useEffect(() => {
+    if (pausado || slides.length <= 1) return;
+    const t = setInterval(() => setIndice((i) => (i + 1) % slides.length), 5500);
+    return () => clearInterval(t);
+  }, [pausado, slides.length]);
+
+  if (slides.length === 0) return null;
+  const slide = slides[indice];
+  const Icon = slide.icon;
+  const trocar = (dir) => setIndice((i) => (i + dir + slides.length) % slides.length);
+
+  return (
+    <div className="hero-in-right relative hidden md:flex flex-col items-center justify-center h-full w-full"
+      onMouseEnter={() => setPausado(true)} onMouseLeave={() => setPausado(false)}>
+      <AnimatePresence mode="wait">
+        <motion.button
+          key={indice}
+          type="button"
+          onClick={slide.onClick}
+          initial={{ opacity: 0, scale: 0.9, rotate: -14 }}
+          animate={{ opacity: 1, scale: 1, rotate: -8 }}
+          exit={{ opacity: 0, scale: 0.9, rotate: -2 }}
+          transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.25}
+          onDragEnd={(e, info) => {
+            if (info.offset.x < -50) trocar(1);
+            else if (info.offset.x > 50) trocar(-1);
+          }}
+          className={`ring-pulse w-56 h-56 rounded-full border-4 border-dashed flex items-center justify-center text-center overflow-hidden ${slide.onClick ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}`}
+          style={{ borderColor: "rgba(255,255,255,0.5)", backgroundImage: slide.foto_url ? `url(${slide.foto_url})` : undefined, backgroundSize: "cover", backgroundPosition: "center" }}
+        >
+          <div className="p-6 rounded-full w-full h-full flex flex-col items-center justify-center" style={slide.foto_url ? { background: "rgba(5,26,46,0.55)" } : undefined}>
+            {Icon && <Icon size={28} color="#fff" className="mx-auto mb-2" />}
+            <p className="font-display font-extrabold text-white text-sm leading-tight whitespace-pre-line line-clamp-2">{slide.titulo}</p>
+            <p className="font-body text-white/70 text-[10px] mt-1 tracking-wide">{slide.subtitulo}</p>
+          </div>
+        </motion.button>
+      </AnimatePresence>
+
+      {slides.length > 1 && (
+        <div className="flex gap-1.5 mt-5">
+          {slides.map((_, i) => (
+            <button key={i} type="button" onClick={() => setIndice(i)} aria-label={`Ir para o slide ${i + 1}`}
+              className="rounded-full transition-all duration-300" style={{ width: i === indice ? 18 : 6, height: 6, background: i === indice ? "#fff" : "rgba(255,255,255,0.35)" }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   const { nomeCidade, nomeCidadeUF } = useCidade();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -10409,6 +10475,40 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   // exibido para sempre.
   const listaBase = empresasReais ?? []; // usa dados reais assim que existirem
 
+  // Slides do carrossel do hero: sempre o carimbo de boas-vindas primeiro,
+  // seguido de uma empresa em destaque e um produto em promoção quando
+  // existirem — pra não depender só de conteúdo estático.
+  const heroSlides = useMemo(() => {
+    const slides = [{
+      titulo: `COMPRE EM\n${nomeCidade.toUpperCase()}`,
+      subtitulo: "MOVIMENTO LOCAL",
+      icon: BadgeCheck,
+      foto_url: null,
+      onClick: undefined,
+    }];
+    const empresaDestaque = (empresasReais ?? []).find((e) => e.destaque);
+    if (empresaDestaque) {
+      slides.push({
+        titulo: empresaDestaque.nome,
+        subtitulo: "EM DESTAQUE",
+        icon: Star,
+        foto_url: empresaDestaque.banner_url || null,
+        onClick: () => abrirEmpresa(empresaDestaque),
+      });
+    }
+    const produtoPromo = (produtosReais ?? []).find((p) => p.precoPromocionalNumerico != null);
+    if (produtoPromo) {
+      slides.push({
+        titulo: produtoPromo.nome,
+        subtitulo: `${produtoPromo.precoPromocional} · ${produtoPromo.empresa}`,
+        icon: Tag,
+        foto_url: produtoPromo.foto_url || null,
+        onClick: () => produtosSecaoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      });
+    }
+    return slides;
+  }, [nomeCidade, empresasReais, produtosReais]);
+
   // Link direto pra uma empresa (ex: alguém compartilhou "#/loja-<id>" no
   // WhatsApp): assim que a lista de empresas carrega, abre o perfil dela
   // automaticamente, sem precisar buscar/clicar de novo.
@@ -10667,17 +10767,8 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             </div>
           </div>
 
-          {/* Signature: selo/carimbo "Compre em Ivatuba" com pulso */}
-          <div className="hero-in-right relative hidden md:flex items-center justify-center h-full">
-            <div className="stamp ring-pulse w-52 h-52 rounded-full border-4 border-dashed flex items-center justify-center text-center p-6"
-              style={{ borderColor: "rgba(255,255,255,0.5)", transform: "rotate(-8deg)" }}>
-              <div>
-                <BadgeCheck size={30} color="#fff" className="mx-auto mb-2" />
-                <p className="font-display font-extrabold text-white text-sm leading-tight">COMPRE EM<br />IVATUBA</p>
-                <p className="font-body text-white/70 text-[10px] mt-1 tracking-wide">MOVIMENTO LOCAL</p>
-              </div>
-            </div>
-          </div>
+          {/* Signature: carrossel do hero — boas-vindas, empresa em destaque e promoção */}
+          <HeroCarousel slides={heroSlides} />
         </div>
 
         {/* Ticker de atividade ao vivo */}
