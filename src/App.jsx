@@ -12548,9 +12548,105 @@ function AvaliacaoTurismoForm({ pontoId, onEnviado }) {
   );
 }
 
+function ModalDetalhePontoTuristico({ p, avaliacoes, onFechar, onEnviado }) {
+  const media = avaliacoes.length ? avaliacoes.reduce((s, a) => s + a.nota, 0) / avaliacoes.length : 0;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.6)" }} onClick={onFechar}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl max-h-[90vh] overflow-y-auto">
+        <div className="h-56 relative overflow-hidden shrink-0" style={{ background: `linear-gradient(135deg, ${C.blueDeep}, ${C.blue})` }}>
+          {p.foto_url ? (
+            <img loading="lazy" decoding="async" src={p.foto_url} alt={p.nome} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center"><MapPinned size={44} className="text-white/90" /></div>
+          )}
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(5,26,46,0.75), rgba(5,26,46,0) 55%)" }} />
+          <button onClick={onFechar} className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center bg-white/90" aria-label="Fechar"><X size={16} color="#425A70" /></button>
+          <div className="absolute left-5 bottom-4 right-5">
+            {p.destaque && (
+              <span className="inline-flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mb-1.5" style={{ background: C.amber, color: C.blueDeep }}>
+                <Star size={10} fill={C.blueDeep} /> Destaque
+              </span>
+            )}
+            <p className="font-display font-extrabold text-xl text-white">{p.nome}</p>
+            {p.categoria && <p className="font-body text-xs font-semibold text-white/85 mt-0.5">{p.categoria}</p>}
+          </div>
+        </div>
+        <div className="p-5">
+          {p.descricao && <p className="font-body text-sm" style={{ color: "#425A70" }}>{p.descricao}</p>}
+          <div className="flex flex-wrap gap-3 mt-3">
+            {p.endereco && <span className="font-body text-xs flex items-center gap-1" style={{ color: "#8896A6" }}><MapPin size={12} /> {p.endereco}</span>}
+            {p.google_maps_url && (
+              <a href={p.google_maps_url} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold flex items-center gap-1" style={{ color: C.blue }}>
+                <ExternalLink size={12} /> Ver no mapa
+              </a>
+            )}
+          </div>
+
+          {avaliacoes.length > 0 && (
+            <div className="mt-4 flex items-center gap-1.5">
+              <div className="flex gap-0.5">
+                {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={13} fill={n <= Math.round(media) ? "#E8A23D" : "none"} color="#E8A23D" />)}
+              </div>
+              <span className="font-body text-xs" style={{ color: "#8896A6" }}>({avaliacoes.length} {avaliacoes.length === 1 ? "avaliação" : "avaliações"})</span>
+            </div>
+          )}
+          {avaliacoes.slice(0, 3).map((a) => (
+            <div key={a.id} className="mt-2 pl-2 border-l-2" style={{ borderColor: C.line }}>
+              <p className="font-body text-xs font-bold" style={{ color: C.ink }}>{a.nome}</p>
+              {a.comentario && <p className="font-body text-xs" style={{ color: "#5C7186" }}>{a.comentario}</p>}
+            </div>
+          ))}
+
+          <AvaliacaoTurismoForm pontoId={p.id} onEnviado={onEnviado} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CardPontoTuristico({ p, destaqueGrande, nota, onAbrir, delay }) {
+  return (
+    <button
+      type="button"
+      onClick={onAbrir}
+      className="glow-card group text-left rounded-3xl border overflow-hidden bg-white hero-in-left flex flex-col"
+      style={{ borderColor: C.line, animationDelay: `${delay}ms` }}
+    >
+      <div className={`relative overflow-hidden shrink-0 ${destaqueGrande ? "h-56" : "h-36"}`} style={{ background: `linear-gradient(135deg, ${C.blueDeep}, ${C.blue})` }}>
+        {p.foto_url ? (
+          <img loading="lazy" decoding="async" src={p.foto_url} alt={p.nome} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center"><MapPinned size={destaqueGrande ? 40 : 28} className="text-white/90" /></div>
+        )}
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(5,26,46,0.78), rgba(5,26,46,0) 60%)" }} />
+        {p.destaque && (
+          <span className="absolute top-3 left-3 flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ background: C.amber, color: C.blueDeep }}>
+            <Star size={10} fill={C.blueDeep} /> Destaque
+          </span>
+        )}
+        {nota > 0 && (
+          <span className="absolute top-3 right-3 flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold font-body bg-white/90" style={{ color: C.blueDeep }}>
+            <Star size={10} fill="#E8A23D" color="#E8A23D" /> {nota.toFixed(1)}
+          </span>
+        )}
+        <div className="absolute left-4 bottom-3 right-4">
+          <p className={`font-display font-extrabold text-white ${destaqueGrande ? "text-lg" : "text-sm"}`}>{p.nome}</p>
+          {p.categoria && <p className="font-body text-[11px] font-semibold text-white/85 mt-0.5">{p.categoria}</p>}
+        </div>
+      </div>
+      {p.descricao && (
+        <div className="p-3.5">
+          <p className="font-body text-xs line-clamp-2" style={{ color: "#5C7186" }}>{p.descricao}</p>
+        </div>
+      )}
+    </button>
+  );
+}
+
 function PaginaTurismo({ siteConfig }) {
   const { nomeCidadeUF } = useCidade();
   const [pontos, setPontos] = useState(null);
+  const [pontoAberto, setPontoAberto] = useState(null);
   const [avaliacoesPorPonto, setAvaliacoesPorPonto] = useState({});
 
   useEffect(() => {
@@ -12607,70 +12703,34 @@ function PaginaTurismo({ siteConfig }) {
       )}
 
       <div className="mt-10">
-        <h2 className="font-display font-extrabold text-lg mb-5" style={{ color: C.ink }}>Roteiro sugerido</h2>
+        <h2 className="font-display font-extrabold text-lg mb-5" style={{ color: C.ink }}>Pontos turísticos</h2>
         {pontos === null && (
-          <div className="flex flex-col gap-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
+          <div className="grid sm:grid-cols-2 gap-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-3xl" />)}</div>
         )}
         {pontos && pontos.length === 0 && (
           <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum ponto turístico cadastrado ainda.</p>
         )}
-        <div className="flex flex-col gap-4">
-          {(pontos || []).map((p, i) => (
-            <div key={p.id} className="flex gap-4">
-              <div className="flex flex-col items-center shrink-0">
-                <span className="w-8 h-8 rounded-full flex items-center justify-center font-display font-bold text-xs text-white" style={{ background: C.blue }}>{i + 1}</span>
-                {i < pontos.length - 1 && <div className="w-0.5 flex-1 mt-1" style={{ background: C.line }} />}
+        <div className="grid sm:grid-cols-2 gap-4">
+          {(pontos || []).map((p, i) => {
+            const avals = avaliacoesPorPonto[p.id] || [];
+            const nota = avals.length ? avals.reduce((s, a) => s + a.nota, 0) / avals.length : 0;
+            return (
+              <div key={p.id} className={p.destaque ? "sm:col-span-2" : ""}>
+                <CardPontoTuristico p={p} destaqueGrande={!!p.destaque} nota={nota} delay={i * 90} onAbrir={() => setPontoAberto(p)} />
               </div>
-              <div className="rounded-2xl border p-4 bg-white flex-1 mb-2 flex gap-3" style={{ borderColor: C.line }}>
-                {p.foto_url && <img loading="lazy" decoding="async" src={p.foto_url} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />}
-                <div className="min-w-0">
-                  <p className="font-display font-bold text-sm flex items-center gap-1.5" style={{ color: C.ink }}>
-                    {p.nome}
-                    {p.destaque && (
-                      <span className="flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body" style={{ background: C.amber, color: C.blueDeep }}>
-                        <Star size={10} fill={C.blueDeep} /> Destaque
-                      </span>
-                    )}
-                  </p>
-                  {p.categoria && <p className="font-body text-[11px] font-semibold" style={{ color: C.blue }}>{p.categoria}</p>}
-                  {p.descricao && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{p.descricao}</p>}
-                  <div className="flex flex-wrap gap-3 mt-1.5">
-                    {p.endereco && <span className="font-body text-[11px] flex items-center gap-1" style={{ color: "#8896A6" }}><MapPin size={11} /> {p.endereco}</span>}
-                    {p.google_maps_url && (
-                      <a href={p.google_maps_url} target="_blank" rel="noopener noreferrer" className="font-body text-[11px] font-bold flex items-center gap-1" style={{ color: C.blue }}>
-                        <ExternalLink size={11} /> Ver no mapa
-                      </a>
-                    )}
-                  </div>
-
-                  {(avaliacoesPorPonto[p.id]?.length ?? 0) > 0 && (
-                    <div className="mt-2 flex items-center gap-1.5">
-                      <div className="flex gap-0.5">
-                        {[1, 2, 3, 4, 5].map((n) => {
-                          const media = avaliacoesPorPonto[p.id].reduce((s, a) => s + a.nota, 0) / avaliacoesPorPonto[p.id].length;
-                          return <Star key={n} size={11} fill={n <= Math.round(media) ? "#E8A23D" : "none"} color="#E8A23D" />;
-                        })}
-                      </div>
-                      <span className="font-body text-[11px]" style={{ color: "#8896A6" }}>
-                        ({avaliacoesPorPonto[p.id].length} {avaliacoesPorPonto[p.id].length === 1 ? "avaliação" : "avaliações"})
-                      </span>
-                    </div>
-                  )}
-
-                  {(avaliacoesPorPonto[p.id] || []).slice(0, 3).map((a) => (
-                    <div key={a.id} className="mt-1.5 pl-2 border-l-2" style={{ borderColor: C.line }}>
-                      <p className="font-body text-[11px] font-bold" style={{ color: C.ink }}>{a.nome}</p>
-                      {a.comentario && <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{a.comentario}</p>}
-                    </div>
-                  ))}
-
-                  <AvaliacaoTurismoForm pontoId={p.id} onEnviado={carregarAvaliacoesTurismo} />
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
+
+      {pontoAberto && (
+        <ModalDetalhePontoTuristico
+          p={pontoAberto}
+          avaliacoes={avaliacoesPorPonto[pontoAberto.id] || []}
+          onFechar={() => setPontoAberto(null)}
+          onEnviado={carregarAvaliacoesTurismo}
+        />
+      )}
     </div>
   );
 }
