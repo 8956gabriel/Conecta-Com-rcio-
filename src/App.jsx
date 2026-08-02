@@ -9812,6 +9812,7 @@ function CalendarioEventos() {
 }
 
 function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
+  const { nomeCidade, nomeCidadeUF } = useCidade();
   const [menuOpen, setMenuOpen] = useState(false);
   const categoriasReaisHome = useCategoriasReais();
 
@@ -10423,12 +10424,12 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   // visto — ajuda o Google a entender do que se trata cada link e deixa o
   // compartilhamento (WhatsApp/Instagram) com nome e descrição certos.
   useEffect(() => {
-    const tituloBase = "Conecta Comércio · Ivatuba - PR";
-    const descBase = "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.";
+    const tituloBase = `Conecta Comércio · ${nomeCidadeUF}`;
+    const descBase = `Plataforma independente para fortalecer o comércio local de ${nomeCidadeUF}.`;
     const metaDesc = document.querySelector('meta[name="description"]');
     if (empresaAberta) {
       document.title = `${empresaAberta.nome} — Conecta Comércio`;
-      if (metaDesc) metaDesc.setAttribute("content", `${empresaAberta.nome}${empresaAberta.cat ? " · " + empresaAberta.cat : ""} em Ivatuba - PR. Veja contato, produtos e avaliações no Conecta Comércio.`);
+      if (metaDesc) metaDesc.setAttribute("content", `${empresaAberta.nome}${empresaAberta.cat ? " · " + empresaAberta.cat : ""} em ${nomeCidadeUF}. Veja contato, produtos e avaliações no Conecta Comércio.`);
     } else {
       document.title = tituloBase;
       if (metaDesc) metaDesc.setAttribute("content", descBase);
@@ -10500,7 +10501,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       {/* Barra institucional */}
       <div className="text-white text-[11px] font-body" style={{ background: `linear-gradient(90deg, ${C.blueDeep}, ${C.blue})` }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6 py-1.5 flex items-center justify-between">
-          <span className="flex items-center gap-1.5 truncate"><MapPinned size={12} /> Feito para fortalecer o comércio de Ivatuba</span>
+          <span className="flex items-center gap-1.5 truncate"><MapPinned size={12} /> Feito para fortalecer o comércio de {nomeCidade}</span>
           <span className="hidden sm:inline">Desenvolvido por Gabriel Oliveira</span>
         </div>
       </div>
@@ -10605,7 +10606,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
               <span className="font-display text-xs font-bold tracking-[0.16em] uppercase text-white/90">Plataforma oficial do comércio local · ao vivo</span>
             </div>
             <h1 className="font-display font-extrabold grad-text text-[34px] leading-[1.12] md:text-[48px] md:leading-[1.08]">
-              O comércio de Ivatuba,<br /> em movimento.
+              O comércio de {nomeCidade},<br /> em movimento.
             </h1>
             <p className="font-body text-white/80 text-[15px] mt-4 max-w-md">
               {frase || "Empresas, produtos, vagas e cursos da sua cidade, atualizados agora mesmo — e cada compra ajuda o dinheiro a girar aqui."}
@@ -11546,7 +11547,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           <div>
             <span className="font-display font-extrabold text-lg">Conecta Comércio</span>
             <p className="font-body text-white/60 text-xs mt-2 leading-relaxed">
-              Plataforma independente para fortalecer o comércio e o empreendedorismo de Ivatuba - PR.
+              Plataforma independente para fortalecer o comércio e o empreendedorismo de {nomeCidadeUF}.
             </p>
             <div className="flex gap-2 mt-4">
               {siteConfig?.instagram_contato ? (
@@ -11568,7 +11569,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             <ul className="font-body text-white/60 text-xs space-y-2">
               <li>Empresas cadastradas</li>
               <li>Cartão do Servidor</li>
-              <li>Compre em Ivatuba</li>
+              <li>Compre em {nomeCidade}</li>
             </ul>
           </div>
           <div>
@@ -12955,7 +12956,7 @@ function PaginaUtilidadePublica() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 md:px-6 py-10">
-      <SectionHeader eyebrow="Dia a dia" title="Utilidade pública" sub="Telefones úteis, ônibus e órgãos públicos de Ivatuba - PR" />
+      <SectionHeader eyebrow="Dia a dia" title="Utilidade pública" sub={`Telefones úteis, ônibus e órgãos públicos de ${nomeCidadeUF}`} />
 
       {itens === null && (
         <div className="flex flex-col gap-3 mt-6">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>
@@ -13010,6 +13011,7 @@ function gerarProtocoloOuvidoria() {
 }
 
 function PaginaOuvidoria() {
+  const { nomeCidadeUF } = useCidade();
   const [categoria, setCategoria] = useState("buraco");
   const [descricao, setDescricao] = useState("");
   const [local, setLocal] = useState("");
@@ -13027,10 +13029,10 @@ function PaginaOuvidoria() {
   useEffect(() => {
     document.title = "Ouvidoria — Conecta Comércio";
     const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", "Denuncie problemas na cidade de Ivatuba - PR: buraco na via, iluminação, lixo e mais.");
+    if (metaDesc) metaDesc.setAttribute("content", `Denuncie problemas na cidade de ${nomeCidadeUF}: buraco na via, iluminação, lixo e mais.`);
     return () => {
-      document.title = "Conecta Comércio · Ivatuba - PR";
-      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+      document.title = `Conecta Comércio · ${nomeCidadeUF}`;
+      if (metaDesc) metaDesc.setAttribute("content", `Plataforma independente para fortalecer o comércio local de ${nomeCidadeUF}.`);
     };
   }, []);
 
@@ -13147,6 +13149,7 @@ function PaginaOuvidoria() {
 const CATEGORIAS_CLASSIFICADOS = ["Móveis", "Eletrônicos e celulares", "Roupas e calçados", "Casa e decoração", "Veículos", "Outros"];
 
 function PaginaClassificados() {
+  const { nomeCidadeUF } = useCidade();
   const [itens, setItens] = useState(null);
   const [filtroTipo, setFiltroTipo] = useState("todos");
 
@@ -13166,10 +13169,10 @@ function PaginaClassificados() {
   useEffect(() => {
     document.title = "Classificados — Conecta Comércio";
     const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", "Compra, venda e doação direto entre moradores de Ivatuba - PR.");
+    if (metaDesc) metaDesc.setAttribute("content", `Compra, venda e doação direto entre moradores de ${nomeCidadeUF}.`);
     return () => {
-      document.title = "Conecta Comércio · Ivatuba - PR";
-      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+      document.title = `Conecta Comércio · ${nomeCidadeUF}`;
+      if (metaDesc) metaDesc.setAttribute("content", `Plataforma independente para fortalecer o comércio local de ${nomeCidadeUF}.`);
     };
   }, []);
 
@@ -13309,16 +13312,17 @@ function PaginaClassificados() {
 // Google uma página com conteúdo textual rico (bom pra indexação/SEO).
 // ---------------------------------------------------------------------------
 function EstatisticasPublicas() {
+  const { nomeCidadeUF } = useCidade();
   const [stats, setStats] = useState(null); // null = carregando
   const [categorias, setCategorias] = useState(null);
 
   useEffect(() => {
     document.title = "Números da plataforma — Conecta Comércio";
     const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", "Veja em números o comércio local de Ivatuba - PR: empresas, produtos, vagas, cursos e eventos cadastrados no Conecta Comércio.");
+    if (metaDesc) metaDesc.setAttribute("content", `Veja em números o comércio local de ${nomeCidadeUF}: empresas, produtos, vagas, cursos e eventos cadastrados no Conecta Comércio.`);
     return () => {
-      document.title = "Conecta Comércio · Ivatuba - PR";
-      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+      document.title = `Conecta Comércio · ${nomeCidadeUF}`;
+      if (metaDesc) metaDesc.setAttribute("content", `Plataforma independente para fortalecer o comércio local de ${nomeCidadeUF}.`);
     };
   }, []);
 
@@ -13372,7 +13376,7 @@ function EstatisticasPublicas() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 md:px-6 py-10">
-      <SectionHeader eyebrow="Transparência" title="Números da plataforma" sub="Dados reais e atualizados do comércio local de Ivatuba - PR" />
+      <SectionHeader eyebrow="Transparência" title="Números da plataforma" sub={`Dados reais e atualizados do comércio local de ${nomeCidadeUF}`} />
       {!stats ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           {Array.from({ length: 11 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
