@@ -8040,8 +8040,129 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
   );
 }
 
+function PainelAvisosEmpresario({ siteConfig }) {
+  const [cursosProximos, setCursosProximos] = useState(null);
+  const [noticiasRecentes, setNoticiasRecentes] = useState(null);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) { setCursosProximos([]); setNoticiasRecentes([]); return; }
+    Promise.all([
+      supabase.from("cursos").select("*").order("data_inicio").limit(20),
+      supabase.from("eventos_calendario").select("*").eq("tipo", "curso").order("data_inicio").limit(20),
+    ]).then(([{ data: cursosData, error: erroCursos }, { data: eventosData, error: erroEventos }]) => {
+      const listaCursos = !erroCursos && cursosData ? cursosData : [];
+      const listaEventosCurso = !erroEventos && eventosData
+        ? eventosData.map((ev) => ({
+            id: `evento-${ev.id}`,
+            titulo: ev.titulo,
+            instituicao: ev.local || "",
+            descricao: ev.descricao || "",
+            data_inicio: ev.data_inicio,
+            link_inscricao: ev.link_inscricao || "",
+            banner_url: ev.banner_url || "",
+            certificado: false,
+            relato: ev.relato || "",
+            relato_fotos: ev.relato_fotos || [],
+            _origemCalendario: true,
+          }))
+        : [];
+      const combinados = [...listaCursos, ...listaEventosCurso].sort((a, b) => (a.data_inicio || "").localeCompare(b.data_inicio || ""));
+      setCursosProximos(combinados);
+    });
+
+    supabase.from("noticias").select("*").order("publicada_em", { ascending: false }).limit(5).then(({ data, error }) => {
+      setNoticiasRecentes(error ? [] : data || []);
+    });
+  }, []);
+
+  const linkWhatsFomento = siteConfig?.fomento_whatsapp
+    ? `https://wa.me/55${String(siteConfig.fomento_whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Quero solicitar informações sobre as linhas de crédito da Fomento Paraná com o agente de crédito ${siteConfig?.fomento_agente_nome || "Gabriel Oliveira"}.`)}`
+    : null;
+
+  return (
+    <div className="flex flex-col gap-10">
+      <SectionHeader eyebrow="Fique por dentro" title="Novidades para você" sub="Serviços, crédito, cursos, notícias e eventos que podem ajudar seu negócio" />
+
+      <div>
+        <h3 className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Serviços do Empreendedor (MEI)</h3>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {servicosEmpreendedor.map((s, i) => {
+            const Icon = s.icon;
+            return (
+              <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="glow-card flex items-center gap-3 rounded-xl border p-3.5 bg-white" style={{ borderColor: C.line }}>
+                <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${s.cor_hex}1A` }}>
+                  <Icon size={18} color={s.cor_hex} />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-display font-bold text-xs" style={{ color: C.ink }}>{s.titulo}</p>
+                  <p className="font-body text-[11px] mt-0.5" style={{ color: "#5C7186" }}>{s.descricao}</p>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+
+      {siteConfig?.fomento_ativo && (
+        <div>
+          <h3 className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Fomento Paraná — linhas de crédito</h3>
+          <div className="rounded-2xl border p-4 flex flex-col sm:flex-row gap-3 sm:items-center" style={{ borderColor: C.line, background: C.blueTint2 }}>
+            <p className="font-body text-xs flex-1" style={{ color: "#425A70" }}>
+              {siteConfig?.fomento_texto || "Precisa de crédito para sua empresa? Conheça as linhas de crédito da Fomento Paraná."}
+            </p>
+            {linkWhatsFomento && (
+              <a href={linkWhatsFomento} target="_blank" rel="noopener noreferrer" className="glow-btn shrink-0 inline-flex items-center justify-center gap-1.5 font-body text-xs font-bold rounded-lg px-4 py-2.5 text-white" style={{ background: C.blue }}>
+                <MessageCircle size={13} /> Falar com o agente
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h3 className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Cursos</h3>
+        {cursosProximos === null && (
+          <div className="grid sm:grid-cols-2 gap-3">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}</div>
+        )}
+        {cursosProximos && cursosProximos.length === 0 && (
+          <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum curso cadastrado no momento.</p>
+        )}
+        <div className="grid sm:grid-cols-2 gap-3">
+          {(cursosProximos || []).slice(0, 4).map((c) => <CursoCard key={c.id} c={c} />)}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Notícias</h3>
+        {noticiasRecentes === null && (
+          <div className="flex flex-col gap-2">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>
+        )}
+        {noticiasRecentes && noticiasRecentes.length === 0 && (
+          <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma notícia publicada ainda.</p>
+        )}
+        <div className="flex flex-col gap-2">
+          {(noticiasRecentes || []).map((n) => (
+            <div key={n.id} className="rounded-xl border p-3.5 flex gap-3" style={{ borderColor: C.line }}>
+              {n.foto_url && <img loading="lazy" decoding="async" src={n.foto_url} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />}
+              <div className="min-w-0">
+                <p className="font-display font-bold text-xs" style={{ color: C.ink }}>{n.titulo}</p>
+                <p className="font-body text-[11px] mt-0.5 line-clamp-2" style={{ color: "#5C7186" }}>{n.resumo || n.conteudo}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Calendário de eventos</h3>
+        <CalendarioEventos />
+      </div>
+    </div>
+  );
+}
+
 function EmpresarioPanel({ siteConfig }) {
-  const [tab, setTab] = useState("perfil");
+  const [tab, setTab] = useState("avisos");
   const [modalProdutoAberto, setModalProdutoAberto] = useState(false);
 
   // Dados reais da empresa do empresário logado — WhatsApp e Instagram
@@ -8455,6 +8576,7 @@ function EmpresarioPanel({ siteConfig }) {
   };
 
   const items = [
+    { id: "avisos", label: "Novidades p/ você", icon: Bell },
     { id: "perfil", label: "Editar perfil", icon: UserCircle2 },
     { id: "produtos", label: "Produtos", icon: ShoppingBag },
     { id: "promocoes", label: "Promoções", icon: Tag },
@@ -8484,6 +8606,7 @@ function EmpresarioPanel({ siteConfig }) {
       </aside>
 
       <div className="min-w-0">
+        {tab === "avisos" && <PainelAvisosEmpresario siteConfig={siteConfig} />}
         {tab === "perfil" && (
           <div>
             <SectionHeader eyebrow="Sua empresa" title="Editar perfil" />
