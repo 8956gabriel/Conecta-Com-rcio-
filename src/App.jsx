@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useContext, createContext } from "react";
 import {
   Search, MapPin, Star, Heart, MessageCircle, Briefcase, GraduationCap,
   Newspaper, Menu, X, ChevronRight, Building2, ShoppingBag, Smartphone,
@@ -12,6 +12,16 @@ import {
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
+
+// ---------------------------------------------------------------------------
+// Cidade — nome configurável pelo admin (em vez de "Ivatuba" fixo no código),
+// preparando o terreno para reaproveitar essa base em outra cidade no futuro
+// (ver NOVA-CIDADE.md). Todo componente pode ler via useCidade().
+// ---------------------------------------------------------------------------
+const CidadeContext = createContext({ nomeCidade: "Ivatuba", nomeCidadeUF: "Ivatuba - PR" });
+function useCidade() {
+  return useContext(CidadeContext);
+}
 
 // ---------------------------------------------------------------------------
 // Tokens
@@ -1530,6 +1540,19 @@ function CursoCard({ c }) {
         {c.certificado && (
           <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 inline-block" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>Com certificado</span>
         )}
+        {c.relato && (
+          <div className="mt-2 rounded-lg p-2.5" style={{ background: C.blueTint2 }}>
+            <p className="font-body text-[10px] font-bold uppercase tracking-wide" style={{ color: C.blue }}>Como foi</p>
+            <p className="font-body text-xs mt-0.5" style={{ color: "#425A70" }}>{c.relato}</p>
+            {c.relato_fotos?.length > 0 && (
+              <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                {c.relato_fotos.map((url, i) => (
+                  <img key={i} loading="lazy" decoding="async" src={url} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
           {c.link_inscricao && (
             <a href={c.link_inscricao} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold flex items-center gap-1 w-fit" style={{ color: C.blue }}>
@@ -2307,7 +2330,7 @@ function AdminPanel() {
   // principal em modo somente leitura (componente CalendarioEventos).
   // -------------------------------------------------------------------------
   const [eventosAdmin, setEventosAdmin] = useState(null);
-  const eventoVazio = { titulo: "", descricao: "", data_inicio: "", data_fim: "", hora: "", local: "", tipo: "outro", banner_url: "", link_inscricao: "", google_maps_url: "", status: "confirmado" };
+  const eventoVazio = { titulo: "", descricao: "", data_inicio: "", data_fim: "", hora: "", local: "", tipo: "outro", banner_url: "", link_inscricao: "", google_maps_url: "", status: "confirmado", relato: "", relato_fotos: [] };
   const [novoEvento, setNovoEvento] = useState(eventoVazio);
   const [salvandoEvento, setSalvandoEvento] = useState(false);
   const [erroEvento, setErroEvento] = useState("");
@@ -2336,6 +2359,8 @@ function AdminPanel() {
   }, []);
 
   const listaEventos = eventosAdmin ?? [];
+  const [filtroTipoEventoAdmin, setFiltroTipoEventoAdmin] = useState("todos");
+  const listaEventosFiltrada = filtroTipoEventoAdmin === "todos" ? listaEventos : listaEventos.filter((ev) => (ev.tipo || "outro") === filtroTipoEventoAdmin);
 
   const adicionarEvento = async (e) => {
     e.preventDefault();
@@ -2383,7 +2408,27 @@ function AdminPanel() {
       data_fim: ev.data_fim || "", hora: ev.hora || "", local: ev.local || "", tipo: ev.tipo || "outro",
       banner_url: ev.banner_url || "", link_inscricao: ev.link_inscricao || "",
       google_maps_url: ev.google_maps_url || "", status: ev.status || "confirmado",
+      relato: ev.relato || "", relato_fotos: ev.relato_fotos || [],
     });
+  };
+
+  const [enviandoFotoRelatoEvento, setEnviandoFotoRelatoEvento] = useState(false);
+  const enviarFotoRelatoEvento = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setFormEvento((f) => ({ ...f, relato_fotos: [...f.relato_fotos, URL.createObjectURL(arquivo)] })); return; }
+    setEnviandoFotoRelatoEvento(true);
+    const caminho = `relatos-eventos/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoRelatoEvento(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+        setFormEvento((f) => ({ ...f, relato_fotos: [...f.relato_fotos, pub.publicUrl] }));
+      }
+    });
+  };
+  const removerFotoRelatoEvento = (indice) => {
+    setFormEvento((f) => ({ ...f, relato_fotos: f.relato_fotos.filter((_, i) => i !== indice) }));
   };
 
   const enviarBannerEdicaoEvento = (e) => {
@@ -3091,7 +3136,27 @@ function AdminPanel() {
       titulo: c.titulo || "", instituicao: c.instituicao || "", descricao: c.descricao || "",
       professor: c.professor || "", carga_horaria: c.carga_horaria || "", data_inicio: c.data_inicio || "",
       link_inscricao: c.link_inscricao || "", certificado: !!c.certificado, banner_url: c.banner_url || "",
+      relato: c.relato || "", relato_fotos: c.relato_fotos || [],
     });
+  };
+
+  const [enviandoFotoRelatoCurso, setEnviandoFotoRelatoCurso] = useState(false);
+  const enviarFotoRelatoCurso = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setFormCurso((f) => ({ ...f, relato_fotos: [...f.relato_fotos, URL.createObjectURL(arquivo)] })); return; }
+    setEnviandoFotoRelatoCurso(true);
+    const caminho = `relatos-cursos/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("banners").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoRelatoCurso(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("banners").getPublicUrl(caminho);
+        setFormCurso((f) => ({ ...f, relato_fotos: [...f.relato_fotos, pub.publicUrl] }));
+      }
+    });
+  };
+  const removerFotoRelatoCurso = (indice) => {
+    setFormCurso((f) => ({ ...f, relato_fotos: f.relato_fotos.filter((_, i) => i !== indice) }));
   };
 
   const enviarBannerEdicaoCurso = (e) => {
@@ -5930,6 +5995,7 @@ function AdminPanel() {
                 <option value="outro">Evento geral</option>
                 <option value="feira">Feira</option>
                 <option value="curso">Curso</option>
+                <option value="festa">Festa</option>
                 <option value="institucional">Institucional</option>
               </select>
               <select value={novoEvento.status} onChange={(e) => setNovoEvento((f) => ({ ...f, status: e.target.value }))}
@@ -5951,8 +6017,28 @@ function AdminPanel() {
               </button>
             </form>
 
+            <div className="flex flex-wrap gap-2 mb-3">
+              {[
+                ["todos", "Todos"], ["festa", "Festa"], ["curso", "Curso"], ["feira", "Feira"],
+                ["institucional", "Institucional"], ["outro", "Evento geral"],
+              ].map(([valor, label]) => (
+                <button key={valor} type="button" onClick={() => setFiltroTipoEventoAdmin(valor)}
+                  className="font-body text-xs font-bold px-3 py-1.5 rounded-full border"
+                  style={{
+                    borderColor: filtroTipoEventoAdmin === valor ? C.blue : C.line,
+                    background: filtroTipoEventoAdmin === valor ? C.blueTint : "transparent",
+                    color: filtroTipoEventoAdmin === valor ? C.blue : "#5C7186",
+                  }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <div className="flex flex-col gap-2 max-w-2xl">
-              {listaEventos.map((ev) => (
+              {listaEventosFiltrada.length === 0 && (
+                <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum evento nessa categoria.</p>
+              )}
+              {listaEventosFiltrada.map((ev) => (
                 <div key={ev.id} className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
                 {editandoEvento === ev.id ? (
                   <div className="grid sm:grid-cols-2 gap-3">
@@ -5982,6 +6068,7 @@ function AdminPanel() {
                       <option value="outro">Evento geral</option>
                       <option value="feira">Feira</option>
                       <option value="curso">Curso</option>
+                      <option value="festa">Festa</option>
                       <option value="institucional">Institucional</option>
                     </select>
                     <select value={formEvento.status} onChange={(e) => setFormEvento((f) => ({ ...f, status: e.target.value }))}
@@ -5998,6 +6085,29 @@ function AdminPanel() {
                       <Camera size={14} /> {enviandoBannerEdicaoEvento ? "Enviando..." : "Trocar banner"}
                       <input type="file" accept="image/*" className="hidden" onChange={enviarBannerEdicaoEvento} />
                     </label>
+
+                    <div className="sm:col-span-2 rounded-xl border p-3 mt-1" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                      <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Como foi o evento (preencha depois que acontecer)</p>
+                      <textarea value={formEvento.relato} onChange={(e) => setFormEvento((f) => ({ ...f, relato: e.target.value }))}
+                        placeholder="Conte como foi, quantas pessoas participaram, destaques..." rows={3}
+                        className="font-body text-sm border rounded-lg px-3 py-2 outline-none w-full bg-white" style={{ borderColor: C.line }} />
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {formEvento.relato_fotos.map((url, i) => (
+                          <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden">
+                            <img loading="lazy" decoding="async" src={url} alt="" className="w-full h-full object-cover" />
+                            <button type="button" onClick={() => removerFotoRelatoEvento(i)}
+                              className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center">
+                              <X size={10} color="#fff" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <label className="font-body text-xs font-bold cursor-pointer flex items-center gap-2 mt-2" style={{ color: C.blue }}>
+                        <Camera size={14} /> {enviandoFotoRelatoEvento ? "Enviando..." : "Adicionar foto do evento"}
+                        <input type="file" accept="image/*" className="hidden" onChange={enviarFotoRelatoEvento} />
+                      </label>
+                    </div>
+
                     <div className="flex gap-2 sm:col-span-2">
                       <button onClick={() => salvarEdicaoEvento(ev.id)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-2" style={{ background: C.blue }}>Salvar</button>
                       <button onClick={() => setEditandoEvento(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>Cancelar</button>
@@ -7139,6 +7249,29 @@ function AdminPanel() {
                         <Camera size={14} /> {enviandoBannerEdicaoCurso ? "Enviando..." : "Trocar banner"}
                         <input type="file" accept="image/*" className="hidden" onChange={enviarBannerEdicaoCurso} />
                       </label>
+
+                      <div className="rounded-xl border p-3 mt-1" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                        <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Como foi o curso (preencha depois que acontecer)</p>
+                        <textarea value={formCurso.relato} onChange={(e) => setFormCurso((f) => ({ ...f, relato: e.target.value }))}
+                          placeholder="Conte como foi, quantas pessoas participaram, destaques..." rows={3}
+                          className="font-body text-sm border rounded-lg px-3 py-2 outline-none w-full bg-white" style={{ borderColor: C.line }} />
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {formCurso.relato_fotos.map((url, i) => (
+                            <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden">
+                              <img loading="lazy" decoding="async" src={url} alt="" className="w-full h-full object-cover" />
+                              <button type="button" onClick={() => removerFotoRelatoCurso(i)}
+                                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center">
+                                <X size={10} color="#fff" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <label className="font-body text-xs font-bold cursor-pointer flex items-center gap-2 mt-2" style={{ color: C.blue }}>
+                          <Camera size={14} /> {enviandoFotoRelatoCurso ? "Enviando..." : "Adicionar foto do curso"}
+                          <input type="file" accept="image/*" className="hidden" onChange={enviarFotoRelatoCurso} />
+                        </label>
+                      </div>
+
                       <div className="flex gap-2 mt-1">
                         <button onClick={() => salvarEdicaoCurso(c.id)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-2" style={{ background: C.blue }}>Salvar</button>
                         <button onClick={() => setEditandoCurso(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>Cancelar</button>
@@ -9331,8 +9464,8 @@ function CalendarioEventos() {
 
   const [mostrarPassados, setMostrarPassados] = useState(false);
 
-  const rotuloTipo = { feira: "Feira", curso: "Curso", institucional: "Institucional", outro: "Evento" };
-  const corTipo = { feira: C.amberDark, curso: C.blue, institucional: C.blueDeep, outro: "#5C7186" };
+  const rotuloTipo = { feira: "Feira", curso: "Curso", festa: "Festa", institucional: "Institucional", outro: "Evento" };
+  const corTipo = { feira: C.amberDark, curso: C.blue, festa: "#C6389E", institucional: C.blueDeep, outro: "#5C7186" };
   const formatarData = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
 
   const listaVisivel = eventosDoDia ?? proximosEventos;
@@ -9372,14 +9505,15 @@ function CalendarioEventos() {
           const selecionado = diaSelecionado === dia;
           return (
             <button key={i} type="button" onClick={() => setDiaSelecionado(selecionado ? null : dia)}
-              className="aspect-square rounded-lg flex items-center justify-center relative font-body text-xs"
+              className="aspect-square rounded-lg flex items-center justify-center relative font-body text-xs border"
               style={{
-                background: selecionado ? C.blue : ehHoje ? C.blueTint : "transparent",
-                color: selecionado ? "#fff" : C.ink,
-                fontWeight: ehHoje || selecionado ? 700 : 500,
+                background: selecionado ? C.blue : ehHoje ? C.blueTint : temEvento ? C.blueTint2 : "transparent",
+                borderColor: temEvento && !selecionado ? C.blue : "transparent",
+                color: selecionado ? "#fff" : temEvento ? C.blue : C.ink,
+                fontWeight: ehHoje || selecionado || temEvento ? 700 : 500,
               }}>
               {dia}
-              {temEvento && <span className="absolute bottom-1 w-1 h-1 rounded-full" style={{ background: selecionado ? "#fff" : C.amberDark }} />}
+              {temEvento && <span className="absolute bottom-1 w-1 h-1 rounded-full" style={{ background: selecionado ? "#fff" : C.blue }} />}
             </button>
           );
         })}
@@ -9421,6 +9555,19 @@ function CalendarioEventos() {
                 <p className="font-body text-[10px]" style={{ color: "#5C7186" }}>
                   {formatarData(ev.data_inicio)}{ev.hora ? ` · ${ev.hora}` : ""}{ev.local ? ` · ${ev.local}` : ""} · {rotuloTipo[ev.tipo] || "Evento"}
                 </p>
+                {ev.relato && (
+                  <div className="mt-1.5 rounded-lg p-2" style={{ background: C.blueTint2 }}>
+                    <p className="font-body text-[9px] font-bold uppercase tracking-wide" style={{ color: C.blue }}>Como foi</p>
+                    <p className="font-body text-[11px] mt-0.5" style={{ color: "#425A70" }}>{ev.relato}</p>
+                    {ev.relato_fotos?.length > 0 && (
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {ev.relato_fotos.map((url, i) => (
+                          <img key={i} loading="lazy" decoding="async" src={url} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center gap-3 mt-1 flex-wrap">
                   {ev.link_inscricao && (
                     <a href={ev.link_inscricao} target="_blank" rel="noopener noreferrer" className="font-body text-[10px] font-bold flex items-center gap-1" style={{ color: C.blue }}>
@@ -12208,6 +12355,7 @@ function PaginaLegal({ titulo, texto }) {
 // FASE 43 (última do backlog de novas funcionalidades).
 // ---------------------------------------------------------------------------
 function PaginaMural({ perfil }) {
+  const { nomeCidadeUF } = useCidade();
   const [publicacoes, setPublicacoes] = useState(null);
   const [nome, setNome] = useState(perfil?.nome || "");
   const [categoria, setCategoria] = useState("sugestao");
@@ -12219,10 +12367,10 @@ function PaginaMural({ perfil }) {
   useEffect(() => {
     document.title = "Mural da comunidade — Conecta Comércio";
     const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", "Sugestões, elogios, reclamações e avisos da comunidade de Ivatuba - PR.");
+    if (metaDesc) metaDesc.setAttribute("content", `Sugestões, elogios, reclamações e avisos da comunidade de ${nomeCidadeUF}.`);
     return () => {
-      document.title = "Conecta Comércio · Ivatuba - PR";
-      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+      document.title = `Conecta Comércio · ${nomeCidadeUF}`;
+      if (metaDesc) metaDesc.setAttribute("content", `Plataforma independente para fortalecer o comércio local de ${nomeCidadeUF}.`);
     };
   }, []);
 
@@ -12377,16 +12525,17 @@ function AvaliacaoTurismoForm({ pontoId, onEnviado }) {
 }
 
 function PaginaTurismo({ siteConfig }) {
+  const { nomeCidadeUF } = useCidade();
   const [pontos, setPontos] = useState(null);
   const [avaliacoesPorPonto, setAvaliacoesPorPonto] = useState({});
 
   useEffect(() => {
     document.title = "Turismo — Conecta Comércio";
     const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", "Conheça a história e os pontos turísticos de Ivatuba - PR, com um roteiro sugerido pela cidade.");
+    if (metaDesc) metaDesc.setAttribute("content", `Conheça a história e os pontos turísticos de ${nomeCidadeUF}, com um roteiro sugerido pela cidade.`);
     return () => {
-      document.title = "Conecta Comércio · Ivatuba - PR";
-      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+      document.title = `Conecta Comércio · ${nomeCidadeUF}`;
+      if (metaDesc) metaDesc.setAttribute("content", `Plataforma independente para fortalecer o comércio local de ${nomeCidadeUF}.`);
     };
   }, []);
 
@@ -12414,7 +12563,7 @@ function PaginaTurismo({ siteConfig }) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-6 py-10">
-      <SectionHeader eyebrow="Conheça a cidade" title="Turismo" sub="A história e os melhores pontos de Ivatuba - PR" />
+      <SectionHeader eyebrow="Conheça a cidade" title="Turismo" sub={`A história e os melhores pontos de ${nomeCidadeUF}`} />
       <PublicidadeBanners posicao="paginas_internas" compacto />
 
       {(siteConfig?.historia_cidade || siteConfig?.historia_foto_url) && (
@@ -12507,15 +12656,16 @@ function PaginaTurismo({ siteConfig }) {
 // órgãos públicos, organizados em três blocos. FASE 47.
 // ---------------------------------------------------------------------------
 function PaginaUtilidadePublica() {
+  const { nomeCidadeUF } = useCidade();
   const [itens, setItens] = useState(null);
 
   useEffect(() => {
     document.title = "Utilidade pública — Conecta Comércio";
     const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", "Telefones úteis, horário de ônibus e endereços de órgãos públicos de Ivatuba - PR.");
+    if (metaDesc) metaDesc.setAttribute("content", `Telefones úteis, horário de ônibus e endereços de órgãos públicos de ${nomeCidadeUF}.`);
     return () => {
-      document.title = "Conecta Comércio · Ivatuba - PR";
-      if (metaDesc) metaDesc.setAttribute("content", "Plataforma independente para fortalecer o comércio local de Ivatuba - PR.");
+      document.title = `Conecta Comércio · ${nomeCidadeUF}`;
+      if (metaDesc) metaDesc.setAttribute("content", `Plataforma independente para fortalecer o comércio local de ${nomeCidadeUF}.`);
     };
   }, []);
 
@@ -13271,6 +13421,7 @@ export default function ConectaComercio() {
   }
 
   return (
+    <CidadeContext.Provider value={{ nomeCidade: siteConfig?.nome_cidade || "Ivatuba", nomeCidadeUF: siteConfig?.nome_cidade_uf || "Ivatuba - PR" }}>
     <div className="font-body min-h-screen" style={{ background: "#fff" }}>
       <style>{fontImport}</style>
 
@@ -13333,5 +13484,6 @@ export default function ConectaComercio() {
       <BotaoCompartilhar />
       <ChatWidget />
     </div>
+    </CidadeContext.Provider>
   );
 }
