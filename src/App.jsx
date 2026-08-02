@@ -11,7 +11,7 @@ import {
   Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 
 // ---------------------------------------------------------------------------
@@ -300,8 +300,6 @@ textarea:focus-visible, [tabindex]:focus-visible {
 .glow-btn { transition: transform .25s ease, box-shadow .25s ease; }
 .glow-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -10px rgba(232,162,61,0.55); }
 
-.reveal { opacity: 0; transform: translateY(28px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.2,1); }
-.reveal.in { opacity: 1; transform: translateY(0); }
 
 @keyframes hero-in-left { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes hero-in-right { from { opacity: 0; transform: scale(0.92) rotate(-4deg); } to { opacity: 1; transform: scale(1) rotate(-8deg); } }
@@ -336,7 +334,7 @@ textarea:focus-visible, [tabindex]:focus-visible {
 .mobile-menu-in { animation: mobile-menu-in .25s cubic-bezier(.2,.8,.2,1) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .blob, .marquee-track, .reveal, .pulse-dot, .ring-pulse, .grad-text, .stamp, .promo-slide, .tech-grid, .scan-line, .price-pop, .hero-in-left, .hero-in-right, .page-transition, .nav-link::after, .mobile-menu-in { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
+  .blob, .marquee-track, .pulse-dot, .ring-pulse, .grad-text, .stamp, .promo-slide, .tech-grid, .scan-line, .price-pop, .hero-in-left, .hero-in-right, .page-transition, .nav-link::after, .mobile-menu-in { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
 }
 `;
 
@@ -344,22 +342,18 @@ textarea:focus-visible, [tabindex]:focus-visible {
 // Motion helpers
 // ---------------------------------------------------------------------------
 function Reveal({ children, delay = 0, className = "" }) {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setInView(true); obs.disconnect(); } },
-      { threshold: 0.15 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
+  const reduzMovimento = useReducedMotion();
+  if (reduzMovimento) return <div className={className}>{children}</div>;
   return (
-    <div ref={ref} className={`reveal ${inView ? "in" : ""} ${className}`} style={{ transitionDelay: `${delay}ms` }}>
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y: 28 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.15 }}
+      transition={{ duration: 0.7, delay: delay / 1000, ease: [0.2, 0.8, 0.2, 1] }}
+    >
       {children}
-    </div>
+    </motion.div>
   );
 }
 
