@@ -1559,12 +1559,12 @@ function CursoCard({ c }) {
               <ExternalLink size={11} /> Inscreva-se
             </a>
           )}
-          {c.id && supabaseConfigurado && (
+          {c.id && !c._origemCalendario && supabaseConfigurado && (
             <button onClick={() => { setFormAberto(formAberto === "inscrever" ? null : "inscrever"); setMensagem(""); setCertificadoLiberado(null); }} className="font-body text-xs font-bold flex items-center gap-1" style={{ color: C.blue }}>
               <Users size={11} /> Inscrever-se pelo site
             </button>
           )}
-          {c.id && c.certificado && supabaseConfigurado && (
+          {c.id && !c._origemCalendario && c.certificado && supabaseConfigurado && (
             <button onClick={() => { setFormAberto(formAberto === "certificado" ? null : "certificado"); setMensagem(""); setCertificadoLiberado(null); }} className="font-body text-xs font-bold flex items-center gap-1" style={{ color: "#1E8E5A" }}>
               <BadgeCheck size={11} /> Baixar certificado
             </button>
@@ -10161,10 +10161,34 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       });
   }, []);
 
+  // Cursos podem ser cadastrados de dois jeitos: pela aba própria "Cursos"
+  // (tabela cursos) ou direto no Calendário com tipo "Curso" (tabela
+  // eventos_calendario) — a aba Cursos do site precisa mostrar os dois
+  // juntos, senão um curso cadastrado só no calendário nunca aparece aqui.
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("cursos").select("*").order("data_inicio").limit(20).then(({ data, error }) => {
-      if (!error && data && data.length > 0) setCursosReais(data);
+    Promise.all([
+      supabase.from("cursos").select("*").order("data_inicio").limit(20),
+      supabase.from("eventos_calendario").select("*").eq("tipo", "curso").order("data_inicio").limit(20),
+    ]).then(([{ data: cursosData, error: erroCursos }, { data: eventosData, error: erroEventos }]) => {
+      const listaCursos = !erroCursos && cursosData ? cursosData : [];
+      const listaEventosCurso = !erroEventos && eventosData
+        ? eventosData.map((ev) => ({
+            id: `evento-${ev.id}`,
+            titulo: ev.titulo,
+            instituicao: ev.local || "",
+            descricao: ev.descricao || "",
+            data_inicio: ev.data_inicio,
+            link_inscricao: ev.link_inscricao || "",
+            banner_url: ev.banner_url || "",
+            certificado: false,
+            relato: ev.relato || "",
+            relato_fotos: ev.relato_fotos || [],
+            _origemCalendario: true,
+          }))
+        : [];
+      const combinados = [...listaCursos, ...listaEventosCurso].sort((a, b) => (a.data_inicio || "").localeCompare(b.data_inicio || ""));
+      if (combinados.length > 0) setCursosReais(combinados);
     });
   }, []);
 
