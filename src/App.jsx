@@ -4781,7 +4781,7 @@ function AdminPanel() {
               })}
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                 <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Acessos no site (últimos 7 dias)</p>
                 <div style={{ width: "100%", height: 200 }}>
@@ -4814,7 +4814,7 @@ function AdminPanel() {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                 <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Resumo geral (todas as áreas)</p>
                 <div style={{ width: "100%", height: 200 }}>
@@ -4851,7 +4851,7 @@ function AdminPanel() {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-2xl border p-4 overflow-x-auto" style={{ borderColor: C.line }}>
                 <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Empresas em destaque (mais visualizadas)</p>
                 {(empresasDestaqueReais ?? []).length > 0 ? (
@@ -11637,7 +11637,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       </section>
 
       {/* Cursos e Notícias */}
-      <section ref={cursosNoticiasSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12 grid md:grid-cols-2 gap-10">
+      <section ref={cursosNoticiasSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12 grid grid-cols-1 md:grid-cols-2 gap-10">
         <div>
           <SectionHeader eyebrow="Sala do Empreendedor" title="Cursos e eventos" />
           <div className="flex flex-col gap-3">
@@ -12339,7 +12339,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
         <div className="blob blob-b absolute bottom-[-8rem] right-[-4rem] w-96 h-96 rounded-full" style={{ background: C.amber, opacity: 0.3 }} />
       </div>
 
-      <div className="relative max-w-5xl w-full mx-auto px-4 md:px-6 py-12 grid md:grid-cols-2 gap-0 rounded-3xl overflow-hidden shadow-2xl">
+      <div className="relative max-w-5xl w-full mx-auto px-4 md:px-6 py-12 grid grid-cols-1 md:grid-cols-2 gap-0 rounded-3xl overflow-hidden shadow-2xl">
         {/* Painel institucional */}
         <div className="p-8 md:p-10 flex flex-col justify-between" style={{ background: "rgba(255,255,255,0.06)", backdropFilter: "blur(6px)" }}>
           <div>
