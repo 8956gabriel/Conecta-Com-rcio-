@@ -1120,7 +1120,66 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
   );
 }
 
-function ModalDetalhePrestador({ p, onFechar, linkWhats, linkInsta }) {
+function AvaliacaoPrestadorForm({ prestadorId, onEnviado }) {
+  const [aberto, setAberto] = useState(false);
+  const [nome, setNome] = useState("");
+  const [nota, setNota] = useState(5);
+  const [comentario, setComentario] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    setErro("");
+    if (!nome.trim()) { setErro("Diga seu nome."); return; }
+    setEnviando(true);
+    const { error } = await supabase.from("avaliacoes").insert({
+      prestador_id: prestadorId,
+      nome: nome.trim(),
+      nota,
+      comentario: comentario.trim() || null,
+      status: "aprovado",
+    });
+    setEnviando(false);
+    if (error) { setErro(error.message || "Não consegui enviar agora."); return; }
+    setNome(""); setNota(5); setComentario(""); setAberto(false);
+    onEnviado?.();
+  };
+
+  if (!aberto) {
+    return (
+      <button type="button" onClick={() => setAberto(true)} className="font-body text-xs font-bold flex items-center gap-1 mt-3" style={{ color: C.blue }}>
+        <Star size={12} /> Avaliar / deixar depoimento
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={enviar} className="mt-3 rounded-xl border p-3 flex flex-col gap-2" style={{ borderColor: C.line, background: C.blueTint2 }}>
+      <div className="flex items-center gap-2">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" onClick={() => setNota(n)}>
+            <Star size={16} fill={n <= nota ? "#E8A23D" : "none"} color="#E8A23D" />
+          </button>
+        ))}
+      </div>
+      <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" className="font-body text-xs border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+      <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} placeholder="Conte sua experiência (opcional)" rows={2} className="font-body text-xs border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+      {erro && <p className="font-body text-[11px]" style={{ color: "#B4462F" }}>{erro}</p>}
+      <div className="flex gap-2">
+        <button type="submit" disabled={enviando} className="font-body text-xs font-bold rounded-lg px-4 py-2 text-white disabled:opacity-60" style={{ background: C.blue }}>
+          {enviando ? "Enviando..." : "Enviar"}
+        </button>
+        <button type="button" onClick={() => setAberto(false)} className="font-body text-xs font-bold rounded-lg px-4 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function ModalDetalhePrestador({ p, onFechar, linkWhats, linkInsta, avaliacoes, onAvaliacaoEnviada }) {
+  const media = avaliacoes.length ? avaliacoes.reduce((s, a) => s + a.nota, 0) / avaliacoes.length : 0;
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.6)" }} onClick={onFechar}>
       <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl max-h-[88vh] overflow-y-auto">
@@ -1158,13 +1217,29 @@ function ModalDetalhePrestador({ p, onFechar, linkWhats, linkInsta }) {
               </a>
             )}
           </div>
+
+          {avaliacoes.length > 0 && (
+            <div className="mt-4 flex items-center gap-1.5">
+              <div className="flex gap-0.5">
+                {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={13} fill={n <= Math.round(media) ? "#E8A23D" : "none"} color="#E8A23D" />)}
+              </div>
+              <span className="font-body text-xs" style={{ color: "#8896A6" }}>({avaliacoes.length} {avaliacoes.length === 1 ? "avaliação" : "avaliações"})</span>
+            </div>
+          )}
+          {avaliacoes.slice(0, 3).map((a) => (
+            <div key={a.id} className="mt-2 pl-2 border-l-2" style={{ borderColor: C.line }}>
+              <p className="font-body text-xs font-bold" style={{ color: C.ink }}>{a.nome}</p>
+              {a.comentario && <p className="font-body text-xs" style={{ color: "#5C7186" }}>{a.comentario}</p>}
+            </div>
+          ))}
+          <AvaliacaoPrestadorForm prestadorId={p.id} onEnviado={onAvaliacaoEnviada} />
         </div>
       </div>
     </div>
   );
 }
 
-function PrestadorCard({ p, agendamentoAtivo }) {
+function PrestadorCard({ p, agendamentoAtivo, avaliacoes = [], onAvaliacaoEnviada }) {
   const linkWhats = p.whatsapp ? `https://wa.me/55${String(p.whatsapp).replace(/\D/g, "")}` : null;
   const linkInsta = p.instagram ? `https://instagram.com/${String(p.instagram).replace(/^@/, "")}` : null;
   const [agendaAberta, setAgendaAberta] = useState(false);
@@ -1183,6 +1258,12 @@ function PrestadorCard({ p, agendamentoAtivo }) {
         <button type="button" onClick={() => setDetalheAberto(true)} className="text-left">
           <p className="font-display font-bold text-sm leading-snug" style={{ color: C.ink }}>{p.nome}</p>
           <p className="font-body text-xs font-semibold" style={{ color: C.blue }}>{p.servico}</p>
+          {avaliacoes.length > 0 && (
+            <span className="font-body text-[11px] flex items-center gap-1 mt-0.5" style={{ color: "#8896A6" }}>
+              <Star size={11} fill="#E8A23D" color="#E8A23D" />
+              {(avaliacoes.reduce((s, a) => s + a.nota, 0) / avaliacoes.length).toFixed(1)} ({avaliacoes.length})
+            </span>
+          )}
         </button>
         {p.endereco && (
           <p className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}>
@@ -1208,7 +1289,10 @@ function PrestadorCard({ p, agendamentoAtivo }) {
         </div>
       </div>
       {agendaAberta && <ModalAgendarHorario prestador={p} onFechar={() => setAgendaAberta(false)} />}
-      {detalheAberto && <ModalDetalhePrestador p={p} onFechar={() => setDetalheAberto(false)} linkWhats={linkWhats} linkInsta={linkInsta} />}
+      {detalheAberto && (
+        <ModalDetalhePrestador p={p} onFechar={() => setDetalheAberto(false)} linkWhats={linkWhats} linkInsta={linkInsta}
+          avaliacoes={avaliacoes} onAvaliacaoEnviada={onAvaliacaoEnviada} />
+      )}
     </div>
   );
 }
@@ -10348,6 +10432,23 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     });
   }, []);
 
+  // Avaliações de prestadores — mesma estrutura já usada pra pontos
+  // turísticos e empresas, só filtrando pela coluna prestador_id.
+  const [avaliacoesPorPrestador, setAvaliacoesPorPrestador] = useState({});
+  const carregarAvaliacoesPrestadores = () => {
+    if (!supabaseConfigurado) return;
+    supabase.from("avaliacoes").select("*").not("prestador_id", "is", null).order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (error) return;
+      const porPrestador = {};
+      (data || []).forEach((a) => {
+        if (!porPrestador[a.prestador_id]) porPrestador[a.prestador_id] = [];
+        porPrestador[a.prestador_id].push(a);
+      });
+      setAvaliacoesPorPrestador(porPrestador);
+    });
+  };
+  useEffect(() => { carregarAvaliacoesPrestadores(); }, []);
+
   const [depoimentosReais, setDepoimentosReais] = useState(null);
   useEffect(() => {
     if (!supabaseConfigurado) return;
@@ -11545,7 +11646,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
             {(prestadoresReais ?? []).map((p, i) => (
               <Reveal key={p.id} delay={i * 70}>
-                <PrestadorCard p={p} agendamentoAtivo={!!siteConfig?.agendamento_ativo} />
+                <PrestadorCard p={p} agendamentoAtivo={!!siteConfig?.agendamento_ativo} avaliacoes={avaliacoesPorPrestador[p.id] || []} onAvaliacaoEnviada={carregarAvaliacoesPrestadores} />
               </Reveal>
             ))}
           </div>
