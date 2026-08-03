@@ -296,6 +296,9 @@ textarea:focus-visible, [tabindex]:focus-visible {
   border-radius: 4px;
 }
 
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 @keyframes skeleton-shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
 .skeleton-pulse {
   background-image: linear-gradient(90deg, #EAF0F7 0px, #F6F9FC 40px, #EAF0F7 80px);
@@ -14072,14 +14075,14 @@ export default function ConectaComercio() {
       <style>{fontImport}</style>
 
       <div className="sticky top-0 z-40 flex justify-center px-3 pt-3">
-        <div className="flex items-center gap-1 bg-white rounded-full border shadow-lg p-1" style={{ borderColor: C.line }}>
+        <div className="flex items-center gap-1 bg-white rounded-full border shadow-lg p-1 max-w-full overflow-x-auto no-scrollbar" style={{ borderColor: C.line }}>
           {modos.map((m) => {
             const Icon = m.icon;
             const active = modo === m.id;
             const bloqueado = m.restrito && supabaseConfigurado && !sessao;
             return (
               <a key={m.id} href={ROTA_HASH[m.id]}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full font-body text-xs font-bold transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full font-body text-xs font-bold transition-colors cursor-pointer shrink-0"
                 style={{ background: active ? C.blue : "transparent", color: active ? "#fff" : "#425A70" }}>
                 <Icon size={13} /> {m.label} {bloqueado && <ShieldCheck size={11} style={{ opacity: 0.5 }} />}
               </a>
