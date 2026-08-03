@@ -1731,8 +1731,8 @@ function CursoCard({ c }) {
       </button>
       <div className="min-w-0 flex-1">
         <button type="button" onClick={() => setDetalheAberto(true)} className="text-left w-full">
-          <p className="font-display font-bold text-sm flex items-center gap-1.5" style={{ color: C.ink }}>
-            {c.titulo}
+          <p className="font-display font-bold text-sm flex flex-wrap items-center gap-1.5" style={{ color: C.ink }}>
+            <span className="min-w-0 break-words">{c.titulo}</span>
             {c.data_inicio && c.data_inicio < new Date().toISOString().slice(0, 10) && (
               <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#EAF0F7", color: "#5C7186" }}>Já aconteceu</span>
             )}
