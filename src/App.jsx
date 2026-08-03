@@ -70,6 +70,18 @@ function normalizarTexto(s) {
     .toLowerCase()
     .trim();
 }
+// Notificação push (Web Push) — a chave pública VAPID é segura de expor,
+// só a privada (guardada como segredo na Edge Function) assina as
+// mensagens de verdade.
+const VAPID_PUBLIC_KEY = "BEBCuOYCXVNPmGEPiQIzdHO2J2z7eDdRnf7_t7rb1dm3GF66FI4ABqxqoC3fj5UMmgvEPzIV_IBOiSsB3ME0Kxc";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
 function textoContem(campo, termo) {
   return normalizarTexto(campo).includes(normalizarTexto(termo));
 }
@@ -10365,6 +10377,56 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   const marcarNotificacoesVistas = () => {
     try { localStorage.setItem("cc_notif_vista_em", String(Date.now())); } catch {}
   };
+
+  // Notificação push de verdade (chega com o site fechado) — opcional, além
+  // do sino. O endpoint da inscrição fica salvo no navegador pra sabermos
+  // qual linha atualizar no banco quando os favoritos mudarem.
+  const [statusPush, setStatusPush] = useState(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) return "indisponivel";
+    return localStorage.getItem("cc_push_endpoint") ? "ativado" : "desativado";
+  });
+
+  const ativarNotificacoesPush = async () => {
+    if (statusPush === "indisponivel" || !supabaseConfigurado) return;
+    setStatusPush("ativando");
+    try {
+      const permissao = await Notification.requestPermission();
+      if (permissao !== "granted") { setStatusPush("desativado"); return; }
+      const registro = await navigator.serviceWorker.ready;
+      let subscription = await registro.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registro.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      }
+      const json = subscription.toJSON();
+      const idsFavoritos = Object.keys(favs).filter((k) => favs[k]);
+      const { error } = await supabase.from("push_subscriptions").upsert({
+        endpoint: json.endpoint,
+        p256dh: json.keys.p256dh,
+        auth: json.keys.auth,
+        empresas_favoritas: idsFavoritos,
+        atualizado_em: new Date().toISOString(),
+      }, { onConflict: "endpoint" });
+      if (error) throw error;
+      localStorage.setItem("cc_push_endpoint", json.endpoint);
+      setStatusPush("ativado");
+    } catch {
+      setStatusPush("erro");
+    }
+  };
+
+  // Sempre que os favoritos mudam, re-sincroniza a lista no banco (se já
+  // tiver uma inscrição ativa), pra empresa nova favoritada também gerar
+  // aviso e empresa desfavoritada parar de gerar.
+  useEffect(() => {
+    if (statusPush !== "ativado" || !supabaseConfigurado) return;
+    const endpoint = localStorage.getItem("cc_push_endpoint");
+    if (!endpoint) return;
+    const idsFavoritos = Object.keys(favs).filter((k) => favs[k]);
+    supabase.from("push_subscriptions").update({ empresas_favoritas: idsFavoritos, atualizado_em: new Date().toISOString() }).eq("endpoint", endpoint).then(() => {});
+  }, [favs, statusPush]);
   const [empresasReais, setEmpresasReais] = useState(null); // null = ainda carregando / indisponível
   const [produtosReais, setProdutosReais] = useState(null);
   const [vagasReais, setVagasReais] = useState(null);
@@ -10844,6 +10906,19 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
               {notifAberta && (
                 <div className="absolute right-0 mt-2 w-72 rounded-2xl border bg-white shadow-2xl p-3 z-40" style={{ borderColor: C.line }}>
                   <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Promoções das suas empresas favoritas</p>
+                  {statusPush !== "indisponivel" && statusPush !== "ativado" && (
+                    <button type="button" onClick={ativarNotificacoesPush} disabled={statusPush === "ativando"}
+                      className="w-full flex items-center gap-1.5 rounded-lg px-2.5 py-2 mb-2 font-body text-[11px] font-bold disabled:opacity-60"
+                      style={{ background: C.blueTint2, color: C.blue }}>
+                      <Bell size={12} />
+                      {statusPush === "ativando" ? "Ativando..." : statusPush === "erro" ? "Não deu certo, tentar de novo" : "Ativar notificação no celular/navegador"}
+                    </button>
+                  )}
+                  {statusPush === "ativado" && (
+                    <p className="font-body text-[11px] flex items-center gap-1.5 mb-2" style={{ color: "#1E8E5A" }}>
+                      <BadgeCheck size={12} /> Notificações ativadas
+                    </p>
+                  )}
                   {notificacoesFavoritas.lista.length === 0 ? (
                     <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nada por aqui ainda. Favorite empresas (❤) pra ver as promoções delas.</p>
                   ) : (

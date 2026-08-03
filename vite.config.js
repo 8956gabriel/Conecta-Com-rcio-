@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.js",
       registerType: "autoUpdate",
       injectRegister: false,
       includeAssets: ["icon-192.png", "icon-512.png", "robots.txt"],
@@ -32,28 +35,9 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,png,svg,ico,webp,woff2}"],
-        navigateFallback: "/index.html",
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) => url.hostname.includes("supabase.co"),
-            handler: "NetworkOnly",
-          },
-          {
-            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
-            handler: "NetworkOnly",
-          },
-          {
-            urlPattern: ({ request }) => request.destination === "image",
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "imagens-conecta-comercio",
-              expiration: { maxEntries: 120, maxAgeSeconds: 30 * 24 * 60 * 60 },
-            },
-          },
-        ],
       },
       devOptions: { enabled: false },
     }),
