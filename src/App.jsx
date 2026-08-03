@@ -4561,6 +4561,25 @@ function AdminPanel() {
     [todosUsuariosAdmin]
   );
 
+  // Relatório de acessos — mesma base de usuários, olhada por atividade em
+  // vez de cadastro. FASE 63.
+  const [filtroTipoAcessosAdmin, setFiltroTipoAcessosAdmin] = useState("");
+  const relatorioAcessosAdmin = useMemo(() => {
+    const agora = Date.now();
+    const umDia = 24 * 60 * 60 * 1000;
+    const umaSemana = 7 * umDia;
+    let lista = todosUsuariosAdmin ?? [];
+    if (filtroTipoAcessosAdmin) lista = lista.filter((u) => u.tipo === filtroTipoAcessosAdmin);
+    const ordenada = [...lista].sort((a, b) => new Date(b.ultimo_acesso || 0) - new Date(a.ultimo_acesso || 0));
+    return {
+      lista: ordenada,
+      onlineAgora: lista.filter((u) => estaOnline(u.ultimo_acesso)).length,
+      ativosHoje: lista.filter((u) => u.ultimo_acesso && agora - new Date(u.ultimo_acesso).getTime() <= umDia).length,
+      ativosSemana: lista.filter((u) => u.ultimo_acesso && agora - new Date(u.ultimo_acesso).getTime() <= umaSemana).length,
+      nuncaAcessou: lista.filter((u) => !u.ultimo_acesso).length,
+    };
+  }, [todosUsuariosAdmin, filtroTipoAcessosAdmin]);
+
   const totalPaginasUsuariosAdmin = Math.max(1, Math.ceil(todosUsuariosFiltradosAdmin.length / ITENS_POR_PAGINA_USUARIOS));
   const usuariosPaginaAtualAdmin = todosUsuariosFiltradosAdmin.slice(
     (paginaTodosUsuariosAdmin - 1) * ITENS_POR_PAGINA_USUARIOS,
@@ -4692,6 +4711,7 @@ function AdminPanel() {
     { id: "dashboard", label: "Estatísticas", icon: LayoutDashboard },
     { id: "usuarios", label: "Cadastrar usuário", icon: UserCircle2 },
     { id: "todos-usuarios", label: "Usuários cadastrados", icon: Users },
+    { id: "acessos", label: "Relatório de acessos", icon: TrendingUp },
     { id: "categorias", label: "Categorias", icon: Tag },
     { id: "empresas", label: "Comerciantes", icon: CheckCircle2 },
     { id: "criterios", label: "Critérios de participação", icon: ClipboardList },
@@ -5384,6 +5404,95 @@ function AdminPanel() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {tab === "acessos" && (
+          <div>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <SectionHeader eyebrow="Atividade" title="Relatório de acessos" sub="Quem está online agora e quando cada um acessou pela última vez" />
+              <button onClick={carregarTodosUsuariosAdmin} title="Atualizar"
+                className="font-body text-xs font-bold rounded-lg px-3 py-2.5 flex items-center gap-1.5 border shrink-0" style={{ borderColor: C.line, color: "#425A70" }}>
+                <RefreshCw size={14} /> Atualizar
+              </button>
+            </div>
+            {!supabaseConfigurado && (
+              <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
+                <BadgeCheck size={14} className="mt-0.5 shrink-0" />
+                Modo demonstração: conecte o Supabase para ver os acessos reais.
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2 mb-5">
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line, background: "#E7F6EE" }}>
+                <p className="font-display font-extrabold text-2xl" style={{ color: "#1E8E5A" }}>{relatorioAcessosAdmin.onlineAgora}</p>
+                <p className="font-body text-xs font-semibold mt-0.5" style={{ color: "#1E8E5A" }}>Online agora</p>
+              </div>
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                <p className="font-display font-extrabold text-2xl" style={{ color: C.ink }}>{relatorioAcessosAdmin.ativosHoje}</p>
+                <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>Ativos nas últimas 24h</p>
+              </div>
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                <p className="font-display font-extrabold text-2xl" style={{ color: C.ink }}>{relatorioAcessosAdmin.ativosSemana}</p>
+                <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>Ativos nos últimos 7 dias</p>
+              </div>
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                <p className="font-display font-extrabold text-2xl" style={{ color: C.ink }}>{relatorioAcessosAdmin.nuncaAcessou}</p>
+                <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>Nunca acessaram</p>
+              </div>
+            </div>
+
+            <select value={filtroTipoAcessosAdmin} onChange={(e) => setFiltroTipoAcessosAdmin(e.target.value)}
+              className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white mb-3" style={{ borderColor: C.line }}>
+              <option value="">Todos os perfis</option>
+              <option value="cliente">Cliente</option>
+              <option value="empresario">Empresário</option>
+              <option value="prestador">Prestador</option>
+              <option value="admin">Administrador</option>
+            </select>
+
+            <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
+              <table className="w-full text-left border-collapse min-w-[640px]">
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Nome</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Perfil</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Cadastro</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Último acesso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!todosUsuariosAdmin && [0, 1, 2, 3].map((i) => (
+                    <tr key={`sk-${i}`} style={{ borderBottom: `1px solid ${C.line}` }}>
+                      {Array.from({ length: 4 }).map((_, j) => <td key={j} className="px-3 py-2.5"><Skeleton className="w-20 h-3.5" /></td>)}
+                    </tr>
+                  ))}
+                  {relatorioAcessosAdmin.lista.map((u) => (
+                    <tr key={u.id} style={{ borderBottom: `1px solid ${C.line}` }}>
+                      <td className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{u.nome || "—"}</td>
+                      <td className="px-3 py-2.5">
+                        <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
+                      </td>
+                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                      <td className="px-3 py-2.5">
+                        <span className="font-body text-xs flex items-center gap-1.5" style={{ color: estaOnline(u.ultimo_acesso) ? "#1E8E5A" : "#5C7186" }}>
+                          {estaOnline(u.ultimo_acesso) && (
+                            <span className="relative flex h-1.5 w-1.5 shrink-0">
+                              <span className="pulse-dot absolute inline-flex h-full w-full rounded-full" style={{ background: "#25A85B" }} />
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: "#25A85B" }} />
+                            </span>
+                          )}
+                          {estaOnline(u.ultimo_acesso) ? "Online agora" : formatarUltimoAcesso(u.ultimo_acesso)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {todosUsuariosAdmin && relatorioAcessosAdmin.lista.length === 0 && (
+                <p className="font-body text-sm p-4" style={{ color: "#5C7186" }}>Nenhum usuário encontrado.</p>
+              )}
+            </div>
           </div>
         )}
 
