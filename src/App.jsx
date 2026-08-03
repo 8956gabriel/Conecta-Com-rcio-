@@ -9919,6 +9919,64 @@ function HeroCarousel({ slides }) {
   );
 }
 
+function ModalDetalheFeirante({ f, onFechar }) {
+  const linkWhats = f.whatsapp ? `https://wa.me/55${String(f.whatsapp).replace(/\D/g, "")}` : null;
+  const linkInsta = f.instagram ? `https://instagram.com/${String(f.instagram).replace(/^@/, "")}` : null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.6)" }} onClick={onFechar}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl max-h-[88vh] overflow-y-auto">
+        <div className="h-44 relative overflow-hidden shrink-0" style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
+          {f.fotos_urls?.[0] ? (
+            <img loading="lazy" decoding="async" src={f.fotos_urls[0]} alt={f.nome} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center"><PartyPopper size={40} className="text-white/90" /></div>
+          )}
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(5,26,46,0.75), rgba(5,26,46,0) 55%)" }} />
+          <button onClick={onFechar} className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center bg-white/90" aria-label="Fechar"><X size={16} color="#425A70" /></button>
+          <div className="absolute left-5 bottom-4 right-5">
+            <p className="font-display font-extrabold text-lg text-white">{f.nome}</p>
+            <p className="font-body text-xs font-semibold text-white/85 mt-0.5">{f.produto}</p>
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="flex flex-wrap gap-2">
+            {f.categoria && (
+              <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{f.categoria}</span>
+            )}
+            {(f.local || f.numero_estande) && (
+              <span className="font-body text-xs flex items-center gap-1" style={{ color: "#8896A6" }}>
+                <MapPin size={12} /> {[f.local, f.numero_estande ? `Barraca ${f.numero_estande}` : null].filter(Boolean).join(" · ")}
+              </span>
+            )}
+          </div>
+          {f.descricao && <p className="font-body text-sm mt-3" style={{ color: "#425A70" }}>{f.descricao}</p>}
+
+          {f.fotos_urls?.length > 1 && (
+            <div className="flex gap-1.5 mt-3 flex-wrap">
+              {f.fotos_urls.slice(1).map((url, i) => (
+                <img key={i} loading="lazy" decoding="async" src={url} alt="" className="w-16 h-16 rounded-lg object-cover" />
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2 mt-4">
+            {linkWhats && (
+              <a href={linkWhats} target="_blank" rel="noopener noreferrer" className="glow-btn flex-1 flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold font-body text-white" style={{ background: "#25A85B" }}>
+                <MessageCircle size={15} /> WhatsApp
+              </a>
+            )}
+            {linkInsta && (
+              <a href={linkInsta} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 rounded-xl py-3 px-4 text-sm font-bold font-body border" style={{ borderColor: C.line, color: C.blue }}>
+                <Instagram size={15} />
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   const { nomeCidade, nomeCidadeUF } = useCidade();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -10180,6 +10238,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   useEffect(() => { try { localStorage.setItem("cc_favoritos_produtos", JSON.stringify(favsProdutos)); } catch {} }, [favsProdutos]);
 
   const [empresaAberta, setEmpresaAberta] = useState(null);
+  const [feiranteAberto, setFeiranteAberto] = useState(null);
 
   // Abrir/fechar o perfil de uma empresa também atualiza o endereço (URL) da
   // página, pra virar um link de verdade — copiável, compartilhável no
@@ -11213,17 +11272,19 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {(feirantesReais ?? []).map((f, i) => (
                 <Reveal key={f.id} delay={i * 60}>
-                  <div className="rounded-2xl border overflow-hidden h-full flex flex-col" style={{ borderColor: C.line }}>
-                    <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                  <div className="glow-card rounded-2xl border overflow-hidden h-full flex flex-col" style={{ borderColor: C.line }}>
+                    <button type="button" onClick={() => setFeiranteAberto(f)} className="aspect-[4/3] bg-gray-100 overflow-hidden w-full text-left">
                       {f.fotos_urls && f.fotos_urls[0] ? (
                         <img loading="lazy" decoding="async" src={f.fotos_urls[0]} alt={f.nome} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center" style={{ background: C.blueTint, color: C.blue }}><PartyPopper size={22} /></div>
                       )}
-                    </div>
+                    </button>
                     <div className="p-3.5 flex-1 flex flex-col">
-                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.nome}</p>
-                      <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{f.produto}</p>
+                      <button type="button" onClick={() => setFeiranteAberto(f)} className="text-left">
+                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.nome}</p>
+                        <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{f.produto}</p>
+                      </button>
                       {f.categoria && (
                         <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 w-fit" style={{ background: C.blueTint, color: C.blue }}>{f.categoria}</span>
                       )}
@@ -11248,6 +11309,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       </section>
 
       {modalFeiranteAberto && <ModalCadastroFeirante onFechar={() => setModalFeiranteAberto(false)} />}
+      {feiranteAberto && <ModalDetalheFeirante f={feiranteAberto} onFechar={() => setFeiranteAberto(null)} />}
 
       {/* Calendário de eventos — só o administrador edita, todo mundo vê */}
       <section className="max-w-6xl mx-auto px-4 md:px-6 pb-12">
