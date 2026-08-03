@@ -1120,23 +1120,70 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
   );
 }
 
+function ModalDetalhePrestador({ p, onFechar, linkWhats, linkInsta }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.6)" }} onClick={onFechar}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl max-h-[88vh] overflow-y-auto">
+        <div className="h-44 relative overflow-hidden shrink-0" style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
+          {p.foto_url ? (
+            <img loading="lazy" decoding="async" src={p.foto_url} alt={p.nome} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center"><Wrench size={40} className="text-white/90" /></div>
+          )}
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(5,26,46,0.75), rgba(5,26,46,0) 55%)" }} />
+          <button onClick={onFechar} className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center bg-white/90" aria-label="Fechar"><X size={16} color="#425A70" /></button>
+          <div className="absolute left-5 bottom-4 right-5">
+            <p className="font-display font-extrabold text-lg text-white">{p.nome}</p>
+            <p className="font-body text-xs font-semibold text-white/85 mt-0.5">{p.servico}</p>
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="flex flex-wrap gap-3">
+            {p.endereco && <span className="font-body text-xs flex items-center gap-1" style={{ color: "#8896A6" }}><MapPin size={12} /> {p.endereco}</span>}
+            {p.google_maps_url && (
+              <a href={p.google_maps_url} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold flex items-center gap-1" style={{ color: C.blue }}>
+                <ExternalLink size={12} /> Ver no mapa
+              </a>
+            )}
+          </div>
+          <div className="flex gap-2 mt-4">
+            {linkWhats && (
+              <a href={linkWhats} target="_blank" rel="noreferrer" className="glow-btn flex-1 flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold font-body text-white" style={{ background: "#25A85B" }}>
+                <MessageCircle size={15} /> WhatsApp
+              </a>
+            )}
+            {linkInsta && (
+              <a href={linkInsta} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 rounded-xl py-3 px-4 text-sm font-bold font-body border" style={{ borderColor: C.line, color: C.blue }}>
+                <Instagram size={15} />
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PrestadorCard({ p, agendamentoAtivo }) {
   const linkWhats = p.whatsapp ? `https://wa.me/55${String(p.whatsapp).replace(/\D/g, "")}` : null;
   const linkInsta = p.instagram ? `https://instagram.com/${String(p.instagram).replace(/^@/, "")}` : null;
   const [agendaAberta, setAgendaAberta] = useState(false);
+  const [detalheAberto, setDetalheAberto] = useState(false);
   return (
     <div className="glow-card rounded-2xl border overflow-hidden flex flex-col"
       style={{ borderColor: C.line, background: "rgba(255,255,255,0.7)", backdropFilter: "blur(10px)" }}>
-      <div className="h-24 relative flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
+      <button type="button" onClick={() => setDetalheAberto(true)} className="h-24 relative flex items-center justify-center overflow-hidden w-full text-left" style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
         {p.foto_url ? (
           <img loading="lazy" decoding="async" src={p.foto_url} alt={p.nome} className="w-full h-full object-cover" />
         ) : (
           <Wrench className="text-white/90" size={26} />
         )}
-      </div>
+      </button>
       <div className="p-4 flex flex-col gap-1.5 flex-1">
-        <p className="font-display font-bold text-sm leading-snug" style={{ color: C.ink }}>{p.nome}</p>
-        <p className="font-body text-xs font-semibold" style={{ color: C.blue }}>{p.servico}</p>
+        <button type="button" onClick={() => setDetalheAberto(true)} className="text-left">
+          <p className="font-display font-bold text-sm leading-snug" style={{ color: C.ink }}>{p.nome}</p>
+          <p className="font-body text-xs font-semibold" style={{ color: C.blue }}>{p.servico}</p>
+        </button>
         {p.endereco && (
           <p className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}>
             <MapPin size={11} /> {p.endereco}
@@ -1161,6 +1208,7 @@ function PrestadorCard({ p, agendamentoAtivo }) {
         </div>
       </div>
       {agendaAberta && <ModalAgendarHorario prestador={p} onFechar={() => setAgendaAberta(false)} />}
+      {detalheAberto && <ModalDetalhePrestador p={p} onFechar={() => setDetalheAberto(false)} linkWhats={linkWhats} linkInsta={linkInsta} />}
     </div>
   );
 }
