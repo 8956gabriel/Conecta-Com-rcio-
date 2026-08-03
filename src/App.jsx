@@ -82,6 +82,26 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 
+const MINUTOS_PARA_CONSIDERAR_ONLINE = 5;
+
+function estaOnline(ultimoAcesso) {
+  if (!ultimoAcesso) return false;
+  return Date.now() - new Date(ultimoAcesso).getTime() <= MINUTOS_PARA_CONSIDERAR_ONLINE * 60 * 1000;
+}
+
+function formatarUltimoAcesso(ultimoAcesso) {
+  if (!ultimoAcesso) return "Nunca acessou";
+  const diffMs = Date.now() - new Date(ultimoAcesso).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "agora mesmo";
+  if (diffMin < 60) return `há ${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `há ${diffH}h`;
+  const diffDias = Math.floor(diffH / 24);
+  if (diffDias < 30) return `há ${diffDias} ${diffDias === 1 ? "dia" : "dias"}`;
+  return new Date(ultimoAcesso).toLocaleDateString("pt-BR");
+}
+
 function textoContem(campo, termo) {
   return normalizarTexto(campo).includes(normalizarTexto(termo));
 }
@@ -4512,7 +4532,7 @@ function AdminPanel() {
 
   const carregarTodosUsuariosAdmin = () => {
     if (!supabaseConfigurado) return;
-    supabase.from("perfis").select("id, nome, email, tipo, telefone, instagram, cpf, cnpj, bloqueado, criado_em").order("criado_em", { ascending: false })
+    supabase.from("perfis").select("id, nome, email, tipo, telefone, instagram, cpf, cnpj, bloqueado, criado_em, ultimo_acesso").order("criado_em", { ascending: false })
       .then(({ data, error }) => { if (!error) setTodosUsuariosAdmin(data || []); });
   };
 
@@ -4531,9 +4551,15 @@ function AdminPanel() {
     if (ordenacaoTodosUsuariosAdmin === "nome") lista.sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
     else if (ordenacaoTodosUsuariosAdmin === "perfil") lista.sort((a, b) => (a.tipo || "").localeCompare(b.tipo || ""));
     else if (ordenacaoTodosUsuariosAdmin === "antigos") lista.sort((a, b) => new Date(a.criado_em || 0) - new Date(b.criado_em || 0));
+    else if (ordenacaoTodosUsuariosAdmin === "acesso") lista.sort((a, b) => new Date(b.ultimo_acesso || 0) - new Date(a.ultimo_acesso || 0));
     else lista.sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0)); // recentes
     return lista;
   }, [todosUsuariosAdmin, buscaTodosUsuariosAdmin, filtroTipoTodosUsuariosAdmin, ordenacaoTodosUsuariosAdmin]);
+
+  const usuariosOnlineAgoraAdmin = useMemo(
+    () => (todosUsuariosAdmin ?? []).filter((u) => estaOnline(u.ultimo_acesso)).length,
+    [todosUsuariosAdmin]
+  );
 
   const totalPaginasUsuariosAdmin = Math.max(1, Math.ceil(todosUsuariosFiltradosAdmin.length / ITENS_POR_PAGINA_USUARIOS));
   const usuariosPaginaAtualAdmin = todosUsuariosFiltradosAdmin.slice(
@@ -5194,7 +5220,16 @@ function AdminPanel() {
         {tab === "todos-usuarios" && (
           <div>
             <div className="flex items-start justify-between gap-3 flex-wrap">
-              <SectionHeader eyebrow="Acesso" title="Usuários cadastrados" sub="Todo mundo que já se cadastrou na plataforma" />
+              <div>
+                <SectionHeader eyebrow="Acesso" title="Usuários cadastrados" sub="Todo mundo que já se cadastrou na plataforma" />
+                <span className="inline-flex items-center gap-1.5 mt-1.5 rounded-full pl-2 pr-3 py-1 font-body text-xs font-bold" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>
+                  <span className="relative flex h-2 w-2">
+                    <span className="pulse-dot absolute inline-flex h-full w-full rounded-full" style={{ background: "#25A85B" }} />
+                    <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: "#25A85B" }} />
+                  </span>
+                  {usuariosOnlineAgoraAdmin} {usuariosOnlineAgoraAdmin === 1 ? "online agora" : "online agora"}
+                </span>
+              </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={carregarTodosUsuariosAdmin} title="Atualizar lista"
                   className="font-body text-xs font-bold rounded-lg px-3 py-2.5 flex items-center gap-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>
@@ -5228,6 +5263,7 @@ function AdminPanel() {
                 className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white" style={{ borderColor: C.line }}>
                 <option value="recentes">Mais recentes</option>
                 <option value="antigos">Mais antigos</option>
+                <option value="acesso">Último acesso</option>
                 <option value="nome">Nome (A-Z)</option>
                 <option value="perfil">Perfil (A-Z)</option>
               </select>
@@ -5253,6 +5289,7 @@ function AdminPanel() {
                     <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>CPF</th>
                     <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>CNPJ</th>
                     <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Cadastro</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Último acesso</th>
                     <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Status</th>
                     <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Ações</th>
                   </tr>
@@ -5260,7 +5297,7 @@ function AdminPanel() {
                 <tbody>
                   {!todosUsuariosAdmin && [0, 1, 2, 3].map((i) => (
                     <tr key={`sk-${i}`} style={{ borderBottom: `1px solid ${C.line}` }}>
-                      {Array.from({ length: 9 }).map((_, j) => <td key={j} className="px-3 py-2.5"><Skeleton className="w-20 h-3.5" /></td>)}
+                      {Array.from({ length: 10 }).map((_, j) => <td key={j} className="px-3 py-2.5"><Skeleton className="w-20 h-3.5" /></td>)}
                     </tr>
                   ))}
                   {usuariosPaginaAtualAdmin.map((u) => (
@@ -5277,6 +5314,7 @@ function AdminPanel() {
                           <td className="px-3 py-2"><input value={formUsuarioAdmin.cpf} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, cpf: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
                           <td className="px-3 py-2"><input value={formUsuarioAdmin.cnpj} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, cnpj: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
                           <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{formatarUltimoAcesso(u.ultimo_acesso)}</td>
                           <td className="px-3 py-2.5">{u.bloqueado ? "Bloqueado" : "Ativo"}</td>
                           <td className="px-3 py-2.5">
                             <button onClick={() => salvarEdicaoUsuarioAdmin(u.id)} className="font-body text-xs font-bold" style={{ color: C.blue }}>Salvar</button>
@@ -5294,6 +5332,17 @@ function AdminPanel() {
                           <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.cpf || "—"}</td>
                           <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.cnpj || "—"}</td>
                           <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td className="px-3 py-2.5">
+                            <span className="font-body text-xs flex items-center gap-1.5" style={{ color: estaOnline(u.ultimo_acesso) ? "#1E8E5A" : "#5C7186" }}>
+                              {estaOnline(u.ultimo_acesso) && (
+                                <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                  <span className="pulse-dot absolute inline-flex h-full w-full rounded-full" style={{ background: "#25A85B" }} />
+                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: "#25A85B" }} />
+                                </span>
+                              )}
+                              {estaOnline(u.ultimo_acesso) ? "Online agora" : formatarUltimoAcesso(u.ultimo_acesso)}
+                            </span>
+                          </td>
                           <td className="px-3 py-2.5">
                             <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: u.bloqueado ? "#FBEAE5" : "#E7F6EE", color: u.bloqueado ? "#B4462F" : "#1E8E5A" }}>
                               {u.bloqueado ? "Bloqueado" : "Ativo"}
@@ -13943,6 +13992,18 @@ export default function ConectaComercio() {
     });
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  // "Heartbeat" de atividade — atualiza o último acesso do usuário logado
+  // de tempos em tempos, pra o admin ver quem esteve ativo recentemente.
+  useEffect(() => {
+    if (!supabaseConfigurado || !sessao?.user?.id) return;
+    const atualizarUltimoAcesso = () => {
+      supabase.from("perfis").update({ ultimo_acesso: new Date().toISOString() }).eq("id", sessao.user.id).then(() => {});
+    };
+    atualizarUltimoAcesso();
+    const intervalo = setInterval(atualizarUltimoAcesso, 2 * 60 * 1000);
+    return () => clearInterval(intervalo);
+  }, [sessao?.user?.id]);
 
   // Busca o perfil (tipo: cliente/empresario/admin) assim que há sessão.
   const [contaBloqueada, setContaBloqueada] = useState(false);
