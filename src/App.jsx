@@ -3122,6 +3122,31 @@ function AdminPanel() {
       if (!error) setFomentoLeadsAdmin(data || []);
     });
   }, []);
+  const ROTULO_STATUS_FOMENTO = { recebido: "Recebido", em_analise: "Em análise", concedido: "Concedido", negado: "Negado" };
+  const CONTAGEM_STATUS_FOMENTO_VAZIA = { recebido: 0, em_analise: 0, concedido: 0, negado: 0 };
+  const contagemStatusFomento = (fomentoLeadsAdmin ?? []).reduce(
+    (acc, l) => ({ ...acc, [l.status || "recebido"]: (acc[l.status || "recebido"] || 0) + 1 }),
+    CONTAGEM_STATUS_FOMENTO_VAZIA
+  );
+  const atualizarStatusFomentoLead = async (id, status) => {
+    const { error } = await supabase.from("fomento_leads").update({ status }).eq("id", id);
+    if (!error) setFomentoLeadsAdmin((atual) => atual.map((l) => (l.id === id ? { ...l, status } : l)));
+    else notificar(error.message || "Não foi possível atualizar o status.", "erro");
+  };
+  const [valorConcedidoEdicao, setValorConcedidoEdicao] = useState({}); // { [id]: texto digitado }
+  const salvarValorConcedidoFomento = async (id) => {
+    const texto = valorConcedidoEdicao[id];
+    if (texto === undefined) return;
+    const valor = texto.trim() === "" ? null : Number(texto);
+    const { error } = await supabase.from("fomento_leads").update({ valor_concedido: valor }).eq("id", id);
+    if (!error) {
+      setFomentoLeadsAdmin((atual) => atual.map((l) => (l.id === id ? { ...l, valor_concedido: valor } : l)));
+      setValorConcedidoEdicao((atual) => { const { [id]: _omit, ...resto } = atual; return resto; });
+    } else {
+      notificar(error.message || "Não foi possível salvar o valor.", "erro");
+    }
+  };
+  const totalConcedidoFomento = (fomentoLeadsAdmin ?? []).reduce((s, l) => s + (Number(l.valor_concedido) || 0), 0);
 
   const enviarFotoFomento = (e) => {
     const arquivo = e.target.files?.[0];
@@ -8269,8 +8294,18 @@ function AdminPanel() {
             </form>
 
             {fomentoLeadsAdmin && fomentoLeadsAdmin.length > 0 && (
-              <div className="mt-6 max-w-lg">
+              <div className="mt-6 max-w-2xl">
                 <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Pessoas interessadas ({fomentoLeadsAdmin.length})</p>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => (
+                    <span key={chave} className="font-body text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: C.blueTint, color: C.blue }}>
+                      {rotulo}: {contagemStatusFomento[chave] || 0}
+                    </span>
+                  ))}
+                  <span className="font-body text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: C.amber, color: C.blueDeep }}>
+                    Total concedido: R$ {totalConcedidoFomento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
                 <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -8279,6 +8314,8 @@ function AdminPanel() {
                         <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>WhatsApp</th>
                         <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Data</th>
                         <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Documentos</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Status</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Valor concedido</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -8304,6 +8341,23 @@ function AdminPanel() {
                                 Baixar ({l.documentos_urls.length})
                               </button>
                             )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <select value={l.status || "recebido"} onChange={(e) => atualizarStatusFomentoLead(l.id, e.target.value)}
+                              className="font-body text-xs border rounded-lg px-2 py-1 outline-none bg-white" style={{ borderColor: C.line }}>
+                              {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => <option key={chave} value={chave}>{rotulo}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1.5">
+                              <input type="number" min={0} step="0.01" placeholder="R$"
+                                value={valorConcedidoEdicao[l.id] ?? (l.valor_concedido ?? "")}
+                                onChange={(e) => setValorConcedidoEdicao((atual) => ({ ...atual, [l.id]: e.target.value }))}
+                                className="w-24 font-body text-xs border rounded-lg px-2 py-1 outline-none" style={{ borderColor: C.line }} />
+                              {valorConcedidoEdicao[l.id] !== undefined && (
+                                <button onClick={() => salvarValorConcedidoFomento(l.id)} className="font-body text-[10px] font-bold px-2 py-1 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -10788,6 +10842,19 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     linhas.forEach((l) => l.meses.forEach((v, i) => { totaisMeses[i] += v; }));
     return { linhas, totaisMeses, totalGeral: totaisMeses.reduce((s, v) => s + v, 0) };
   }, [totaisSalaPublicos, anoSalaPublico]);
+  const mesAtualSalaPublico = useMemo(() => {
+    const hoje = new Date();
+    if (!totaisSalaPublicos) return { total: 0, nome: MESES_ABREV[hoje.getMonth()] };
+    const total = totaisSalaPublicos
+      .filter((r) => r.ano === hoje.getFullYear() && r.mes === hoje.getMonth() + 1)
+      .reduce((s, r) => s + r.total, 0);
+    return { total, nome: MESES_ABREV[hoje.getMonth()] };
+  }, [totaisSalaPublicos]);
+  const [qtdCursosPublico, setQtdCursosPublico] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("cursos").select("*", { count: "exact", head: true }).then(({ count }) => setQtdCursosPublico(count ?? 0));
+  }, []);
   const [licitacaoNome, setLicitacaoNome] = useState("");
   const [licitacaoWhatsapp, setLicitacaoWhatsapp] = useState("");
   const [enviandoLicitacao, setEnviandoLicitacao] = useState(false);
@@ -12078,9 +12145,19 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
           <Reveal><SectionHeader eyebrow="Empreendedorismo" title="Sala do Empreendedor" sub={`Atendimentos prestados em ${anoSalaPublico} — números oficiais (fonte: Sebrae)`} /></Reveal>
           <Reveal>
-            <div className="rounded-2xl border p-4 mt-4" style={{ borderColor: C.line, background: C.blueTint }}>
-              <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{relatorioSalaPublico.totalGeral}</p>
-              <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Atendimentos realizados em {anoSalaPublico}</p>
+            <div className="grid sm:grid-cols-3 gap-3 mt-4">
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line, background: C.blueTint }}>
+                <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{relatorioSalaPublico.totalGeral}</p>
+                <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Atendimentos realizados em {anoSalaPublico}</p>
+              </div>
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line, background: C.blueTint }}>
+                <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{mesAtualSalaPublico.total}</p>
+                <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Atendimentos em {mesAtualSalaPublico.nome}</p>
+              </div>
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line, background: C.blueTint }}>
+                <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{qtdCursosPublico ?? "—"}</p>
+                <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Cursos oferecidos</p>
+              </div>
             </div>
           </Reveal>
           <Reveal>
