@@ -3159,6 +3159,70 @@ function AdminPanel() {
   };
   const totalConcedidoFomento = (fomentoLeadsAdmin ?? []).reduce((s, l) => s + (Number(l.valor_concedido) || 0), 0);
 
+  const formatarValorRelatorioFomento = (v) => v != null ? Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "—";
+
+  const exportarFomentoExcel = () => {
+    const cabecalho = ["Nome/Categoria", "Status", "Valor concedido (R$)", "Data", "Orientação", "Proposta"];
+    const linhas = (fomentoLeadsAdmin ?? []).map((l) => [
+      l.nome || l.categoria || "—",
+      ROTULO_STATUS_FOMENTO[l.status] || l.status || "—",
+      formatarValorRelatorioFomento(l.valor_concedido),
+      l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—",
+      l.orientacao || "",
+      l.proposta || "",
+    ]);
+    linhas.push(["TOTAL CONCEDIDO", "", formatarValorRelatorioFomento(totalConcedidoFomento), "", "", ""]);
+    const csv = [cabecalho, ...linhas].map((linha) => linha.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "fomento-parana.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportarFomentoPDF = () => {
+    const janela = window.open("", "_blank");
+    if (!janela) return;
+    const linhasHtml = (fomentoLeadsAdmin ?? []).map((l) => `
+      <tr>
+        <td>${l.nome || l.categoria || "—"}</td>
+        <td>${ROTULO_STATUS_FOMENTO[l.status] || l.status || "—"}</td>
+        <td class="num">R$ ${formatarValorRelatorioFomento(l.valor_concedido)}</td>
+        <td>${l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+        <td>${l.orientacao || ""}</td>
+        <td>${l.proposta || ""}</td>
+      </tr>
+    `).join("");
+    janela.document.write(`
+      <html><head><title>Fomento Paraná — Ivatuba</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:24px;color:#0E2233}
+        h2{margin-bottom:4px} p{color:#5C7186;margin-top:0;font-size:12px}
+        table{width:100%;border-collapse:collapse;margin-top:16px}
+        th,td{border:1px solid #DCE7F2;padding:6px 8px;text-align:left;font-size:12px}
+        th{background:#EAF2FB;color:#0A5AA8}
+        td.num,th.num{text-align:right}
+        tfoot td{font-weight:bold;background:#EAF2FB}
+      </style></head>
+      <body>
+        <h2>Relatório de Pedidos — Fomento Paraná — Ivatuba</h2>
+        <p>${(fomentoLeadsAdmin ?? []).length} pedido(s) · gerado em ${new Date().toLocaleDateString("pt-BR")}</p>
+        <table>
+          <thead><tr><th>Nome/Categoria</th><th>Status</th><th class="num">Valor concedido</th><th>Data</th><th>Orientação</th><th>Proposta</th></tr></thead>
+          <tbody>${linhasHtml}</tbody>
+          <tfoot><tr><td colspan="2">TOTAL CONCEDIDO</td><td class="num">R$ ${formatarValorRelatorioFomento(totalConcedidoFomento)}</td><td colspan="3"></td></tr></tfoot>
+        </table>
+      </body></html>
+    `);
+    janela.document.close();
+    janela.focus();
+    setTimeout(() => janela.print(), 300);
+  };
+
   // Cadastro manual de pedido do Fomento direto pelo admin (sem precisar
   // que a pessoa preencha o formulário público), tudo na aba Sala do
   // Empreendedor: valor, orientação, proposta, anexo e status.
@@ -7152,9 +7216,19 @@ function AdminPanel() {
             )}
 
             <div className="mt-4 border-t pt-6" style={{ borderColor: C.line }}>
-              <SectionHeader eyebrow="Crédito" title="Fomento Paraná — pedidos" sub="Cadastre e acompanhe cada pedido de crédito: valor, orientação, proposta, anexo e status" />
+              <div className="flex items-start justify-between flex-wrap gap-3">
+                <SectionHeader eyebrow="Crédito" title="Fomento Paraná — pedidos" sub="Cadastre e acompanhe cada pedido de crédito: valor, orientação, proposta, anexo e status" />
+                <div className="flex gap-2 h-fit shrink-0">
+                  <button onClick={exportarFomentoExcel} className="font-body text-xs font-bold px-3 py-2 rounded-lg border flex items-center gap-1.5" style={{ borderColor: C.line, color: "#425A70" }}>
+                    <FileText size={13} /> Excel
+                  </button>
+                  <button onClick={exportarFomentoPDF} className="font-body text-xs font-bold px-3 py-2 rounded-lg border flex items-center gap-1.5" style={{ borderColor: C.line, color: "#425A70" }}>
+                    <FileText size={13} /> PDF
+                  </button>
+                </div>
+              </div>
 
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4 mt-3">
                 {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => (
                   <span key={chave} className="font-body text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: C.blueTint, color: C.blue }}>
                     {rotulo}: {contagemStatusFomento[chave] || 0}
