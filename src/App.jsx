@@ -2103,103 +2103,59 @@ function AdminPanel() {
   }, []);
 
   // -------------------------------------------------------------------------
-  // Sala do Empreendedor — registro interno de atendimentos (categoria +
-  // detalhe + data), com relatório por ano/mês no mesmo formato do relatório
-  // oficial do Sebrae (categorias x meses + totais).
-  // -------------------------------------------------------------------------
-  const atendimentoSalaVazio = { categoria: CATEGORIAS_SALA_EMPREENDEDOR[0], detalhe: "", data: new Date().toISOString().slice(0, 10), observacoes: "", resultado: "" };
-  const [atendimentosSala, setAtendimentosSala] = useState(null); // null = carregando
-  const [novoAtendimentoSala, setNovoAtendimentoSala] = useState(atendimentoSalaVazio);
-  const [salvandoAtendimentoSala, setSalvandoAtendimentoSala] = useState(false);
-  const [statusAtendimentoSala, setStatusAtendimentoSala] = useState("");
-  const [editandoAtendimentoId, setEditandoAtendimentoId] = useState(null);
-  const [formEdicaoAtendimento, setFormEdicaoAtendimento] = useState(atendimentoSalaVazio);
-  const [anoRelatorioSala, setAnoRelatorioSala] = useState(new Date().getFullYear());
+  // Sala do Empreendedor — totais oficiais mensais (transcritos do relatório
+  // do Sebrae), categoria x mês. Isso aqui é o que fica visível no site
+  // público — a Sala do Empreendedor "divulga" os números oficiais mês a mês.
+  const [anoTotaisSala, setAnoTotaisSala] = useState(new Date().getFullYear());
+  const [totaisSalaGrid, setTotaisSalaGrid] = useState(null); // null = carregando
+  const [salvandoTotaisSala, setSalvandoTotaisSala] = useState(false);
+  const [statusTotaisSala, setStatusTotaisSala] = useState("");
 
-  const carregarAtendimentosSala = () => {
-    if (!supabaseConfigurado) { setAtendimentosSala([]); return; }
-    supabase.from("sala_atendimentos").select("*").order("data", { ascending: false }).then(({ data, error }) => {
-      if (!error) setAtendimentosSala(data || []);
+  const grelhaVazia = () => Object.fromEntries(CATEGORIAS_SALA_EMPREENDEDOR.map((c) => [c, Array(12).fill(0)]));
+
+  const carregarTotaisSala = (ano) => {
+    if (!supabaseConfigurado) { setTotaisSalaGrid(grelhaVazia()); return; }
+    setTotaisSalaGrid(null);
+    supabase.from("sala_atendimentos_totais").select("*").eq("ano", ano).then(({ data, error }) => {
+      const grelha = grelhaVazia();
+      if (!error) (data || []).forEach((r) => { if (grelha[r.categoria]) grelha[r.categoria][r.mes - 1] = r.total; });
+      setTotaisSalaGrid(grelha);
     });
   };
 
-  useEffect(() => { carregarAtendimentosSala(); }, []);
+  useEffect(() => { carregarTotaisSala(anoTotaisSala); }, [anoTotaisSala]);
 
-  const criarAtendimentoSala = async (e) => {
-    e.preventDefault();
-    setStatusAtendimentoSala("");
-    if (!novoAtendimentoSala.categoria) { setStatusAtendimentoSala("Escolha a categoria."); return; }
-    if (!supabaseConfigurado) { setStatusAtendimentoSala("ok"); return; }
-    setSalvandoAtendimentoSala(true);
-    try {
-      const { data, error } = await supabase.from("sala_atendimentos").insert({
-        categoria: novoAtendimentoSala.categoria,
-        detalhe: novoAtendimentoSala.detalhe.trim() || null,
-        data: novoAtendimentoSala.data,
-        observacoes: novoAtendimentoSala.observacoes.trim() || null,
-        resultado: novoAtendimentoSala.resultado.trim() || null,
-      }).select().single();
-      if (error) throw error;
-      setAtendimentosSala((atual) => [data, ...(atual ?? [])]);
-      setNovoAtendimentoSala(atendimentoSalaVazio);
-      setStatusAtendimentoSala("ok");
-    } catch (err) {
-      setStatusAtendimentoSala(err.message || "Não foi possível registrar o atendimento.");
-    } finally {
-      setSalvandoAtendimentoSala(false);
-    }
+  const atualizarCelulaTotais = (categoria, mesIndex, valor) => {
+    setTotaisSalaGrid((atual) => ({ ...atual, [categoria]: atual[categoria].map((v, i) => (i === mesIndex ? Math.max(0, Number(valor) || 0) : v)) }));
   };
 
-  const iniciarEdicaoAtendimento = (a) => {
-    setEditandoAtendimentoId(a.id);
-    setFormEdicaoAtendimento({ categoria: a.categoria, detalhe: a.detalhe || "", data: a.data, observacoes: a.observacoes || "", resultado: a.resultado || "" });
+  const salvarTotaisSala = async () => {
+    setStatusTotaisSala("");
+    if (!supabaseConfigurado) { setStatusTotaisSala("ok"); return; }
+    setSalvandoTotaisSala(true);
+    const linhas = CATEGORIAS_SALA_EMPREENDEDOR.flatMap((categoria) =>
+      totaisSalaGrid[categoria].map((total, i) => ({ ano: anoTotaisSala, mes: i + 1, categoria, total }))
+    );
+    const { error } = await supabase.from("sala_atendimentos_totais").upsert(linhas, { onConflict: "ano,mes,categoria" });
+    setSalvandoTotaisSala(false);
+    setStatusTotaisSala(error ? error.message || "Não foi possível salvar." : "ok");
   };
 
-  const salvarEdicaoAtendimento = async (id) => {
-    setStatusAtendimentoSala("");
-    const registro = {
-      categoria: formEdicaoAtendimento.categoria,
-      detalhe: formEdicaoAtendimento.detalhe.trim() || null,
-      data: formEdicaoAtendimento.data,
-      observacoes: formEdicaoAtendimento.observacoes.trim() || null,
-      resultado: formEdicaoAtendimento.resultado.trim() || null,
-    };
-    if (!supabaseConfigurado) {
-      setAtendimentosSala((atual) => atual.map((a) => (a.id === id ? { ...a, ...registro } : a)));
-      setEditandoAtendimentoId(null);
-      return;
-    }
-    const { error } = await supabase.from("sala_atendimentos").update(registro).eq("id", id);
-    if (!error) {
-      setAtendimentosSala((atual) => atual.map((a) => (a.id === id ? { ...a, ...registro } : a)));
-      setEditandoAtendimentoId(null);
-    } else {
-      setStatusAtendimentoSala(error.message || "Não foi possível salvar a edição.");
-    }
-  };
-
-  const apagarAtendimentoSala = async (id) => {
-    setStatusAtendimentoSala("");
-    if (!supabaseConfigurado) { setAtendimentosSala((atual) => atual.filter((a) => a.id !== id)); return; }
-    const { error } = await supabase.from("sala_atendimentos").delete().eq("id", id);
-    if (!error) setAtendimentosSala((atual) => atual.filter((a) => a.id !== id));
-    else setStatusAtendimentoSala(error.message || "Não foi possível excluir o registro.");
-  };
-
-  const anosDisponiveisSala = useMemo(() => {
-    const anos = new Set((atendimentosSala ?? []).map((a) => Number(a.data.slice(0, 4))));
-    anos.add(new Date().getFullYear());
-    return Array.from(anos).sort((a, b) => b - a);
-  }, [atendimentosSala]);
+  const [anosDisponiveisSala, setAnosDisponiveisSala] = useState([new Date().getFullYear()]);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("sala_atendimentos_totais").select("ano").then(({ data, error }) => {
+      if (error) return;
+      const anos = new Set((data || []).map((r) => r.ano));
+      anos.add(new Date().getFullYear());
+      setAnosDisponiveisSala(Array.from(anos).sort((a, b) => b - a));
+    });
+  }, [statusTotaisSala]);
 
   const relatorioSala = useMemo(() => {
-    const doAno = (atendimentosSala ?? []).filter((a) => Number(a.data.slice(0, 4)) === anoRelatorioSala);
+    const grelha = totaisSalaGrid || {};
     const linhas = CATEGORIAS_SALA_EMPREENDEDOR.map((categoria) => {
-      const meses = Array(12).fill(0);
-      doAno.filter((a) => a.categoria === categoria).forEach((a) => {
-        const mes = Number(a.data.slice(5, 7)) - 1;
-        meses[mes] += 1;
-      });
+      const meses = grelha[categoria] || Array(12).fill(0);
       const total = meses.reduce((s, v) => s + v, 0);
       return { categoria, meses, total };
     }).filter((l) => l.total > 0);
@@ -2207,7 +2163,7 @@ function AdminPanel() {
     linhas.forEach((l) => l.meses.forEach((v, i) => { totaisMeses[i] += v; }));
     const totalGeral = totaisMeses.reduce((s, v) => s + v, 0);
     return { linhas, totaisMeses, totalGeral };
-  }, [atendimentosSala, anoRelatorioSala]);
+  }, [totaisSalaGrid]);
 
   const exportarRelatorioSalaExcel = () => {
     const cabecalho = ["Categoria", "Total", ...MESES_ABREV];
@@ -2218,7 +2174,7 @@ function AdminPanel() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sala-empreendedor-${anoRelatorioSala}.csv`;
+    a.download = `sala-empreendedor-${anoTotaisSala}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -2232,7 +2188,7 @@ function AdminPanel() {
       <tr><td>${l.categoria}</td><td class="num">${l.total}</td>${l.meses.map((v) => `<td class="num">${v}</td>`).join("")}</tr>
     `).join("");
     janela.document.write(`
-      <html><head><title>Sala do Empreendedor ${anoRelatorioSala} — Ivatuba</title>
+      <html><head><title>Sala do Empreendedor ${anoTotaisSala} — Ivatuba</title>
       <style>
         body{font-family:Arial,sans-serif;padding:24px;color:#0E2233}
         h2{margin-bottom:4px} p{color:#5C7186;margin-top:0;font-size:12px}
@@ -2243,7 +2199,7 @@ function AdminPanel() {
         tfoot td{font-weight:bold;background:#EAF2FB}
       </style></head>
       <body>
-        <h2>Relatório de Atendimento — Sala do Empreendedor — Ano ${anoRelatorioSala} — Ivatuba</h2>
+        <h2>Relatório de Atendimento — Sala do Empreendedor — Ano ${anoTotaisSala} — Ivatuba</h2>
         <p>Totalizado por atendimentos · gerado em ${new Date().toLocaleDateString("pt-BR")}</p>
         <table>
           <thead><tr><th>Serviços prestados</th><th class="num">Totais</th>${MESES_ABREV.map((m) => `<th class="num">${m}</th>`).join("")}</tr></thead>
@@ -6979,41 +6935,18 @@ function AdminPanel() {
 
         {tab === "sala-empreendedor" && (
           <div>
-            <SectionHeader eyebrow="Empreendedorismo" title="Sala do Empreendedor — Atendimentos" sub="Registro interno dos atendimentos prestados, com relatório por ano e mês" />
+            <SectionHeader eyebrow="Empreendedorismo" title="Sala do Empreendedor — Atendimentos" sub="Totais oficiais mensais (transcritos do relatório do Sebrae) — aparece no site público" />
             {!supabaseConfigurado && (
               <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2 max-w-2xl" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
                 <BadgeCheck size={14} className="mt-0.5 shrink-0" />
-                Modo demonstração: conecte o Supabase para esses registros serem salvos de verdade.
+                Modo demonstração: conecte o Supabase para esses números serem salvos de verdade.
               </div>
             )}
 
-            <form onSubmit={criarAtendimentoSala} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl mb-6" style={{ borderColor: C.line }}>
-              <select value={novoAtendimentoSala.categoria} onChange={(e) => setNovoAtendimentoSala((v) => ({ ...v, categoria: e.target.value }))}
-                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white sm:col-span-2" style={{ borderColor: C.line }}>
-                {CATEGORIAS_SALA_EMPREENDEDOR.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <input value={novoAtendimentoSala.detalhe} onChange={(e) => setNovoAtendimentoSala((v) => ({ ...v, detalhe: e.target.value }))}
-                placeholder="Detalhe (opcional, ex: Impressão DAS Atrasado)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
-              <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
-                Data
-                <input type="date" value={novoAtendimentoSala.data} onChange={(e) => setNovoAtendimentoSala((v) => ({ ...v, data: e.target.value }))}
-                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              </label>
-              <input value={novoAtendimentoSala.observacoes} onChange={(e) => setNovoAtendimentoSala((v) => ({ ...v, observacoes: e.target.value }))}
-                placeholder="Observação (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <input value={novoAtendimentoSala.resultado} onChange={(e) => setNovoAtendimentoSala((v) => ({ ...v, resultado: e.target.value }))}
-                placeholder="Resultado (opcional, ex: concluído, pendente, encaminhado)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
-              {statusAtendimentoSala && statusAtendimentoSala !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusAtendimentoSala}</p>}
-              {statusAtendimentoSala === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Atendimento registrado!</p>}
-              <button type="submit" disabled={salvandoAtendimentoSala} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
-                {salvandoAtendimentoSala ? "Registrando..." : "Registrar atendimento"}
-              </button>
-            </form>
-
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Relatório por ano e mês</p>
+              <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Totais por categoria e mês</p>
               <div className="flex items-center gap-2">
-                <select value={anoRelatorioSala} onChange={(e) => setAnoRelatorioSala(Number(e.target.value))}
+                <select value={anoTotaisSala} onChange={(e) => setAnoTotaisSala(Number(e.target.value))}
                   className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none bg-white" style={{ borderColor: C.line }}>
                   {anosDisponiveisSala.map((ano) => <option key={ano} value={ano}>{ano}</option>)}
                 </select>
@@ -7026,82 +6959,55 @@ function AdminPanel() {
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border mb-8" style={{ borderColor: C.line }}>
-              <table className="w-full" style={{ borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ background: C.blueTint }}>
-                    <th className="font-body text-[11px] font-bold text-left px-3 py-2" style={{ color: C.blue }}>Serviço</th>
-                    <th className="font-body text-[11px] font-bold px-2 py-2" style={{ color: C.blue }}>Total</th>
-                    {MESES_ABREV.map((m) => <th key={m} className="font-body text-[11px] font-bold px-2 py-2" style={{ color: C.blue }}>{m}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {relatorioSala.linhas.map((l) => (
-                    <tr key={l.categoria} className="border-t" style={{ borderColor: C.line }}>
-                      <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{l.categoria}</td>
-                      <td className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{l.total}</td>
-                      {l.meses.map((v, i) => <td key={i} className="font-body text-xs text-center px-2 py-2" style={{ color: "#5C7186" }}>{v}</td>)}
-                    </tr>
-                  ))}
-                  {relatorioSala.linhas.length === 0 && (
-                    <tr><td colSpan={14} className="font-body text-xs text-center px-3 py-4" style={{ color: "#8896A6" }}>Nenhum atendimento registrado em {anoRelatorioSala}.</td></tr>
-                  )}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t" style={{ borderColor: C.line, background: C.blueTint2 }}>
-                    <td className="font-body text-xs font-bold px-3 py-2" style={{ color: C.ink }}>TOTALIZAÇÃO GERAL</td>
-                    <td className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{relatorioSala.totalGeral}</td>
-                    {relatorioSala.totaisMeses.map((v, i) => <td key={i} className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{v}</td>)}
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-
-            <p className="font-display font-bold text-sm mb-2" style={{ color: C.ink }}>Últimos registros</p>
-            <div className="flex flex-col gap-2 max-w-3xl">
-              {(atendimentosSala ?? []).slice(0, 30).map((a) => (
-                <div key={a.id} className="rounded-xl border p-3" style={{ borderColor: C.line }}>
-                  {editandoAtendimentoId === a.id ? (
-                    <div className="flex flex-col gap-2">
-                      <select value={formEdicaoAtendimento.categoria} onChange={(e) => setFormEdicaoAtendimento((f) => ({ ...f, categoria: e.target.value }))}
-                        className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none bg-white" style={{ borderColor: C.line }}>
-                        {CATEGORIAS_SALA_EMPREENDEDOR.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                      <div className="flex gap-2 flex-wrap">
-                        <input value={formEdicaoAtendimento.detalhe} onChange={(e) => setFormEdicaoAtendimento((f) => ({ ...f, detalhe: e.target.value }))}
-                          placeholder="Detalhe" className="flex-1 font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
-                        <input type="date" value={formEdicaoAtendimento.data} onChange={(e) => setFormEdicaoAtendimento((f) => ({ ...f, data: e.target.value }))}
-                          className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
-                      </div>
-                      <input value={formEdicaoAtendimento.observacoes} onChange={(e) => setFormEdicaoAtendimento((f) => ({ ...f, observacoes: e.target.value }))}
-                        placeholder="Observação" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
-                      <input value={formEdicaoAtendimento.resultado} onChange={(e) => setFormEdicaoAtendimento((f) => ({ ...f, resultado: e.target.value }))}
-                        placeholder="Resultado" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
-                      <div className="flex gap-2">
-                        <button onClick={() => salvarEdicaoAtendimento(a.id)} className="font-body text-xs font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
-                        <button onClick={() => setEditandoAtendimentoId(null)} className="font-body text-xs font-bold px-3 py-1.5 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Cancelar</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-body text-xs font-bold truncate" style={{ color: C.ink }}>{a.categoria}{a.detalhe ? ` — ${a.detalhe}` : ""}</p>
-                        <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>
-                          {a.data.split("-").reverse().join("/")}{a.resultado ? ` · Resultado: ${a.resultado}` : ""}{a.observacoes ? ` · ${a.observacoes}` : ""}
-                        </p>
-                      </div>
-                      <div className="flex gap-2 shrink-0">
-                        <button onClick={() => iniciarEdicaoAtendimento(a)} className="font-body text-xs font-bold px-2.5 py-1.5 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
-                        <button onClick={() => { if (window.confirm("Excluir esse registro de atendimento?")) apagarAtendimentoSala(a.id); }} className="font-body text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ color: "#B4462F" }}>Excluir</button>
-                      </div>
-                    </div>
-                  )}
+            {!totaisSalaGrid ? (
+              <p className="font-body text-sm" style={{ color: "#5C7186" }}>Carregando...</p>
+            ) : (
+              <>
+                <div className="overflow-x-auto rounded-2xl border mb-3" style={{ borderColor: C.line }}>
+                  <table className="w-full" style={{ borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ background: C.blueTint }}>
+                        <th className="font-body text-[11px] font-bold text-left px-3 py-2" style={{ color: C.blue }}>Serviço</th>
+                        <th className="font-body text-[11px] font-bold px-2 py-2" style={{ color: C.blue }}>Total</th>
+                        {MESES_ABREV.map((m) => <th key={m} className="font-body text-[11px] font-bold px-1 py-2" style={{ color: C.blue }}>{m}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {CATEGORIAS_SALA_EMPREENDEDOR.map((categoria) => {
+                        const meses = totaisSalaGrid[categoria];
+                        const total = meses.reduce((s, v) => s + v, 0);
+                        return (
+                          <tr key={categoria} className="border-t" style={{ borderColor: C.line }}>
+                            <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{categoria}</td>
+                            <td className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{total}</td>
+                            {meses.map((v, i) => (
+                              <td key={i} className="px-1 py-1">
+                                <input type="number" min={0} value={v} onChange={(e) => atualizarCelulaTotais(categoria, i, e.target.value)}
+                                  className="w-12 font-body text-xs text-center border rounded px-1 py-1 outline-none" style={{ borderColor: C.line }} />
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                        <td className="font-body text-xs font-bold px-3 py-2" style={{ color: C.ink }}>TOTALIZAÇÃO GERAL</td>
+                        <td className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{relatorioSala.totalGeral}</td>
+                        {relatorioSala.totaisMeses.map((v, i) => <td key={i} className="font-body text-xs font-bold text-center px-1 py-2" style={{ color: C.ink }}>{v}</td>)}
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
-              ))}
-              {(atendimentosSala ?? []).length === 0 && atendimentosSala !== null && (
-                <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum atendimento registrado ainda.</p>
-              )}
-            </div>
+                <div className="flex items-center gap-3 mb-8">
+                  <button onClick={salvarTotaisSala} disabled={salvandoTotaisSala} className="font-body text-sm font-bold text-white rounded-lg px-5 py-2.5 disabled:opacity-60" style={{ background: C.blue }}>
+                    {salvandoTotaisSala ? "Salvando..." : "Salvar e divulgar"}
+                  </button>
+                  {statusTotaisSala === "ok" && <span className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Salvo! Já aparece no site público.</span>}
+                  {statusTotaisSala && statusTotaisSala !== "ok" && <span className="font-body text-xs" style={{ color: "#B4462F" }}>{statusTotaisSala}</span>}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -10855,6 +10761,33 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   }, []);
   const licitacoesAbertasPublicas = (licitacoesPublicas ?? []).filter((l) => l.ativo && !l.resultado);
   const licitacoesComResultadoPublicas = (licitacoesPublicas ?? []).filter((l) => l.resultado);
+
+  // Sala do Empreendedor — números oficiais divulgados publicamente (ano
+  // mais recente que já tenha algum total lançado).
+  const [totaisSalaPublicos, setTotaisSalaPublicos] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("sala_atendimentos_totais").select("*").then(({ data, error }) => {
+      if (!error) setTotaisSalaPublicos(data || []);
+    });
+  }, []);
+  const anoSalaPublico = useMemo(() => {
+    if (!totaisSalaPublicos || totaisSalaPublicos.length === 0) return null;
+    return Math.max(...totaisSalaPublicos.map((r) => r.ano));
+  }, [totaisSalaPublicos]);
+  const relatorioSalaPublico = useMemo(() => {
+    if (!totaisSalaPublicos || anoSalaPublico === null) return { linhas: [], totaisMeses: Array(12).fill(0), totalGeral: 0 };
+    const doAno = totaisSalaPublicos.filter((r) => r.ano === anoSalaPublico);
+    const linhas = CATEGORIAS_SALA_EMPREENDEDOR.map((categoria) => {
+      const meses = Array(12).fill(0);
+      doAno.filter((r) => r.categoria === categoria).forEach((r) => { meses[r.mes - 1] = r.total; });
+      const total = meses.reduce((s, v) => s + v, 0);
+      return { categoria, meses, total };
+    }).filter((l) => l.total > 0);
+    const totaisMeses = Array(12).fill(0);
+    linhas.forEach((l) => l.meses.forEach((v, i) => { totaisMeses[i] += v; }));
+    return { linhas, totaisMeses, totalGeral: totaisMeses.reduce((s, v) => s + v, 0) };
+  }, [totaisSalaPublicos, anoSalaPublico]);
   const [licitacaoNome, setLicitacaoNome] = useState("");
   const [licitacaoWhatsapp, setLicitacaoWhatsapp] = useState("");
   const [enviandoLicitacao, setEnviandoLicitacao] = useState(false);
@@ -12137,6 +12070,48 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
               </Reveal>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* Sala do Empreendedor — números oficiais divulgados */}
+      {relatorioSalaPublico.linhas.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+          <Reveal><SectionHeader eyebrow="Empreendedorismo" title="Sala do Empreendedor" sub={`Atendimentos prestados em ${anoSalaPublico} — números oficiais (fonte: Sebrae)`} /></Reveal>
+          <Reveal>
+            <div className="rounded-2xl border p-4 mt-4" style={{ borderColor: C.line, background: C.blueTint }}>
+              <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{relatorioSalaPublico.totalGeral}</p>
+              <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Atendimentos realizados em {anoSalaPublico}</p>
+            </div>
+          </Reveal>
+          <Reveal>
+            <div className="overflow-x-auto rounded-2xl border mt-4" style={{ borderColor: C.line }}>
+              <table className="w-full" style={{ borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: C.blueTint }}>
+                    <th className="font-body text-[11px] font-bold text-left px-3 py-2" style={{ color: C.blue }}>Serviço</th>
+                    <th className="font-body text-[11px] font-bold px-2 py-2" style={{ color: C.blue }}>Total</th>
+                    {MESES_ABREV.map((m) => <th key={m} className="font-body text-[11px] font-bold px-1.5 py-2" style={{ color: C.blue }}>{m}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {relatorioSalaPublico.linhas.map((l) => (
+                    <tr key={l.categoria} className="border-t" style={{ borderColor: C.line }}>
+                      <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{l.categoria}</td>
+                      <td className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{l.total}</td>
+                      {l.meses.map((v, i) => <td key={i} className="font-body text-xs text-center px-1.5 py-2" style={{ color: "#5C7186" }}>{v}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                    <td className="font-body text-xs font-bold px-3 py-2" style={{ color: C.ink }}>TOTALIZAÇÃO GERAL</td>
+                    <td className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{relatorioSalaPublico.totalGeral}</td>
+                    {relatorioSalaPublico.totaisMeses.map((v, i) => <td key={i} className="font-body text-xs font-bold text-center px-1.5 py-2" style={{ color: C.ink }}>{v}</td>)}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </Reveal>
         </section>
       )}
 
