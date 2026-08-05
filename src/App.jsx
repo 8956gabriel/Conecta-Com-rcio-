@@ -3133,12 +3133,31 @@ function AdminPanel() {
       if (!error) setFomentoLeadsAdmin(data || []);
     });
   }, []);
-  const ROTULO_STATUS_FOMENTO = { recebido: "Recebido", em_analise: "Em processo", concedido: "Concedido", negado: "Negado" };
-  const CONTAGEM_STATUS_FOMENTO_VAZIA = { recebido: 0, em_analise: 0, concedido: 0, negado: 0 };
+  const ROTULO_STATUS_FOMENTO = { recebido: "Recebido", em_analise: "Em processo", concedido: "Concedido", negado: "Negado", excluido: "Excluído" };
+  const CONTAGEM_STATUS_FOMENTO_VAZIA = { recebido: 0, em_analise: 0, concedido: 0, negado: 0, excluido: 0 };
   const contagemStatusFomento = (fomentoLeadsAdmin ?? []).reduce(
     (acc, l) => ({ ...acc, [l.status || "recebido"]: (acc[l.status || "recebido"] || 0) + 1 }),
     CONTAGEM_STATUS_FOMENTO_VAZIA
   );
+  const valorPorStatusFomento = (fomentoLeadsAdmin ?? []).reduce(
+    (acc, l) => ({ ...acc, [l.status || "recebido"]: (acc[l.status || "recebido"] || 0) + (Number(l.valor_concedido) || 0) }),
+    { ...CONTAGEM_STATUS_FOMENTO_VAZIA }
+  );
+  // Cruzamento categoria x status — quantidade e valor de cada combinacao,
+  // pra ver de onde vem o dinheiro por linha de credito.
+  const resumoCategoriaStatusFomento = CATEGORIAS_FOMENTO.map((categoria) => {
+    const doCategoria = (fomentoLeadsAdmin ?? []).filter((l) => (l.categoria || "Outros") === categoria);
+    const porStatus = Object.fromEntries(Object.keys(ROTULO_STATUS_FOMENTO).map((chave) => {
+      const doStatus = doCategoria.filter((l) => (l.status || "recebido") === chave);
+      return [chave, { qtd: doStatus.length, valor: doStatus.reduce((s, l) => s + (Number(l.valor_concedido) || 0), 0) }];
+    }));
+    return {
+      categoria,
+      porStatus,
+      qtdTotal: doCategoria.length,
+      valorTotal: doCategoria.reduce((s, l) => s + (Number(l.valor_concedido) || 0), 0),
+    };
+  }).filter((r) => r.qtdTotal > 0);
   const atualizarStatusFomentoLead = async (id, status) => {
     const { error } = await supabase.from("fomento_leads").update({ status }).eq("id", id);
     if (!error) setFomentoLeadsAdmin((atual) => atual.map((l) => (l.id === id ? { ...l, status } : l)));
@@ -7238,14 +7257,13 @@ function AdminPanel() {
                     </p>
                   </div>
                   <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-                    <div className="rounded-2xl p-3.5 lg:col-span-2" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}>
-                      <p className="font-display font-extrabold text-2xl text-white">R$ {totalConcedidoFomento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
-                      <p className="font-body text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>Total concedido</p>
-                    </div>
                     {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => (
                       <div key={chave} className="rounded-2xl p-3.5" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}>
                         <p className="font-display font-extrabold text-2xl text-white">{contagemStatusFomento[chave] || 0}</p>
                         <p className="font-body text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>{rotulo}</p>
+                        <p className="font-body text-[11px] font-bold mt-1" style={{ color: "#8FC1F2" }}>
+                          R$ {(valorPorStatusFomento[chave] || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -7265,6 +7283,41 @@ function AdminPanel() {
                   )}
                 </div>
               </motion.div>
+
+              {resumoCategoriaStatusFomento.length > 0 && (
+                <div className="overflow-x-auto rounded-2xl border mb-6" style={{ borderColor: C.line }}>
+                  <table className="w-full" style={{ borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ background: C.blueTint }}>
+                        <th className="font-body text-[11px] font-bold text-left px-3 py-2" style={{ color: C.blue }}>Categoria</th>
+                        <th className="font-body text-[11px] font-bold px-2 py-2" style={{ color: C.blue }}>Total</th>
+                        {Object.values(ROTULO_STATUS_FOMENTO).map((rotulo) => (
+                          <th key={rotulo} className="font-body text-[11px] font-bold px-2 py-2" style={{ color: C.blue }}>{rotulo}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resumoCategoriaStatusFomento.map((r) => (
+                        <tr key={r.categoria} className="border-t" style={{ borderColor: C.line }}>
+                          <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{r.categoria}</td>
+                          <td className="px-2 py-2 text-center">
+                            <p className="font-body text-xs font-bold" style={{ color: C.ink }}>{r.qtdTotal}</p>
+                            <p className="font-body text-[10px]" style={{ color: "#5C7186" }}>R$ {r.valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                          </td>
+                          {Object.keys(ROTULO_STATUS_FOMENTO).map((chave) => (
+                            <td key={chave} className="px-2 py-2 text-center">
+                              <p className="font-body text-xs" style={{ color: C.ink }}>{r.porStatus[chave].qtd}</p>
+                              <p className="font-body text-[10px]" style={{ color: "#5C7186" }}>
+                                {r.porStatus[chave].valor > 0 ? `R$ ${r.porStatus[chave].valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                              </p>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               <form onSubmit={criarLeadFomentoAdmin} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl mb-6" style={{ borderColor: C.line }}>
                 <select value={novoLeadFomentoAdmin.categoria} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, categoria: e.target.value }))}
