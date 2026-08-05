@@ -8712,8 +8712,8 @@ function AdminPanel() {
 // Painel do empresário
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
-// Modal "Novo produto" com IA — gera descrição de vendas a partir de poucas
-// palavras, e dá dicas sobre a FOTO REAL do produto (nunca gera foto falsa).
+// Modal "Novo produto" — descrição e foto preenchidas manualmente pelo
+// empresário (recursos de IA desativados por enquanto).
 // ---------------------------------------------------------------------------
 function ModalNovoProduto({ onFechar, onSalvo }) {
   const [nome, setNome] = useState("");
@@ -8721,63 +8721,13 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
   const [preco, setPreco] = useState("");
   const [precoPromocional, setPrecoPromocional] = useState("");
   const [estoque, setEstoque] = useState("");
-  const [palavrasChave, setPalavrasChave] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [gerandoDescricao, setGerandoDescricao] = useState(false);
-  const [erroDescricao, setErroDescricao] = useState("");
 
   const [foto, setFoto] = useState(null); // { previewUrl, base64, mediaType }
-  const [dicasFoto, setDicasFoto] = useState("");
-  const [analisandoFoto, setAnalisandoFoto] = useState(false);
-  const [erroFoto, setErroFoto] = useState("");
-
-  const [imagemIA, setImagemIA] = useState(null); // base64 da imagem ilustrativa
-  const [gerandoImagemIA, setGerandoImagemIA] = useState(false);
-  const [erroImagemIA, setErroImagemIA] = useState("");
 
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
   const [erroSalvar, setErroSalvar] = useState("");
-
-  const gerarImagemIlustrativa = async () => {
-    if (!nome.trim()) { setErroImagemIA("Preencha ao menos o nome do produto primeiro."); return; }
-    setErroImagemIA("");
-    setGerandoImagemIA(true);
-    try {
-      const resp = await fetch("/api/gerar-imagem-ilustrativa", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ nome, categoria, descricao }),
-      });
-      const dados = await resp.json();
-      if (!resp.ok) throw new Error(dados.error || "Não consegui gerar a imagem agora.");
-      setImagemIA(dados.imagemBase64);
-    } catch (err) {
-      setErroImagemIA(err.message || "Não consegui gerar a imagem agora. Tente de novo.");
-    } finally {
-      setGerandoImagemIA(false);
-    }
-  };
-
-  const gerarDescricao = async () => {
-    if (!nome.trim()) { setErroDescricao("Preencha ao menos o nome do produto primeiro."); return; }
-    setErroDescricao("");
-    setGerandoDescricao(true);
-    try {
-      const resp = await fetch("/api/gerar-descricao", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ nome, categoria, palavrasChave }),
-      });
-      const dados = await resp.json();
-      if (!resp.ok) throw new Error(dados.error || "Não consegui gerar agora.");
-      setDescricao(dados.descricao);
-    } catch (err) {
-      setErroDescricao(err.message || "Não consegui gerar agora. Tente de novo.");
-    } finally {
-      setGerandoDescricao(false);
-    }
-  };
 
   const escolherFoto = (e) => {
     const arquivo = e.target.files?.[0];
@@ -8787,29 +8737,8 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
     leitor.onload = () => {
       const base64 = leitor.result.split(",")[1];
       setFoto({ previewUrl, base64, mediaType: arquivo.type, arquivo });
-      setDicasFoto("");
     };
     leitor.readAsDataURL(arquivo);
-  };
-
-  const analisarFoto = async () => {
-    if (!foto) return;
-    setErroFoto("");
-    setAnalisandoFoto(true);
-    try {
-      const resp = await fetch("/api/analisar-foto", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imagemBase64: foto.base64, mediaType: foto.mediaType }),
-      });
-      const dados = await resp.json();
-      if (!resp.ok) throw new Error(dados.error || "Não consegui analisar agora.");
-      setDicasFoto(dados.dicas);
-    } catch (err) {
-      setErroFoto(err.message || "Não consegui analisar agora. Tente de novo.");
-    } finally {
-      setAnalisandoFoto(false);
-    }
   };
 
   const salvar = async (e) => {
@@ -8821,7 +8750,6 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
     setSalvando(true);
     try {
       let fotoUrl = null;
-      let usandoImagemIlustrativa = false;
 
       if (foto?.arquivo) {
         const caminho = `produtos/${Date.now()}-${foto.arquivo.name}`;
@@ -8829,19 +8757,6 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
         if (erroUpload) throw erroUpload;
         const { data: pub } = supabase.storage.from("fotos-produtos").getPublicUrl(caminho);
         fotoUrl = pub.publicUrl;
-      } else if (imagemIA) {
-        // Só usa a imagem ilustrativa se não houver foto real — e marca isso
-        // no banco, para o site sempre mostrar o selo "gerada por IA".
-        const bytes = atob(imagemIA);
-        const arr = new Uint8Array(bytes.length);
-        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-        const blob = new Blob([arr], { type: "image/png" });
-        const caminho = `produtos/${Date.now()}-ilustrativa.png`;
-        const { error: erroUpload } = await supabase.storage.from("fotos-produtos").upload(caminho, blob);
-        if (erroUpload) throw erroUpload;
-        const { data: pub } = supabase.storage.from("fotos-produtos").getPublicUrl(caminho);
-        fotoUrl = pub.publicUrl;
-        usandoImagemIlustrativa = true;
       }
 
       const { data: sessao } = await supabase.auth.getSession();
@@ -8852,7 +8767,7 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
         nome, categoria, preco: preco ? Number(preco) : null,
         preco_promocional: precoPromocional ? Number(precoPromocional) : null,
         estoque: estoque !== "" ? Number(estoque) : null,
-        descricao, foto_url: fotoUrl, imagem_ilustrativa: usandoImagemIlustrativa, ativo: true,
+        descricao, foto_url: fotoUrl, ativo: true,
       });
       if (error) throw error;
       setSalvo(true);
@@ -8883,7 +8798,7 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
           {!supabaseConfigurado && (
             <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
               <BadgeCheck size={14} className="mt-0.5 shrink-0" />
-              Modo demonstração: a descrição e a análise de foto por IA só funcionam com a ANTHROPIC_API_KEY configurada no servidor.
+              Modo demonstração: conecte o Supabase para o produto ser salvo de verdade.
             </div>
           )}
           {erroSalvar && <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs" style={{ background: "#FBEAE5", color: "#B4462F" }}>{erroSalvar}</div>}
@@ -8928,24 +8843,13 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
                 </label>
               </div>
 
-              {/* Descrição com IA */}
-              <div className="rounded-2xl border p-3.5" style={{ borderColor: C.line, background: C.blueTint2 }}>
-                <p className="font-body text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: "#425A70" }}>
-                  <Sparkles size={13} color={C.blue} /> Descrição de impacto (com IA)
-                </p>
-                <input value={palavrasChave} onChange={(e) => setPalavrasChave(e.target.value)} placeholder="Palavras-chave: ex. fresquinho, feito na hora, sem conservantes"
-                  className="w-full font-body text-xs border rounded-lg px-3 py-2 outline-none mb-2" style={{ borderColor: C.line }} />
-                <button type="button" onClick={gerarDescricao} disabled={gerandoDescricao}
-                  className="glow-btn font-body text-xs font-bold rounded-lg px-3 py-2 flex items-center gap-1.5 disabled:opacity-60"
-                  style={{ background: C.blue, color: "#fff" }}>
-                  <Sparkles size={12} /> {gerandoDescricao ? "Gerando..." : "Gerar descrição"}
-                </button>
-                {erroDescricao && <p className="font-body text-[11px] mt-2" style={{ color: "#B4462F" }}>{erroDescricao}</p>}
-                <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} placeholder="A descrição gerada aparece aqui — você pode editar antes de salvar"
-                  className="w-full font-body text-xs border rounded-lg px-3 py-2.5 outline-none mt-2.5" style={{ borderColor: C.line, background: "#fff" }} />
-              </div>
+              <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
+                Descrição
+                <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={3} placeholder="Conte o que faz esse produto especial"
+                  className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
 
-              {/* Foto real do produto + análise por IA */}
+              {/* Foto real do produto */}
               <div className="rounded-2xl border p-3.5" style={{ borderColor: C.line, background: C.blueTint2 }}>
                 <p className="font-body text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: "#425A70" }}>
                   <Camera size={13} color={C.blue} /> Foto real do produto
@@ -8953,15 +8857,10 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
                 {foto ? (
                   <div className="flex gap-3 items-start">
                     <img loading="lazy" decoding="async" src={foto.previewUrl} alt="Prévia do produto" className="w-20 h-20 rounded-lg object-cover border" style={{ borderColor: C.line }} />
-                    <div className="flex-1">
-                      <button type="button" onClick={analisarFoto} disabled={analisandoFoto}
-                        className="glow-btn font-body text-xs font-bold rounded-lg px-3 py-2 flex items-center gap-1.5 disabled:opacity-60"
-                        style={{ background: C.blue, color: "#fff" }}>
-                        <Sparkles size={12} /> {analisandoFoto ? "Analisando..." : "Dicas para essa foto"}
-                      </button>
-                      {erroFoto && <p className="font-body text-[11px] mt-2" style={{ color: "#B4462F" }}>{erroFoto}</p>}
-                      {dicasFoto && <p className="font-body text-[11px] mt-2 leading-relaxed" style={{ color: "#425A70" }}>{dicasFoto}</p>}
-                    </div>
+                    <label className="font-body text-xs font-semibold cursor-pointer" style={{ color: C.blue }}>
+                      Trocar foto
+                      <input type="file" accept="image/*" className="hidden" onChange={escolherFoto} />
+                    </label>
                   </div>
                 ) : (
                   <label className="flex items-center gap-2 justify-center rounded-lg border-2 border-dashed py-5 cursor-pointer" style={{ borderColor: C.line }}>
@@ -8970,51 +8869,7 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
                     <input type="file" accept="image/*" className="hidden" onChange={escolherFoto} />
                   </label>
                 )}
-                <p className="font-body text-[10px] mt-2" style={{ color: "#B7C6D6" }}>
-                  A IA só dá dicas sobre a sua foto de verdade — ela nunca substitui a foto real sem você pedir.
-                </p>
               </div>
-
-              {/* Imagem ilustrativa opcional, só quando ainda não há foto real */}
-              {!foto && (
-                <div className="rounded-2xl border p-3.5" style={{ borderColor: C.line, background: "#FFF6E9" }}>
-                  <p className="font-body text-xs font-semibold mb-1 flex items-center gap-1.5" style={{ color: "#8A5A12" }}>
-                    <Sparkles size={13} /> Ainda não tem foto? Gere uma imagem ilustrativa (opcional)
-                  </p>
-                  <p className="font-body text-[10px] mb-2" style={{ color: "#8A5A12", opacity: 0.85 }}>
-                    Ela sempre aparece marcada como "gerada por IA" — assim que você tiver a foto de verdade, troque por ela.
-                  </p>
-
-                  {imagemIA ? (
-                    <div className="flex gap-3 items-start">
-                      <div className="relative w-20 h-20 shrink-0">
-                        <img loading="lazy" decoding="async" src={`data:image/png;base64,${imagemIA}`} alt="Imagem ilustrativa gerada por IA" className="w-20 h-20 rounded-lg object-cover border" style={{ borderColor: C.line }} />
-                        <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap font-body text-[8px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: C.amberDark, color: "#fff" }}>
-                          IA
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <button type="button" onClick={gerarImagemIlustrativa} disabled={gerandoImagemIA}
-                          className="font-body text-xs font-bold rounded-lg px-3 py-2 flex items-center gap-1.5 disabled:opacity-60 border"
-                          style={{ borderColor: C.amberDark, color: C.amberDark }}>
-                          <Sparkles size={12} /> {gerandoImagemIA ? "Gerando..." : "Gerar outra"}
-                        </button>
-                        <button type="button" onClick={() => setImagemIA(null)}
-                          className="font-body text-xs font-semibold ml-2" style={{ color: "#B4462F" }}>
-                          Remover
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button type="button" onClick={gerarImagemIlustrativa} disabled={gerandoImagemIA}
-                      className="glow-btn font-body text-xs font-bold rounded-lg px-3 py-2 flex items-center gap-1.5 disabled:opacity-60"
-                      style={{ background: C.amberDark, color: "#fff" }}>
-                      <Sparkles size={12} /> {gerandoImagemIA ? "Gerando imagem..." : "Gerar imagem ilustrativa"}
-                    </button>
-                  )}
-                  {erroImagemIA && <p className="font-body text-[11px] mt-2" style={{ color: "#B4462F" }}>{erroImagemIA}</p>}
-                </div>
-              )}
 
               <button type="submit" disabled={salvando} className="glow-btn font-body font-bold text-sm text-white rounded-xl py-3 mt-1 disabled:opacity-60" style={{ background: C.blue }}>
                 {salvando ? "Salvando..." : "Salvar produto"}
@@ -9190,7 +9045,7 @@ function EmpresarioPanel({ siteConfig }) {
   const [perfilForm, setPerfilForm] = useState({
     nome: "", whatsapp: "", instagram: "", endereco: "", horario_atendimento: "", horario_funcionamento: null, chave_pix: "",
     logo_url: "", banner_url: "", fotos_urls: [], email: "", facebook: "", site: "",
-    cpf: "", cnpj: "", possui_mei: false, aceita_cartao_servidor: false, destaque: false,
+    cpf: "", cnpj: "", possui_mei: false, possui_cnpj: false, autonomo: false, aceita_cartao_servidor: false, destaque: false,
   });
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [statusPerfil, setStatusPerfil] = useState("");
@@ -9349,6 +9204,7 @@ function EmpresarioPanel({ siteConfig }) {
           logo_url: data.logo_url || "", banner_url: data.banner_url || "", fotos_urls: data.fotos_urls || [],
           email: data.email || "", facebook: data.facebook || "", site: data.site || "",
           cpf: data.cpf || "", cnpj: data.cnpj || "", possui_mei: !!data.possui_mei,
+          possui_cnpj: !!data.possui_cnpj, autonomo: !!data.autonomo,
           aceita_cartao_servidor: !!data.aceita_cartao_servidor, destaque: !!data.destaque,
         });
         setVisualizacoesEmpresa(data.visualizacoes ?? 0);
@@ -9703,6 +9559,7 @@ function EmpresarioPanel({ siteConfig }) {
         fotos_urls: perfilForm.fotos_urls, email: perfilForm.email || null,
         facebook: perfilForm.facebook || null, site: perfilForm.site || null,
         cpf: perfilForm.cpf || null, cnpj: perfilForm.cnpj || null, possui_mei: perfilForm.possui_mei,
+        possui_cnpj: perfilForm.possui_cnpj, autonomo: perfilForm.autonomo,
         aceita_cartao_servidor: perfilForm.aceita_cartao_servidor, destaque: perfilForm.destaque,
       }).eq("id", empresaId);
       if (error) throw error;
@@ -9839,6 +9696,14 @@ function EmpresarioPanel({ siteConfig }) {
               <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
                 <input type="checkbox" checked={perfilForm.possui_mei} onChange={(e) => atualizarPerfilForm("possui_mei", e.target.checked)} />
                 Possui MEI
+              </label>
+              <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={perfilForm.possui_cnpj} onChange={(e) => atualizarPerfilForm("possui_cnpj", e.target.checked)} />
+                Tenho CNPJ
+              </label>
+              <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={perfilForm.autonomo} onChange={(e) => atualizarPerfilForm("autonomo", e.target.checked)} />
+                Sou Autônomo
               </label>
               <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
                 <input type="checkbox" checked={perfilForm.aceita_cartao_servidor} onChange={(e) => atualizarPerfilForm("aceita_cartao_servidor", e.target.checked)} />
