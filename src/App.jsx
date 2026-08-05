@@ -2107,7 +2107,7 @@ function AdminPanel() {
   // detalhe + data), com relatório por ano/mês no mesmo formato do relatório
   // oficial do Sebrae (categorias x meses + totais).
   // -------------------------------------------------------------------------
-  const atendimentoSalaVazio = { categoria: CATEGORIAS_SALA_EMPREENDEDOR[0], detalhe: "", data: new Date().toISOString().slice(0, 10), observacoes: "" };
+  const atendimentoSalaVazio = { categoria: CATEGORIAS_SALA_EMPREENDEDOR[0], detalhe: "", data: new Date().toISOString().slice(0, 10), observacoes: "", resultado: "" };
   const [atendimentosSala, setAtendimentosSala] = useState(null); // null = carregando
   const [novoAtendimentoSala, setNovoAtendimentoSala] = useState(atendimentoSalaVazio);
   const [salvandoAtendimentoSala, setSalvandoAtendimentoSala] = useState(false);
@@ -2137,6 +2137,7 @@ function AdminPanel() {
         detalhe: novoAtendimentoSala.detalhe.trim() || null,
         data: novoAtendimentoSala.data,
         observacoes: novoAtendimentoSala.observacoes.trim() || null,
+        resultado: novoAtendimentoSala.resultado.trim() || null,
       }).select().single();
       if (error) throw error;
       setAtendimentosSala((atual) => [data, ...(atual ?? [])]);
@@ -2151,7 +2152,7 @@ function AdminPanel() {
 
   const iniciarEdicaoAtendimento = (a) => {
     setEditandoAtendimentoId(a.id);
-    setFormEdicaoAtendimento({ categoria: a.categoria, detalhe: a.detalhe || "", data: a.data, observacoes: a.observacoes || "" });
+    setFormEdicaoAtendimento({ categoria: a.categoria, detalhe: a.detalhe || "", data: a.data, observacoes: a.observacoes || "", resultado: a.resultado || "" });
   };
 
   const salvarEdicaoAtendimento = async (id) => {
@@ -2161,6 +2162,7 @@ function AdminPanel() {
       detalhe: formEdicaoAtendimento.detalhe.trim() || null,
       data: formEdicaoAtendimento.data,
       observacoes: formEdicaoAtendimento.observacoes.trim() || null,
+      resultado: formEdicaoAtendimento.resultado.trim() || null,
     };
     if (!supabaseConfigurado) {
       setAtendimentosSala((atual) => atual.map((a) => (a.id === id ? { ...a, ...registro } : a)));
@@ -4095,6 +4097,31 @@ function AdminPanel() {
   const apagarLicitacaoAdmin = async (id) => {
     const { error } = await supabase.from("licitacoes").delete().eq("id", id);
     if (!error) { setLicitacoesAdmin((atual) => atual.filter((l) => l.id !== id)); notificar("Edital excluído."); }
+  };
+
+  const [formResultadoLicitacao, setFormResultadoLicitacao] = useState({}); // { [id]: { resultado, data_resultado } }
+  const [editandoResultadoId, setEditandoResultadoId] = useState(null);
+  const [salvandoResultadoId, setSalvandoResultadoId] = useState(null);
+
+  const iniciarEdicaoResultado = (l) => {
+    setEditandoResultadoId(l.id);
+    setFormResultadoLicitacao((f) => ({ ...f, [l.id]: { resultado: l.resultado || "", data_resultado: l.data_resultado || new Date().toISOString().slice(0, 10) } }));
+  };
+
+  const salvarResultadoLicitacao = async (id) => {
+    const v = formResultadoLicitacao[id];
+    if (!v) return;
+    setSalvandoResultadoId(id);
+    const registro = { resultado: v.resultado.trim() || null, data_resultado: v.resultado.trim() ? v.data_resultado : null };
+    const { error } = await supabase.from("licitacoes").update(registro).eq("id", id);
+    setSalvandoResultadoId(null);
+    if (!error) {
+      setLicitacoesAdmin((atual) => atual.map((l) => (l.id === id ? { ...l, ...registro } : l)));
+      setEditandoResultadoId(null);
+      notificar("Resultado divulgado.");
+    } else {
+      notificar(error.message || "Não foi possível salvar o resultado.", "erro");
+    }
   };
 
   // -------------------------------------------------------------------------
@@ -6974,6 +7001,8 @@ function AdminPanel() {
               </label>
               <input value={novoAtendimentoSala.observacoes} onChange={(e) => setNovoAtendimentoSala((v) => ({ ...v, observacoes: e.target.value }))}
                 placeholder="Observação (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novoAtendimentoSala.resultado} onChange={(e) => setNovoAtendimentoSala((v) => ({ ...v, resultado: e.target.value }))}
+                placeholder="Resultado (opcional, ex: concluído, pendente, encaminhado)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
               {statusAtendimentoSala && statusAtendimentoSala !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusAtendimentoSala}</p>}
               {statusAtendimentoSala === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Atendimento registrado!</p>}
               <button type="submit" disabled={salvandoAtendimentoSala} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
@@ -7046,6 +7075,8 @@ function AdminPanel() {
                       </div>
                       <input value={formEdicaoAtendimento.observacoes} onChange={(e) => setFormEdicaoAtendimento((f) => ({ ...f, observacoes: e.target.value }))}
                         placeholder="Observação" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoAtendimento.resultado} onChange={(e) => setFormEdicaoAtendimento((f) => ({ ...f, resultado: e.target.value }))}
+                        placeholder="Resultado" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
                       <div className="flex gap-2">
                         <button onClick={() => salvarEdicaoAtendimento(a.id)} className="font-body text-xs font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
                         <button onClick={() => setEditandoAtendimentoId(null)} className="font-body text-xs font-bold px-3 py-1.5 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Cancelar</button>
@@ -7055,7 +7086,9 @@ function AdminPanel() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-body text-xs font-bold truncate" style={{ color: C.ink }}>{a.categoria}{a.detalhe ? ` — ${a.detalhe}` : ""}</p>
-                        <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>{a.data.split("-").reverse().join("/")}{a.observacoes ? ` · ${a.observacoes}` : ""}</p>
+                        <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>
+                          {a.data.split("-").reverse().join("/")}{a.resultado ? ` · Resultado: ${a.resultado}` : ""}{a.observacoes ? ` · ${a.observacoes}` : ""}
+                        </p>
                       </div>
                       <div className="flex gap-2 shrink-0">
                         <button onClick={() => iniciarEdicaoAtendimento(a)} className="font-body text-xs font-bold px-2.5 py-1.5 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
@@ -7107,6 +7140,36 @@ function AdminPanel() {
                     <button onClick={() => alternarAtivoLicitacaoAdmin(l.id, !l.ativo)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>{l.ativo ? "Encerrar" : "Reabrir"}</button>
                     <button onClick={() => { if (confirmarExclusao("Excluir esse edital?")) apagarLicitacaoAdmin(l.id); }} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ color: "#B4462F" }}>Excluir</button>
                   </div>
+
+                  {editandoResultadoId === l.id ? (
+                    <div className="mt-3 pt-3 border-t flex flex-col gap-2" style={{ borderColor: C.line }}>
+                      <textarea value={formResultadoLicitacao[l.id]?.resultado ?? ""} onChange={(e) => setFormResultadoLicitacao((f) => ({ ...f, [l.id]: { ...f[l.id], resultado: e.target.value } }))}
+                        placeholder="Ex: Vencedor — Empresa X, R$ 12.345,00 / Deserto / Cancelado" rows={2}
+                        className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      <input type="date" value={formResultadoLicitacao[l.id]?.data_resultado ?? ""} onChange={(e) => setFormResultadoLicitacao((f) => ({ ...f, [l.id]: { ...f[l.id], data_resultado: e.target.value } }))}
+                        className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none w-fit" style={{ borderColor: C.line }} />
+                      <div className="flex gap-2">
+                        <button onClick={() => salvarResultadoLicitacao(l.id)} disabled={salvandoResultadoId === l.id} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 text-white disabled:opacity-60" style={{ background: C.blue }}>
+                          {salvandoResultadoId === l.id ? "Salvando..." : "Divulgar resultado"}
+                        </button>
+                        <button onClick={() => setEditandoResultadoId(null)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 pt-3 border-t" style={{ borderColor: C.line }}>
+                      {l.resultado ? (
+                        <div className="rounded-lg px-2.5 py-2 mb-2" style={{ background: C.blueTint2 }}>
+                          <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>
+                            Resultado{l.data_resultado ? ` — ${l.data_resultado.split("-").reverse().join("/")}` : ""}
+                          </p>
+                          <p className="font-body text-[11px]" style={{ color: "#425A70" }}>{l.resultado}</p>
+                        </div>
+                      ) : null}
+                      <button onClick={() => iniciarEdicaoResultado(l)} className="font-body text-xs font-bold" style={{ color: C.blue }}>
+                        {l.resultado ? "Editar resultado" : "Divulgar resultado"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
               {(licitacoesAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum edital cadastrado ainda.</p>}
@@ -10786,10 +10849,12 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   const [licitacoesPublicas, setLicitacoesPublicas] = useState(null);
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("licitacoes").select("*").eq("ativo", true).order("data_limite", { ascending: true, nullsFirst: false }).then(({ data, error }) => {
+    supabase.from("licitacoes").select("*").or("ativo.eq.true,resultado.not.is.null").order("data_limite", { ascending: true, nullsFirst: false }).then(({ data, error }) => {
       if (!error) setLicitacoesPublicas(data || []);
     });
   }, []);
+  const licitacoesAbertasPublicas = (licitacoesPublicas ?? []).filter((l) => l.ativo && !l.resultado);
+  const licitacoesComResultadoPublicas = (licitacoesPublicas ?? []).filter((l) => l.resultado);
   const [licitacaoNome, setLicitacaoNome] = useState("");
   const [licitacaoWhatsapp, setLicitacaoWhatsapp] = useState("");
   const [enviandoLicitacao, setEnviandoLicitacao] = useState(false);
@@ -11988,11 +12053,11 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       )}
 
       {/* Editais e Licitações */}
-      {licitacoesPublicas && licitacoesPublicas.length > 0 && (
+      {licitacoesAbertasPublicas.length > 0 && (
         <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
           <Reveal><SectionHeader eyebrow="Compras públicas" title="Editais e Licitações" sub="Oportunidades abertas pra empresas locais participarem" /></Reveal>
           <div className="grid sm:grid-cols-2 gap-4 mt-4">
-            {licitacoesPublicas.map((l) => {
+            {licitacoesAbertasPublicas.map((l) => {
               const hoje = new Date().toISOString().slice(0, 10);
               const vencido = l.data_limite && l.data_limite < hoje;
               return (
@@ -12043,6 +12108,34 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
                 {erroLicitacao && <p className="font-body text-[11px]" style={{ color: "#B4462F" }}>{erroLicitacao}</p>}
               </form>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* Resultados de editais e licitações já divulgados */}
+      {licitacoesComResultadoPublicas.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+          <Reveal><SectionHeader eyebrow="Compras públicas" title="Resultados de editais" sub="Resultados já divulgados de editais e licitações anteriores" /></Reveal>
+          <div className="grid sm:grid-cols-2 gap-4 mt-4">
+            {licitacoesComResultadoPublicas.map((l) => (
+              <Reveal key={l.id}>
+                <div className="rounded-2xl border p-4 bg-white h-full flex flex-col gap-1.5" style={{ borderColor: C.line }}>
+                  <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{l.titulo}</p>
+                  {l.orgao && <p className="font-body text-xs" style={{ color: "#5C7186" }}>{l.orgao}</p>}
+                  <div className="rounded-lg px-2.5 py-2 mt-1" style={{ background: C.blueTint2 }}>
+                    <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>
+                      Resultado{l.data_resultado ? ` — ${l.data_resultado.split("-").reverse().join("/")}` : ""}
+                    </p>
+                    <p className="font-body text-[11px]" style={{ color: "#425A70" }}>{l.resultado}</p>
+                  </div>
+                  {l.link_edital && (
+                    <a href={l.link_edital} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold flex items-center gap-1 mt-1 w-fit" style={{ color: C.blue }}>
+                      <ExternalLink size={11} /> Ver edital completo
+                    </a>
+                  )}
+                </div>
+              </Reveal>
+            ))}
           </div>
         </section>
       )}
