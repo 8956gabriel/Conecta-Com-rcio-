@@ -10123,6 +10123,294 @@ function EmpresarioPanel({ siteConfig }) {
 }
 
 // ---------------------------------------------------------------------------
+// Painel do prestador de serviço — auto-atendimento igual ao Painel do
+// Empresário, porém mais enxuto (a tabela `prestadores` não tem produtos,
+// vagas, cupons, combos ou fidelidade — só perfil e avaliações).
+// ---------------------------------------------------------------------------
+function PrestadorPanel({ siteConfig }) {
+  const [tab, setTab] = useState("perfil");
+  const [prestadorId, setPrestadorId] = useState(null);
+  const [prestadorNaoEncontrado, setPrestadorNaoEncontrado] = useState(false);
+  const [usuarioIdAtual, setUsuarioIdAtual] = useState(null);
+  const [formCriarPrestador, setFormCriarPrestador] = useState({ nome: "", servico: "", whatsapp: "" });
+  const [criandoPrestadorAgora, setCriandoPrestadorAgora] = useState(false);
+  const [statusCriarPrestadorAgora, setStatusCriarPrestadorAgora] = useState("");
+
+  const criarMeuPrestadorAgora = async (e) => {
+    e.preventDefault();
+    setStatusCriarPrestadorAgora("");
+    if (!formCriarPrestador.nome.trim()) { setStatusCriarPrestadorAgora("Informe seu nome."); return; }
+    if (!formCriarPrestador.servico.trim()) { setStatusCriarPrestadorAgora("Informe o serviço prestado."); return; }
+    if (!usuarioIdAtual) { setStatusCriarPrestadorAgora("Sessão expirada — saia e entre de novo."); return; }
+    setCriandoPrestadorAgora(true);
+    try {
+      const { data, error } = await supabase.from("prestadores").insert({
+        dono_id: usuarioIdAtual,
+        nome: formCriarPrestador.nome,
+        servico: formCriarPrestador.servico,
+        whatsapp: formCriarPrestador.whatsapp || null,
+        status: "aprovado",
+      }).select().single();
+      if (error) throw error;
+      setPrestadorId(data.id);
+      setPrestadorNaoEncontrado(false);
+      setPerfilForm((f) => ({ ...f, nome: data.nome || "", servico: data.servico || "", whatsapp: data.whatsapp || "" }));
+      setStatusCriarPrestadorAgora("ok");
+    } catch (err) {
+      setStatusCriarPrestadorAgora(err.message || "Não foi possível cadastrar.");
+    } finally {
+      setCriandoPrestadorAgora(false);
+    }
+  };
+
+  const [perfilForm, setPerfilForm] = useState({
+    nome: "", servico: "", descricao: "", foto_url: "", endereco: "", whatsapp: "", instagram: "",
+    email: "", cpf: "", cnpj: "", google_maps_url: "",
+  });
+  const [salvandoPerfil, setSalvandoPerfil] = useState(false);
+  const [statusPerfil, setStatusPerfil] = useState("");
+  const [enviandoFotoPerfil, setEnviandoFotoPerfil] = useState(false);
+
+  const [minhasAvaliacoes, setMinhasAvaliacoes] = useState(null);
+  const [respostaAvaliacao, setRespostaAvaliacao] = useState({});
+  const [enviandoRespostaId, setEnviandoRespostaId] = useState(null);
+  const [erroRespostaAvaliacao, setErroRespostaAvaliacao] = useState("");
+
+  const carregarMinhasAvaliacoes = (idPrestador) => {
+    if (!supabaseConfigurado || !idPrestador) return;
+    supabase.from("avaliacoes").select("*").eq("prestador_id", idPrestador).order("criado_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMinhasAvaliacoes(data || []);
+    });
+  };
+
+  const enviarRespostaAvaliacao = async (id) => {
+    const texto = (respostaAvaliacao[id] || "").trim();
+    if (!texto) return;
+    setErroRespostaAvaliacao("");
+    setEnviandoRespostaId(id);
+    const { error } = await supabase.from("avaliacoes").update({ resposta_comerciante: texto }).eq("id", id);
+    if (!error) setMinhasAvaliacoes((atual) => atual.map((a) => (a.id === id ? { ...a, resposta_comerciante: texto } : a)));
+    else setErroRespostaAvaliacao(error.message || "Não foi possível enviar a resposta.");
+    setEnviandoRespostaId(null);
+  };
+
+  useEffect(() => {
+    if (!supabaseConfigurado) {
+      setPerfilForm({
+        nome: "João Elétrica", servico: "Eletricista", descricao: "Instalações e reparos elétricos residenciais.",
+        foto_url: "", endereco: "Ivatuba - PR", whatsapp: "(44) 99999-0002", instagram: "", email: "", cpf: "", cnpj: "", google_maps_url: "",
+      });
+      return;
+    }
+    (async () => {
+      const { data: sessaoAtual } = await supabase.auth.getSession();
+      const usuarioId = sessaoAtual?.session?.user?.id;
+      if (!usuarioId) return;
+      setUsuarioIdAtual(usuarioId);
+      const { data, error } = await supabase.from("prestadores").select("*").eq("dono_id", usuarioId).single();
+      if (error) {
+        console.error("Falha ao carregar o cadastro de prestador do usuário logado:", error);
+        setPrestadorNaoEncontrado(true);
+        return;
+      }
+      if (data) {
+        setPrestadorId(data.id);
+        setPerfilForm({
+          nome: data.nome || "", servico: data.servico || "", descricao: data.descricao || "",
+          foto_url: data.foto_url || "", endereco: data.endereco || "", whatsapp: data.whatsapp || "",
+          instagram: data.instagram || "", email: data.email || "", cpf: data.cpf || "", cnpj: data.cnpj || "",
+          google_maps_url: data.google_maps_url || "",
+        });
+        carregarMinhasAvaliacoes(data.id);
+      }
+    })();
+  }, []);
+
+  const atualizarPerfilForm = (campo, valor) => setPerfilForm((f) => ({ ...f, [campo]: valor }));
+
+  const enviarFotoPerfil = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setPerfilForm((f) => ({ ...f, foto_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoFotoPerfil(true);
+    const caminho = `prestadores/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("fotos-empresas").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoPerfil(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("fotos-empresas").getPublicUrl(caminho);
+        setPerfilForm((f) => ({ ...f, foto_url: pub.publicUrl }));
+      }
+    });
+  };
+
+  const salvarPerfil = async (e) => {
+    e.preventDefault();
+    setStatusPerfil("");
+    if (!supabaseConfigurado) { setStatusPerfil("ok"); return; }
+    if (!prestadorId) {
+      setStatusPerfil("Não encontramos seu cadastro de prestador. Fale com o suporte antes de tentar salvar de novo.");
+      return;
+    }
+    setSalvandoPerfil(true);
+    try {
+      const { error } = await supabase.from("prestadores").update({
+        nome: perfilForm.nome, servico: perfilForm.servico, descricao: perfilForm.descricao || null,
+        foto_url: perfilForm.foto_url || null, endereco: perfilForm.endereco || null, whatsapp: perfilForm.whatsapp || null,
+        instagram: perfilForm.instagram || null, email: perfilForm.email || null, cpf: perfilForm.cpf || null,
+        cnpj: perfilForm.cnpj || null, google_maps_url: perfilForm.google_maps_url || null,
+      }).eq("id", prestadorId);
+      if (error) throw error;
+      setStatusPerfil("ok");
+    } catch (err) {
+      setStatusPerfil(err.message || "Não foi possível salvar agora. Tente de novo.");
+    } finally {
+      setSalvandoPerfil(false);
+    }
+  };
+
+  const items = [
+    { id: "perfil", label: "Editar perfil", icon: UserCircle2 },
+    { id: "avaliacoes", label: "Avaliações", icon: Star },
+  ];
+
+  return (
+    <div className="grid md:grid-cols-[220px_1fr] gap-6">
+      <aside className="rounded-2xl border p-3 h-fit" style={{ borderColor: C.line }}>
+        <p className="font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2 truncate" style={{ color: "#5C7186" }}>{perfilForm.nome || "Meu cadastro"}</p>
+        {items.map((it) => {
+          const Icon = it.icon;
+          const active = tab === it.id;
+          return (
+            <button key={it.id} onClick={() => setTab(it.id)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-body font-semibold text-left"
+              style={{ background: active ? C.blueTint : "transparent", color: active ? C.blue : "#425A70" }}>
+              <Icon size={16} /> {it.label}
+            </button>
+          );
+        })}
+      </aside>
+
+      <div className="min-w-0">
+        {tab === "perfil" && (
+          <div>
+            <SectionHeader eyebrow="Seu cadastro" title="Editar perfil" />
+            {!supabaseConfigurado && (
+              <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2 max-w-2xl" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
+                <BadgeCheck size={14} className="mt-0.5 shrink-0" />
+                Modo demonstração: conecte o Supabase para essas alterações serem salvas de verdade.
+              </div>
+            )}
+            {prestadorNaoEncontrado && (
+              <div className="mb-4 rounded-2xl border p-5 max-w-2xl" style={{ borderColor: "#F0B8A8", background: "#FDEEEA" }}>
+                <p className="font-body text-xs flex items-start gap-2 mb-3" style={{ color: "#B4462F" }}>
+                  <BadgeCheck size={14} className="mt-0.5 shrink-0" />
+                  Não encontramos um cadastro de prestador vinculado a este login ainda. Cadastre agora pra liberar o resto do painel:
+                </p>
+                <form onSubmit={criarMeuPrestadorAgora} className="grid sm:grid-cols-2 gap-2">
+                  <input value={formCriarPrestador.nome} onChange={(e) => setFormCriarPrestador((f) => ({ ...f, nome: e.target.value }))}
+                    placeholder="Seu nome" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                  <input value={formCriarPrestador.servico} onChange={(e) => setFormCriarPrestador((f) => ({ ...f, servico: e.target.value }))}
+                    placeholder="Serviço (ex: Eletricista)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  <input value={formCriarPrestador.whatsapp} onChange={(e) => setFormCriarPrestador((f) => ({ ...f, whatsapp: e.target.value }))}
+                    placeholder="WhatsApp" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  {statusCriarPrestadorAgora && statusCriarPrestadorAgora !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusCriarPrestadorAgora}</p>}
+                  <button type="submit" disabled={criandoPrestadorAgora} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                    {criandoPrestadorAgora ? "Cadastrando..." : "Cadastrar meu perfil"}
+                  </button>
+                </form>
+              </div>
+            )}
+            <form onSubmit={salvarPerfil} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl" style={{ borderColor: C.line }}>
+              <input value={perfilForm.nome} onChange={(e) => atualizarPerfilForm("nome", e.target.value)} placeholder="Seu nome"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <input value={perfilForm.servico} onChange={(e) => atualizarPerfilForm("servico", e.target.value)} placeholder="Serviço prestado (ex: Eletricista)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <textarea value={perfilForm.descricao} onChange={(e) => atualizarPerfilForm("descricao", e.target.value)} placeholder="Descrição do seu serviço" rows={3}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+
+              <div className="sm:col-span-2 flex flex-wrap gap-3 items-center">
+                <label className="font-body text-xs font-bold cursor-pointer w-fit flex items-center gap-1.5" style={{ color: C.blue }}>
+                  <Camera size={13} /> {enviandoFotoPerfil ? "Enviando..." : "Trocar foto"}
+                  <input type="file" accept="image/*" className="hidden" onChange={enviarFotoPerfil} />
+                </label>
+                {perfilForm.foto_url && <img loading="lazy" decoding="async" src={perfilForm.foto_url} alt="Foto" className="w-9 h-9 rounded-lg object-cover border" style={{ borderColor: C.line }} />}
+              </div>
+
+              <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                WhatsApp
+                <input value={perfilForm.whatsapp} onChange={(e) => atualizarPerfilForm("whatsapp", e.target.value)} placeholder="(44) 99999-0000"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                Instagram
+                <input value={perfilForm.instagram} onChange={(e) => atualizarPerfilForm("instagram", e.target.value)} placeholder="@seu.perfil"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                E-mail
+                <input value={perfilForm.email} onChange={(e) => atualizarPerfilForm("email", e.target.value)} placeholder="contato@voce.com"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <input value={perfilForm.endereco} onChange={(e) => atualizarPerfilForm("endereco", e.target.value)} placeholder="Endereço / região de atendimento"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <input value={perfilForm.google_maps_url} onChange={(e) => atualizarPerfilForm("google_maps_url", e.target.value)} placeholder="Link do Google Maps (opcional)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+
+              <input value={perfilForm.cpf} onChange={(e) => atualizarPerfilForm("cpf", e.target.value)} placeholder="CPF"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={perfilForm.cnpj} onChange={(e) => atualizarPerfilForm("cnpj", e.target.value)} placeholder="CNPJ (se tiver)"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+
+              {statusPerfil && statusPerfil !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusPerfil}</p>}
+              {statusPerfil === "ok" && <p className="sm:col-span-2 font-body text-xs font-bold" style={{ color: "#1F8A4C" }}>Salvo com sucesso!</p>}
+              <button type="submit" disabled={salvandoPerfil} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                {salvandoPerfil ? "Salvando..." : "Salvar perfil"}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {tab === "avaliacoes" && (
+          <div>
+            <SectionHeader eyebrow="Reputação" title="Avaliações" sub="O que os clientes estão dizendo — responda pra mostrar que você se importa" />
+            {erroRespostaAvaliacao && <p className="font-body text-xs mb-3" style={{ color: "#B4462F" }}>{erroRespostaAvaliacao}</p>}
+            <div className="flex flex-col gap-3 max-w-xl">
+              {(minhasAvaliacoes ?? []).map((a) => (
+                <div key={a.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{a.nome}</p>
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={12} fill={n <= a.nota ? "#E8A23D" : "none"} color="#E8A23D" />)}
+                    </div>
+                  </div>
+                  {a.comentario && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{a.comentario}</p>}
+                  {a.resposta_comerciante ? (
+                    <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: C.blueTint2 }}>
+                      <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>Sua resposta</p>
+                      <p className="font-body text-[11px]" style={{ color: "#425A70" }}>{a.resposta_comerciante}</p>
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex gap-2">
+                      <input value={respostaAvaliacao[a.id] || ""} onChange={(e) => setRespostaAvaliacao((r) => ({ ...r, [a.id]: e.target.value }))}
+                        placeholder="Responder este cliente..." className="flex-1 font-body text-xs border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                      <button onClick={() => enviarRespostaAvaliacao(a.id)} disabled={enviandoRespostaId === a.id}
+                        className="font-body text-xs font-bold rounded-lg px-3 py-2 text-white disabled:opacity-60" style={{ background: C.blue }}>
+                        Responder
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(minhasAvaliacoes ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Ainda não recebeu nenhuma avaliação.</p>}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Modal de cadastro de feirante — nome, contato, redes sociais e até 5 fotos
 // dos produtos oferecidos.
 // ---------------------------------------------------------------------------
@@ -13939,6 +14227,8 @@ function AcessoRestrito({ tipo, onEntrar }) {
       <p className="font-body text-sm mt-2" style={{ color: "#5C7186" }}>
         {tipo === "admin"
           ? "Essa área é exclusiva para administradores da plataforma."
+          : tipo === "prestador"
+          ? "Essa área é exclusiva para prestadores de serviço cadastrados."
           : "Essa área é exclusiva para empresários com uma empresa cadastrada."}
       </p>
       <button onClick={trocarConta} className="glow-btn font-body text-sm font-bold mt-6 px-5 py-2.5 rounded-xl text-white" style={{ background: C.blue }}>
@@ -13955,7 +14245,7 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", prestador: "#/prestador", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
@@ -13970,6 +14260,7 @@ function modoDaHash(hash) {
   if (h.startsWith("#/termos")) return "termos";
   if (h.startsWith("#/privacidade")) return "privacidade";
   if (h.startsWith("#/empresa") || h.startsWith("#/vendedor")) return "empresario";
+  if (h.startsWith("#/prestador")) return "prestador";
   if (h.startsWith("#/cadastro")) return "cadastro-conta";
   if (h.startsWith("#/entrar") || h.startsWith("#/conta")) return "conta";
   return null;
@@ -15068,6 +15359,7 @@ export default function ConectaComercio() {
     { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
     { id: "empresario", label: "Painel Empresário", icon: Briefcase, restrito: "empresario" },
+    { id: "prestador", label: "Painel Prestador", icon: Wrench, restrito: "prestador" },
   ];
 
   // Link direto de acesso: le o hash da URL (#/admin, #/empresa, #/entrar,
@@ -15086,6 +15378,8 @@ export default function ConectaComercio() {
         setMensagemAcesso(
           m.restrito === "admin"
             ? "Entre com sua conta de administrador para acessar esse painel."
+            : m.restrito === "prestador"
+            ? "Entre ou cadastre-se como prestador para acessar esse painel."
             : "Entre ou cadastre sua empresa para acessar o painel do empresário."
         );
         setDestinoPosLogin(m.id);
@@ -15206,6 +15500,19 @@ export default function ConectaComercio() {
           </div>
         ) : (
           <AcessoRestrito tipo="empresario" onEntrar={() => irPara(modos.find((m) => m.id === "empresario"))} />
+        )
+      )}
+
+      {modo === "prestador" && (
+        sessao === undefined ? (
+          <LoadingBrand texto="Verificando seu acesso..." />
+        ) : podeVer("prestador") ? (
+          <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
+            <SectionHeader eyebrow="Área restrita" title="Painel do prestador" sub={perfil?.nome ? `Olá, ${perfil.nome}` : "Visível só para o prestador de serviço, após login"} />
+            <PrestadorPanel siteConfig={siteConfig} />
+          </div>
+        ) : (
+          <AcessoRestrito tipo="prestador" onEntrar={() => irPara(modos.find((m) => m.id === "prestador"))} />
         )
       )}
       </div>
