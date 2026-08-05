@@ -3126,6 +3126,7 @@ function AdminPanel() {
   }, []);
 
   // Cadastros de interessados na Fomento Paraná (leads).
+  const CATEGORIAS_FOMENTO = ["Microcrédito", "Capital de giro", "Máquinas e equipamentos", "Outros"];
   const [fomentoLeadsAdmin, setFomentoLeadsAdmin] = useState(null);
   useEffect(() => {
     if (!supabaseConfigurado) return;
@@ -3245,7 +3246,6 @@ function AdminPanel() {
   // Cadastro manual de pedido do Fomento direto pelo admin (sem precisar
   // que a pessoa preencha o formulário público), tudo na aba Sala do
   // Empreendedor: valor, orientação, proposta, anexo e status.
-  const CATEGORIAS_FOMENTO = ["Microcrédito", "Capital de giro", "Máquinas e equipamentos", "Outros"];
   const leadFomentoAdminVazio = { categoria: CATEGORIAS_FOMENTO[0], orientacao: "", proposta: "", valor_concedido: "", status: "recebido" };
   const [novoLeadFomentoAdmin, setNovoLeadFomentoAdmin] = useState(leadFomentoAdminVazio);
   const [anexoLeadFomentoAdmin, setAnexoLeadFomentoAdmin] = useState(null);
