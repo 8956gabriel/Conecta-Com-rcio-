@@ -8533,9 +8533,17 @@ function EmpresarioPanel({ siteConfig }) {
   // já existem no banco (tabela `empresas`), só faltava esta tela ler e
   // gravar de verdade em vez de mostrar valores fixos.
   const [empresaId, setEmpresaId] = useState(null);
-  const [perfilForm, setPerfilForm] = useState({ nome: "", whatsapp: "", instagram: "", endereco: "", horario_atendimento: "", horario_funcionamento: null, chave_pix: "" });
+  const [empresaNaoEncontrada, setEmpresaNaoEncontrada] = useState(false);
+  const [perfilForm, setPerfilForm] = useState({
+    nome: "", whatsapp: "", instagram: "", endereco: "", horario_atendimento: "", horario_funcionamento: null, chave_pix: "",
+    logo_url: "", banner_url: "", fotos_urls: [], email: "", facebook: "", site: "",
+    cpf: "", cnpj: "", possui_mei: false, aceita_cartao_servidor: false, destaque: false,
+  });
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [statusPerfil, setStatusPerfil] = useState("");
+  const [enviandoLogoPerfil, setEnviandoLogoPerfil] = useState(false);
+  const [enviandoBannerPerfil, setEnviandoBannerPerfil] = useState(false);
+  const [enviandoFotoGaleriaPerfil, setEnviandoFotoGaleriaPerfil] = useState(false);
 
   // Produtos reais desta empresa — substitui a lista de exemplo assim que
   // soubermos o id da empresa (buscado no efeito abaixo).
@@ -8579,26 +8587,34 @@ function EmpresarioPanel({ siteConfig }) {
     }
   };
 
+  const [erroAcaoProduto, setErroAcaoProduto] = useState("");
+
   const alternarAtivoMeuProduto = async (id, ativo) => {
+    setErroAcaoProduto("");
     if (!supabaseConfigurado) { setMeusProdutosReais((atual) => (atual ?? []).map((p) => (p.id === id ? { ...p, ativo } : p))); return; }
     const { error } = await supabase.from("produtos").update({ ativo }).eq("id", id);
     if (!error) setMeusProdutosReais((atual) => atual.map((p) => (p.id === id ? { ...p, ativo } : p)));
+    else setErroAcaoProduto(error.message || "Não foi possível atualizar o produto.");
   };
 
   const removerMeuProduto = async (id) => {
+    setErroAcaoProduto("");
     if (!supabaseConfigurado) { setMeusProdutosReais((atual) => (atual ?? []).filter((p) => p.id !== id)); return; }
     const { error } = await supabase.from("produtos").delete().eq("id", id);
     if (!error) setMeusProdutosReais((atual) => atual.filter((p) => p.id !== id));
+    else setErroAcaoProduto(error.message || "Não foi possível excluir o produto.");
   };
 
   const [editandoValoresProduto, setEditandoValoresProduto] = useState({}); // { [id]: { preco_promocional, estoque } }
   const salvarValoresProduto = async (id) => {
     const v = editandoValoresProduto[id];
     if (!v) return;
+    setErroAcaoProduto("");
     const registro = { preco_promocional: v.preco_promocional !== "" ? Number(v.preco_promocional) : null, estoque: v.estoque !== "" ? Number(v.estoque) : null };
     if (!supabaseConfigurado) { setMeusProdutosReais((atual) => atual.map((p) => (p.id === id ? { ...p, ...registro } : p))); return; }
     const { error } = await supabase.from("produtos").update(registro).eq("id", id);
     if (!error) setMeusProdutosReais((atual) => atual.map((p) => (p.id === id ? { ...p, ...registro } : p)));
+    else setErroAcaoProduto(error.message || "Não foi possível salvar os valores do produto.");
   };
 
   // -------------------------------------------------------------------------
@@ -8623,7 +8639,8 @@ function EmpresarioPanel({ siteConfig }) {
     e.preventDefault();
     setStatusVagaEmpresario("");
     if (!novaVagaEmpresario.cargo) { setStatusVagaEmpresario("Informe ao menos o cargo."); return; }
-    if (!supabaseConfigurado || !empresaId) { setStatusVagaEmpresario("ok"); return; }
+    if (!supabaseConfigurado) { setStatusVagaEmpresario("ok"); return; }
+    if (!empresaId) { setStatusVagaEmpresario("Não encontramos sua empresa cadastrada. Fale com o suporte."); return; }
     setPublicandoVagaEmpresario(true);
     try {
       const { data, error } = await supabase.from("vagas").insert({ ...novaVagaEmpresario, empresa_id: empresaId, status: "aberta" }).select().single();
@@ -8639,9 +8656,11 @@ function EmpresarioPanel({ siteConfig }) {
   };
 
   const encerrarVagaEmpresario = async (id) => {
+    setStatusVagaEmpresario("");
     if (!supabaseConfigurado) { setMinhasVagasReais((atual) => atual.map((v) => (v.id === id ? { ...v, status: "encerrada" } : v))); return; }
     const { error } = await supabase.from("vagas").update({ status: "encerrada" }).eq("id", id);
     if (!error) setMinhasVagasReais((atual) => atual.map((v) => (v.id === id ? { ...v, status: "encerrada" } : v)));
+    else setStatusVagaEmpresario(error.message || "Não foi possível encerrar a vaga.");
   };
 
   // Visualizações do perfil — a coluna já existia na empresa (usada até pra
@@ -8661,13 +8680,22 @@ function EmpresarioPanel({ siteConfig }) {
       const { data: sessaoAtual } = await supabase.auth.getSession();
       const usuarioId = sessaoAtual?.session?.user?.id;
       if (!usuarioId) return;
-      const { data } = await supabase.from("empresas").select("*").eq("dono_id", usuarioId).single();
+      const { data, error } = await supabase.from("empresas").select("*").eq("dono_id", usuarioId).single();
+      if (error) {
+        console.error("Falha ao carregar a empresa do usuário logado:", error);
+        setEmpresaNaoEncontrada(true);
+        return;
+      }
       if (data) {
         setEmpresaId(data.id);
         setPerfilForm({
           nome: data.nome || "", whatsapp: data.whatsapp || "", instagram: data.instagram || "",
           endereco: data.endereco || "", horario_atendimento: data.horario_atendimento || "",
           horario_funcionamento: data.horario_funcionamento || null, chave_pix: data.chave_pix || "",
+          logo_url: data.logo_url || "", banner_url: data.banner_url || "", fotos_urls: data.fotos_urls || [],
+          email: data.email || "", facebook: data.facebook || "", site: data.site || "",
+          cpf: data.cpf || "", cnpj: data.cnpj || "", possui_mei: !!data.possui_mei,
+          aceita_cartao_servidor: !!data.aceita_cartao_servidor, destaque: !!data.destaque,
         });
         setVisualizacoesEmpresa(data.visualizacoes ?? 0);
         setPlanoPremiumEmpresa({ ativo: planoPremiumAtivo(data), ate: data.plano_premium_ate || null });
@@ -8722,18 +8750,24 @@ function EmpresarioPanel({ siteConfig }) {
   };
 
   const alternarAtivoCupom = async (id, ativo) => {
+    setStatusCupom("");
     const { error } = await supabase.from("cupons").update({ ativo }).eq("id", id);
     if (!error) setMeusCupons((atual) => atual.map((c) => (c.id === id ? { ...c, ativo } : c)));
+    else setStatusCupom(error.message || "Não foi possível atualizar o cupom.");
   };
 
   const registrarResgateCupom = async (id, usosAtuais) => {
+    setStatusCupom("");
     const { error } = await supabase.from("cupons").update({ usos_atuais: usosAtuais + 1 }).eq("id", id);
     if (!error) setMeusCupons((atual) => atual.map((c) => (c.id === id ? { ...c, usos_atuais: usosAtuais + 1 } : c)));
+    else setStatusCupom(error.message || "Não foi possível registrar o resgate.");
   };
 
   const apagarCupom = async (id) => {
+    setStatusCupom("");
     const { error } = await supabase.from("cupons").delete().eq("id", id);
     if (!error) setMeusCupons((atual) => atual.filter((c) => c.id !== id));
+    else setStatusCupom(error.message || "Não foi possível excluir o cupom.");
   };
 
   // Combos e promoções combinadas (ex: "Combo lanche + suco por R$ 20").
@@ -8774,13 +8808,17 @@ function EmpresarioPanel({ siteConfig }) {
   };
 
   const alternarAtivoCombo = async (id, ativo) => {
+    setStatusCombo("");
     const { error } = await supabase.from("combos").update({ ativo }).eq("id", id);
     if (!error) setMeusCombos((atual) => atual.map((c) => (c.id === id ? { ...c, ativo } : c)));
+    else setStatusCombo(error.message || "Não foi possível atualizar o combo.");
   };
 
   const apagarCombo = async (id) => {
+    setStatusCombo("");
     const { error } = await supabase.from("combos").delete().eq("id", id);
     if (!error) setMeusCombos((atual) => atual.filter((c) => c.id !== id));
+    else setStatusCombo(error.message || "Não foi possível excluir o combo.");
   };
 
   // Cartão fidelidade digital — a loja define a regra (ex: "a cada 10
@@ -8793,6 +8831,7 @@ function EmpresarioPanel({ siteConfig }) {
   const [buscaFidelidadeNome, setBuscaFidelidadeNome] = useState("");
   const [clienteFidelidade, setClienteFidelidade] = useState(null); // undefined = buscando, null = não encontrado ainda
   const [meusClientesFidelidade, setMeusClientesFidelidade] = useState(null);
+  const [erroAcaoFidelidade, setErroAcaoFidelidade] = useState("");
 
   const carregarFidelidade = (idEmpresa) => {
     if (!supabaseConfigurado || !idEmpresa) return;
@@ -8827,8 +8866,14 @@ function EmpresarioPanel({ siteConfig }) {
   const buscarOuCriarClienteFidelidade = async (idEmpresaAtual) => {
     const telefone = buscaFidelidadeTelefone.replace(/\D/g, "");
     if (!telefone) return;
+    setErroAcaoFidelidade("");
     setClienteFidelidade(undefined);
-    const { data } = await supabase.from("fidelidade_clientes").select("*").eq("empresa_id", idEmpresaAtual).eq("telefone", telefone).maybeSingle();
+    const { data, error: erroBusca } = await supabase.from("fidelidade_clientes").select("*").eq("empresa_id", idEmpresaAtual).eq("telefone", telefone).maybeSingle();
+    if (erroBusca) {
+      setErroAcaoFidelidade(erroBusca.message || "Não foi possível buscar o cliente.");
+      setClienteFidelidade(null);
+      return;
+    }
     if (data) { setClienteFidelidade(data); return; }
     const { data: novo, error } = await supabase.from("fidelidade_clientes").insert({
       empresa_id: idEmpresaAtual, telefone, nome: buscaFidelidadeNome || null, carimbos: 0,
@@ -8836,25 +8881,34 @@ function EmpresarioPanel({ siteConfig }) {
     if (!error) {
       setClienteFidelidade(novo);
       setMeusClientesFidelidade((atual) => [novo, ...(atual ?? [])]);
+    } else {
+      setErroAcaoFidelidade(error.message || "Não foi possível cadastrar o cliente.");
+      setClienteFidelidade(null);
     }
   };
 
   const darCarimbo = async () => {
     if (!clienteFidelidade) return;
+    setErroAcaoFidelidade("");
     const novoValor = clienteFidelidade.carimbos + 1;
     const { error } = await supabase.from("fidelidade_clientes").update({ carimbos: novoValor }).eq("id", clienteFidelidade.id);
     if (!error) {
       setClienteFidelidade((c) => ({ ...c, carimbos: novoValor }));
       setMeusClientesFidelidade((atual) => atual.map((c) => (c.id === clienteFidelidade.id ? { ...c, carimbos: novoValor } : c)));
+    } else {
+      setErroAcaoFidelidade(error.message || "Não foi possível registrar o carimbo.");
     }
   };
 
   const resgatarFidelidade = async () => {
     if (!clienteFidelidade) return;
+    setErroAcaoFidelidade("");
     const { error } = await supabase.from("fidelidade_clientes").update({ carimbos: 0 }).eq("id", clienteFidelidade.id);
     if (!error) {
       setClienteFidelidade((c) => ({ ...c, carimbos: 0 }));
       setMeusClientesFidelidade((atual) => atual.map((c) => (c.id === clienteFidelidade.id ? { ...c, carimbos: 0 } : c)));
+    } else {
+      setErroAcaoFidelidade(error.message || "Não foi possível resgatar a recompensa.");
     }
   };
 
@@ -8900,6 +8954,7 @@ function EmpresarioPanel({ siteConfig }) {
   const [minhasAvaliacoes, setMinhasAvaliacoes] = useState(null);
   const [respostaAvaliacao, setRespostaAvaliacao] = useState({}); // { [id]: texto }
   const [enviandoRespostaId, setEnviandoRespostaId] = useState(null);
+  const [erroRespostaAvaliacao, setErroRespostaAvaliacao] = useState("");
 
   const carregarMinhasAvaliacoes = (idEmpresa) => {
     if (!supabaseConfigurado || !idEmpresa) return;
@@ -8911,24 +8966,90 @@ function EmpresarioPanel({ siteConfig }) {
   const enviarRespostaAvaliacao = async (id) => {
     const texto = (respostaAvaliacao[id] || "").trim();
     if (!texto) return;
+    setErroRespostaAvaliacao("");
     setEnviandoRespostaId(id);
     const { error } = await supabase.from("avaliacoes").update({ resposta_comerciante: texto }).eq("id", id);
     if (!error) setMinhasAvaliacoes((atual) => atual.map((a) => (a.id === id ? { ...a, resposta_comerciante: texto } : a)));
+    else setErroRespostaAvaliacao(error.message || "Não foi possível enviar a resposta.");
     setEnviandoRespostaId(null);
   };
 
   const atualizarPerfilForm = (campo, valor) => setPerfilForm((f) => ({ ...f, [campo]: valor }));
 
+  const enviarLogoPerfil = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setPerfilForm((f) => ({ ...f, logo_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoLogoPerfil(true);
+    const caminho = `logos/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("logos").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoLogoPerfil(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("logos").getPublicUrl(caminho);
+        setPerfilForm((f) => ({ ...f, logo_url: pub.publicUrl }));
+      }
+    });
+  };
+
+  const enviarBannerPerfil = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { setPerfilForm((f) => ({ ...f, banner_url: URL.createObjectURL(arquivo) })); return; }
+    setEnviandoBannerPerfil(true);
+    const caminho = `banners-empresas/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("fotos-empresas").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoBannerPerfil(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("fotos-empresas").getPublicUrl(caminho);
+        setPerfilForm((f) => ({ ...f, banner_url: pub.publicUrl }));
+      }
+    });
+  };
+
+  const limiteFotosPerfil = planoPremiumEmpresa.ativo ? LIMITE_FOTOS_PREMIUM : LIMITE_FOTOS_GRATUITO;
+
+  const enviarFotoGaleriaPerfil = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (perfilForm.fotos_urls.length >= limiteFotosPerfil) {
+      setStatusPerfil(`Limite de ${limiteFotosPerfil} fotos atingido.`);
+      return;
+    }
+    if (!supabaseConfigurado) { setPerfilForm((f) => ({ ...f, fotos_urls: [...f.fotos_urls, URL.createObjectURL(arquivo)] })); return; }
+    setEnviandoFotoGaleriaPerfil(true);
+    const caminho = `galeria/${Date.now()}-${arquivo.name}`;
+    supabase.storage.from("fotos-empresas").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoGaleriaPerfil(false);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("fotos-empresas").getPublicUrl(caminho);
+        setPerfilForm((f) => ({ ...f, fotos_urls: [...f.fotos_urls, pub.publicUrl] }));
+      }
+    });
+  };
+
+  const removerFotoGaleriaPerfil = (indice) => {
+    setPerfilForm((f) => ({ ...f, fotos_urls: f.fotos_urls.filter((_, i) => i !== indice) }));
+  };
+
   const salvarPerfil = async (e) => {
     e.preventDefault();
     setStatusPerfil("");
-    if (!supabaseConfigurado || !empresaId) { setStatusPerfil("ok"); return; }
+    if (!supabaseConfigurado) { setStatusPerfil("ok"); return; }
+    if (!empresaId) {
+      setStatusPerfil("Não encontramos sua empresa cadastrada. Fale com o suporte antes de tentar salvar de novo.");
+      return;
+    }
     setSalvandoPerfil(true);
     try {
       const { error } = await supabase.from("empresas").update({
         nome: perfilForm.nome, whatsapp: perfilForm.whatsapp, instagram: perfilForm.instagram,
         endereco: perfilForm.endereco, horario_atendimento: perfilForm.horario_atendimento,
         horario_funcionamento: perfilForm.horario_funcionamento, chave_pix: perfilForm.chave_pix || null,
+        logo_url: perfilForm.logo_url || null, banner_url: perfilForm.banner_url || null,
+        fotos_urls: perfilForm.fotos_urls, email: perfilForm.email || null,
+        facebook: perfilForm.facebook || null, site: perfilForm.site || null,
+        cpf: perfilForm.cpf || null, cnpj: perfilForm.cnpj || null, possui_mei: perfilForm.possui_mei,
+        aceita_cartao_servidor: perfilForm.aceita_cartao_servidor, destaque: perfilForm.destaque,
       }).eq("id", empresaId);
       if (error) throw error;
       setStatusPerfil("ok");
@@ -8980,9 +9101,29 @@ function EmpresarioPanel({ siteConfig }) {
                 Modo demonstração: conecte o Supabase para essas alterações serem salvas de verdade.
               </div>
             )}
+            {empresaNaoEncontrada && (
+              <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2 max-w-2xl" style={{ background: "#FDEEEA", color: "#B4462F" }}>
+                <BadgeCheck size={14} className="mt-0.5 shrink-0" />
+                Não encontramos uma empresa vinculada a este login, então nada aqui vai salvar. Fale com o suporte.
+              </div>
+            )}
             <form onSubmit={salvarPerfil} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl" style={{ borderColor: C.line }}>
               <input value={perfilForm.nome} onChange={(e) => atualizarPerfilForm("nome", e.target.value)} placeholder="Nome da empresa"
                 className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+
+              <div className="sm:col-span-2 flex flex-wrap gap-3">
+                <label className="font-body text-xs font-bold cursor-pointer w-fit flex items-center gap-1.5" style={{ color: C.blue }}>
+                  <Camera size={13} /> {enviandoLogoPerfil ? "Enviando..." : "Trocar logo"}
+                  <input type="file" accept="image/*" className="hidden" onChange={enviarLogoPerfil} />
+                </label>
+                <label className="font-body text-xs font-bold cursor-pointer w-fit flex items-center gap-1.5" style={{ color: C.blue }}>
+                  <ImageIcon size={13} /> {enviandoBannerPerfil ? "Enviando..." : "Trocar banner"}
+                  <input type="file" accept="image/*" className="hidden" onChange={enviarBannerPerfil} />
+                </label>
+                {perfilForm.logo_url && <img loading="lazy" decoding="async" src={perfilForm.logo_url} alt="Logo" className="w-9 h-9 rounded-lg object-cover border" style={{ borderColor: C.line }} />}
+                {perfilForm.banner_url && <img loading="lazy" decoding="async" src={perfilForm.banner_url} alt="Banner" className="w-16 h-9 rounded-lg object-cover border" style={{ borderColor: C.line }} />}
+              </div>
+
               <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
                 WhatsApp
                 <input value={perfilForm.whatsapp} onChange={(e) => atualizarPerfilForm("whatsapp", e.target.value)} placeholder="(44) 99999-0000"
@@ -8991,6 +9132,21 @@ function EmpresarioPanel({ siteConfig }) {
               <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
                 Instagram
                 <input value={perfilForm.instagram} onChange={(e) => atualizarPerfilForm("instagram", e.target.value)} placeholder="@sua.empresa"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                Facebook
+                <input value={perfilForm.facebook} onChange={(e) => atualizarPerfilForm("facebook", e.target.value)} placeholder="Link do Facebook"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                Site
+                <input value={perfilForm.site} onChange={(e) => atualizarPerfilForm("site", e.target.value)} placeholder="https://..."
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                E-mail
+                <input value={perfilForm.email} onChange={(e) => atualizarPerfilForm("email", e.target.value)} placeholder="contato@suaempresa.com"
                   className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               </label>
               <input value={perfilForm.endereco} onChange={(e) => atualizarPerfilForm("endereco", e.target.value)} placeholder="Endereço"
@@ -9007,6 +9163,47 @@ function EmpresarioPanel({ siteConfig }) {
               <input value={perfilForm.chave_pix} onChange={(e) => atualizarPerfilForm("chave_pix", e.target.value)} placeholder="Chave Pix (CPF, CNPJ, e-mail, telefone ou aleatória)"
                 className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
               <p className="font-body text-[11px] sm:col-span-2 -mt-1.5" style={{ color: "#8896A6" }}>Com a chave Pix cadastrada, o cliente vê um código Pix pra pagar direto no carrinho — o dinheiro cai na sua conta, o site não participa do pagamento.</p>
+
+              <input value={perfilForm.cpf} onChange={(e) => atualizarPerfilForm("cpf", e.target.value)} placeholder="CPF"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={perfilForm.cnpj} onChange={(e) => atualizarPerfilForm("cnpj", e.target.value)} placeholder="CNPJ"
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={perfilForm.possui_mei} onChange={(e) => atualizarPerfilForm("possui_mei", e.target.checked)} />
+                Possui MEI
+              </label>
+              <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={perfilForm.aceita_cartao_servidor} onChange={(e) => atualizarPerfilForm("aceita_cartao_servidor", e.target.checked)} />
+                Aceita Cartão do Servidor
+              </label>
+              <label className="font-body text-xs font-semibold flex items-center gap-2 w-fit cursor-pointer sm:col-span-2" style={{ color: "#425A70" }}>
+                <input type="checkbox" checked={perfilForm.destaque} onChange={(e) => atualizarPerfilForm("destaque", e.target.checked)} />
+                Mostrar em destaque na Vitrine Local
+              </label>
+
+              <div className="sm:col-span-2">
+                <p className="font-body text-xs font-bold mb-1.5" style={{ color: "#425A70" }}>
+                  Galeria de fotos <span style={{ color: "#8896A6", fontWeight: 400 }}>({perfilForm.fotos_urls.length}/{limiteFotosPerfil})</span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {perfilForm.fotos_urls.map((url, i) => (
+                    <div key={url + i} className="relative w-14 h-14 rounded-lg overflow-hidden border" style={{ borderColor: C.line }}>
+                      <img loading="lazy" decoding="async" src={url} alt="" className="w-full h-full object-cover" />
+                      <button onClick={() => removerFotoGaleriaPerfil(i)} type="button" className="absolute top-0 right-0 w-5 h-5 bg-black/60 text-white flex items-center justify-center"><X size={11} /></button>
+                    </div>
+                  ))}
+                  {perfilForm.fotos_urls.length < limiteFotosPerfil && (
+                    <label className="w-14 h-14 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, color: "#5C7186" }}>
+                      {enviandoFotoGaleriaPerfil ? "..." : <PlusCircle size={16} />}
+                      <input type="file" accept="image/*" className="hidden" onChange={enviarFotoGaleriaPerfil} />
+                    </label>
+                  )}
+                </div>
+                {!planoPremiumEmpresa.ativo && perfilForm.fotos_urls.length >= LIMITE_FOTOS_GRATUITO && (
+                  <p className="font-body text-[10px] mt-1" style={{ color: "#8A5A12" }}>Limite do plano gratuito. Ative o Plano Premium pra liberar até {LIMITE_FOTOS_PREMIUM} fotos.</p>
+                )}
+              </div>
+
               <button type="submit" disabled={salvandoPerfil} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
                 {salvandoPerfil ? "Salvando..." : "Salvar alterações"}
               </button>
@@ -9029,6 +9226,7 @@ function EmpresarioPanel({ siteConfig }) {
                 </button>
               </div>
             </div>
+            {erroAcaoProduto && <p className="font-body text-xs mb-3" style={{ color: "#B4462F" }}>{erroAcaoProduto}</p>}
             <div className="flex flex-col gap-3 -mt-4">
               {(meusProdutosReais ?? meusProdutos.map((p, i) => ({ id: `demo-${i}`, ...p, preco_exibicao: p.preco }))).map((p) => {
                 const editando = editandoValoresProduto[p.id] ?? { preco_promocional: p.preco_promocional ?? "", estoque: p.estoque ?? "" };
@@ -9261,6 +9459,7 @@ function EmpresarioPanel({ siteConfig }) {
               <button onClick={() => buscarOuCriarClienteFidelidade(empresaId)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border w-full" style={{ borderColor: C.line, color: "#425A70" }}>
                 Buscar / cadastrar cliente
               </button>
+              {erroAcaoFidelidade && <p className="font-body text-xs mt-2" style={{ color: "#B4462F" }}>{erroAcaoFidelidade}</p>}
               {clienteFidelidade === undefined && <p className="font-body text-xs mt-2" style={{ color: "#5C7186" }}>Buscando...</p>}
               {clienteFidelidade && (
                 <div className="mt-3 rounded-xl p-3" style={{ background: C.blueTint2 }}>
@@ -9296,6 +9495,7 @@ function EmpresarioPanel({ siteConfig }) {
         {tab === "avaliacoes" && (
           <div>
             <SectionHeader eyebrow="Reputação" title="Avaliações" sub="O que os clientes estão dizendo — responda pra mostrar que você se importa" />
+            {erroRespostaAvaliacao && <p className="font-body text-xs mb-3" style={{ color: "#B4462F" }}>{erroRespostaAvaliacao}</p>}
             <div className="flex flex-col gap-3 max-w-xl">
               {(minhasAvaliacoes ?? []).map((a) => (
                 <div key={a.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
