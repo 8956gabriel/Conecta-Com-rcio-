@@ -756,7 +756,7 @@ function CategoryCard({ cat, onClick }) {
 }
 
 function EmpresaCard({ e, fav, onFav, onAbrir }) {
-  const linkWhats = e.whatsapp ? `https://wa.me/55${String(e.whatsapp).replace(/\D/g, "")}` : null;
+  const linkWhats = e.whatsapp ? `https://wa.me/55${String(e.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vim pelo Conecta Comércio e quero saber mais sobre a ${e.nome}.`)}` : null;
   return (
     <div className="glow-card rounded-2xl border overflow-hidden bg-white flex flex-col" style={{ borderColor: C.line }}>
       <button type="button" onClick={onAbrir} className="h-24 relative flex items-center justify-center overflow-hidden w-full text-left" style={{ background: e.banner_url ? undefined : `linear-gradient(135deg, ${C.blue}, ${C.blueDeep})` }}>
@@ -960,7 +960,7 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
     }
   };
 
-  const linkWhats = empresa.whatsapp ? `https://wa.me/55${String(empresa.whatsapp).replace(/\D/g, "")}` : null;
+  const linkWhats = empresa.whatsapp ? `https://wa.me/55${String(empresa.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vim pelo Conecta Comércio e quero saber mais sobre a ${empresa.nome}.`)}` : null;
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.55)" }} onClick={onFechar}>
@@ -1308,7 +1308,7 @@ function ModalDetalhePrestador({ p, onFechar, linkWhats, linkInsta, avaliacoes, 
 }
 
 function PrestadorCard({ p, agendamentoAtivo, avaliacoes = [], onAvaliacaoEnviada }) {
-  const linkWhats = p.whatsapp ? `https://wa.me/55${String(p.whatsapp).replace(/\D/g, "")}` : null;
+  const linkWhats = p.whatsapp ? `https://wa.me/55${String(p.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vim pelo Conecta Comércio e quero saber mais sobre o serviço de ${p.nome}.`)}` : null;
   const linkInsta = p.instagram ? `https://instagram.com/${String(p.instagram).replace(/^@/, "")}` : null;
   const [agendaAberta, setAgendaAberta] = useState(false);
   const [detalheAberto, setDetalheAberto] = useState(false);
@@ -10667,12 +10667,13 @@ function CapaComercianteDestaque({ empresas, onAbrir }) {
 
   if (patrocinadas.length === 0) return null;
   const c = patrocinadas[indice % patrocinadas.length];
-  const linkWhats = c.whatsapp ? `https://wa.me/55${String(c.whatsapp).replace(/\D/g, "")}` : null;
+  const linkWhats = c.whatsapp ? `https://wa.me/55${String(c.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vim pelo Conecta Comércio e quero saber mais sobre a ${c.nome}.`)}` : null;
 
   return (
     <section className="max-w-6xl mx-auto px-4 md:px-6 py-4">
       <Reveal>
-        <div className="glow-card rounded-3xl overflow-hidden relative border-2" style={{ background: `linear-gradient(100deg, #14324F, ${C.blueDeep} 55%, ${C.blue})`, borderColor: C.amber, boxShadow: `0 0 0 4px rgba(232,162,61,0.15), 0 20px 45px -15px rgba(10,90,168,0.5)` }}>
+        <div role="button" tabIndex={0} onClick={() => onAbrir?.(c)} onKeyDown={(ev) => { if (ev.key === "Enter") onAbrir?.(c); }}
+          className="glow-card rounded-3xl overflow-hidden relative border-2 cursor-pointer" style={{ background: `linear-gradient(100deg, #14324F, ${C.blueDeep} 55%, ${C.blue})`, borderColor: C.amber, boxShadow: `0 0 0 4px rgba(232,162,61,0.15), 0 20px 45px -15px rgba(10,90,168,0.5)` }}>
           <div aria-hidden="true" className="tech-grid absolute inset-0 pointer-events-none opacity-60" />
           <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
             <div className="blob absolute -bottom-20 right-[-2rem] w-72 h-72 rounded-full" style={{ background: C.blue, opacity: 0.35 }} />
@@ -10709,19 +10710,19 @@ function CapaComercianteDestaque({ empresas, onAbrir }) {
             </div>
 
             <div className="flex sm:flex-col gap-2 shrink-0">
-              <a href={linkWhats || "#"} target={linkWhats ? "_blank" : undefined} rel="noreferrer"
+              <a href={linkWhats || "#"} target={linkWhats ? "_blank" : undefined} rel="noreferrer" onClick={(ev) => ev.stopPropagation()}
                 className="glow-btn font-body font-bold text-xs rounded-xl px-5 py-3 flex items-center justify-center gap-1.5 text-white"
                 style={{ background: "#25A85B", opacity: linkWhats ? 1 : 0.5 }}>
                 <MessageCircle size={14} /> WhatsApp
               </a>
-              <button onClick={() => onAbrir?.(c)} className="font-body font-bold text-xs rounded-xl px-5 py-3 flex items-center justify-center gap-1.5 border border-white/25 text-white">
+              <button onClick={(ev) => { ev.stopPropagation(); onAbrir?.(c); }} className="font-body font-bold text-xs rounded-xl px-5 py-3 flex items-center justify-center gap-1.5 border border-white/25 text-white">
                 Ver perfil
               </button>
             </div>
           </div>
 
           {patrocinadas.length > 1 && (
-            <div className="relative flex justify-center gap-1.5 pb-4">
+            <div className="relative flex justify-center gap-1.5 pb-4" onClick={(ev) => ev.stopPropagation()}>
               {patrocinadas.map((_, i) => (
                 <button key={i} onClick={() => setIndice(i)} aria-label={`Anunciante ${i + 1}`}
                   className="rounded-full transition-all"
@@ -10768,7 +10769,7 @@ function BannerPromocoes() {
   if (!promocoesReais || promocoesReais.length === 0) return null;
 
   const promo = promocoesReais[indice];
-  const linkWhats = promo.whatsapp ? `https://wa.me/55${String(promo.whatsapp).replace(/\D/g, "")}` : null;
+  const linkWhats = promo.whatsapp ? `https://wa.me/55${String(promo.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vim pelo Conecta Comércio e vi a promoção de "${promo.produto}".`)}` : null;
   const desconto = promo.precoOriginal > 0 ? Math.round((1 - promo.precoPromo / promo.precoOriginal) * 100) : 0;
 
   return (
@@ -11198,7 +11199,7 @@ function HeroCarousel({ slides }) {
 }
 
 function ModalDetalheFeirante({ f, onFechar }) {
-  const linkWhats = f.whatsapp ? `https://wa.me/55${String(f.whatsapp).replace(/\D/g, "")}` : null;
+  const linkWhats = f.whatsapp ? `https://wa.me/55${String(f.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vim pelo Conecta Comércio e vi seu estande de "${f.nome}" na Feira do Empreendedor.`)}` : null;
   const linkInsta = f.instagram ? `https://instagram.com/${String(f.instagram).replace(/^@/, "")}` : null;
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ background: "rgba(5,26,46,0.6)" }} onClick={onFechar}>
@@ -11988,6 +11989,19 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   // aberta), a home passa a mostrar só dados reais — nada de exemplo fica
   // exibido para sempre.
   const listaBase = empresasReais ?? []; // usa dados reais assim que existirem
+
+  // "O que abriu essa semana" — empresas e prestadores aprovados nos
+  // últimos 7 dias, pra dar destaque a quem acabou de chegar na plataforma.
+  const novidadesSemana = useMemo(() => {
+    const seteDiasAtras = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const novasEmpresas = (empresasReais ?? [])
+      .filter((e) => e.criado_em && new Date(e.criado_em).getTime() >= seteDiasAtras)
+      .map((e) => ({ tipo: "empresa", dados: e, criado_em: e.criado_em }));
+    const novosPrestadores = (prestadoresReais ?? [])
+      .filter((p) => p.criado_em && new Date(p.criado_em).getTime() >= seteDiasAtras)
+      .map((p) => ({ tipo: "prestador", dados: p, criado_em: p.criado_em }));
+    return [...novasEmpresas, ...novosPrestadores].sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+  }, [empresasReais, prestadoresReais]);
 
   // Slides do carrossel do hero: sempre o carimbo de boas-vindas primeiro,
   // seguido de uma empresa em destaque e um produto em promoção quando
@@ -12826,7 +12840,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
                         </p>
                       )}
                       {f.whatsapp && (
-                        <a href={`https://wa.me/55${(f.whatsapp || "").replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer"
+                        <a href={`https://wa.me/55${(f.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vim pelo Conecta Comércio e vi seu estande de "${f.nome}" na Feira do Empreendedor.`)}`} target="_blank" rel="noopener noreferrer"
                           className="mt-auto pt-3 font-body text-xs font-bold flex items-center gap-1.5" style={{ color: "#1E8E5A" }}>
                           <MessageCircle size={13} /> Chamar no WhatsApp
                         </a>
@@ -12851,24 +12865,26 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         </div>
       </section>
 
-      {/* O que abriu essa semana — empresas cadastradas nos últimos 7 dias */}
-      {(() => {
-        const seteDiasAtras = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        const novasDaSemana = (empresasReais ?? []).filter((e) => e.criado_em && new Date(e.criado_em).getTime() >= seteDiasAtras);
-        if (novasDaSemana.length === 0) return null;
-        return (
-          <section className="max-w-6xl mx-auto px-4 md:px-6 py-10">
-            <Reveal><SectionHeader eyebrow="Novidades" title="O que abriu essa semana" sub="Comércios recém-chegados na plataforma" /></Reveal>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {novasDaSemana.slice(0, 6).map((e, i) => (
-                <Reveal key={e.nome} delay={i * 70}>
-                  <EmpresaCard e={e} fav={!!favs[e.id || e.nome]} onFav={() => setFavs((f) => ({ ...f, [e.id || e.nome]: !f[e.id || e.nome] }))} onAbrir={() => abrirEmpresa(e)} />
-                </Reveal>
-              ))}
-            </div>
-          </section>
-        );
-      })()}
+      {/* O que abriu essa semana — empresas e prestadores aprovados nos últimos 7 dias */}
+      {novidadesSemana.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 md:px-6 py-10">
+          <Reveal><SectionHeader eyebrow="Novidades" title="O que abriu essa semana" sub="Comércios e prestadores recém-chegados na plataforma" /></Reveal>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {novidadesSemana.slice(0, 6).map((item, i) => (
+              <Reveal key={`${item.tipo}-${item.dados.id || item.dados.nome}`} delay={i * 70}>
+                {item.tipo === "empresa" ? (
+                  <EmpresaCard e={item.dados} fav={!!favs[item.dados.id || item.dados.nome]}
+                    onFav={() => setFavs((f) => ({ ...f, [item.dados.id || item.dados.nome]: !f[item.dados.id || item.dados.nome] }))}
+                    onAbrir={() => abrirEmpresa(item.dados)} />
+                ) : (
+                  <PrestadorCard p={item.dados} agendamentoAtivo={!!siteConfig?.agendamento_ativo}
+                    avaliacoes={avaliacoesPorPrestador[item.dados.id] || []} onAvaliacaoEnviada={carregarAvaliacoesPrestadores} />
+                )}
+              </Reveal>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Empresas em destaque */}
       <section ref={empresasSecaoRef} className="py-12" style={{ background: C.blueTint2 }}>
@@ -13284,7 +13300,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
                 <span className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"><Instagram size={14} /></span>
               )}
               {siteConfig?.whatsapp_contato ? (
-                <a href={`https://wa.me/55${String(siteConfig.whatsapp_contato).replace(/\D/g, "")}`} target="_blank" rel="noreferrer"
+                <a href={`https://wa.me/55${String(siteConfig.whatsapp_contato).replace(/\D/g, "")}?text=${encodeURIComponent("Olá! Vim pelo site Conecta Comércio.")}`} target="_blank" rel="noreferrer"
                   className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20"><MessageCircle size={14} /></a>
               ) : (
                 <span className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"><MessageCircle size={14} /></span>
@@ -15016,7 +15032,7 @@ function PaginaClassificados() {
       )}
       <div className="grid sm:grid-cols-2 gap-3">
         {itensFiltrados.map((item) => {
-          const linkWhats = item.whatsapp ? `https://wa.me/55${String(item.whatsapp).replace(/\D/g, "")}` : null;
+          const linkWhats = item.whatsapp ? `https://wa.me/55${String(item.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vim pelo Conecta Comércio e vi o anúncio "${item.titulo}".`)}` : null;
           return (
             <div key={item.id} className="rounded-2xl border overflow-hidden bg-white flex flex-col" style={{ borderColor: C.line }}>
               {item.foto_url && <img loading="lazy" decoding="async" src={item.foto_url} alt="" className="w-full h-32 object-cover" />}
