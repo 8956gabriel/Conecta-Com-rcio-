@@ -127,6 +127,28 @@ function planoPremiumAtivo(e) {
 const LIMITE_FOTOS_GRATUITO = 3;
 const LIMITE_FOTOS_PREMIUM = 15;
 
+// Categorias estáveis do relatório oficial da Sala do Empreendedor (Sebrae) —
+// os subitens variam de ano pra ano, mas esses grupos se repetem, por isso
+// usamos eles como categoria fixa e deixamos um campo livre pro detalhe.
+const CATEGORIAS_SALA_EMPREENDEDOR = [
+  "Alteração de Dados",
+  "Alvará",
+  "Baixa da Inscrição do MEI (CNPJ)",
+  "Boleto DAS - (INSS/ICMS/ISS)",
+  "CNPJ MEI",
+  "Compras Públicas",
+  "Crédito",
+  "Declaração Anual - DASN-SIMEI",
+  "Formalização - Abertura de Empresa",
+  "Nota Fiscal MEI - SERVIÇO (ISS)",
+  "Orientações sobre o MEI",
+  "Parcelamento Especial - Microempreendedor Individual",
+  "Parcelamento - Microempreendedor Individual",
+  "Parcelamento - Regularize (Dívida Ativa)",
+  "Outros",
+];
+const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
 // -----------------------------------------------------------------------
 // Horário de funcionamento por dia da semana e indicador "aberto agora".
 // Guardado como JSON: { seg: { aberto, abre, fecha }, ter: {...}, ... }.
@@ -2079,6 +2101,159 @@ function AdminPanel() {
       if (!error && data && data.length > 0) { setServicos(data); setServicosCarregados(true); }
     });
   }, []);
+
+  // -------------------------------------------------------------------------
+  // Sala do Empreendedor — registro interno de atendimentos (categoria +
+  // detalhe + data), com relatório por ano/mês no mesmo formato do relatório
+  // oficial do Sebrae (categorias x meses + totais).
+  // -------------------------------------------------------------------------
+  const atendimentoSalaVazio = { categoria: CATEGORIAS_SALA_EMPREENDEDOR[0], detalhe: "", data: new Date().toISOString().slice(0, 10), observacoes: "" };
+  const [atendimentosSala, setAtendimentosSala] = useState(null); // null = carregando
+  const [novoAtendimentoSala, setNovoAtendimentoSala] = useState(atendimentoSalaVazio);
+  const [salvandoAtendimentoSala, setSalvandoAtendimentoSala] = useState(false);
+  const [statusAtendimentoSala, setStatusAtendimentoSala] = useState("");
+  const [editandoAtendimentoId, setEditandoAtendimentoId] = useState(null);
+  const [formEdicaoAtendimento, setFormEdicaoAtendimento] = useState(atendimentoSalaVazio);
+  const [anoRelatorioSala, setAnoRelatorioSala] = useState(new Date().getFullYear());
+
+  const carregarAtendimentosSala = () => {
+    if (!supabaseConfigurado) { setAtendimentosSala([]); return; }
+    supabase.from("sala_atendimentos").select("*").order("data", { ascending: false }).then(({ data, error }) => {
+      if (!error) setAtendimentosSala(data || []);
+    });
+  };
+
+  useEffect(() => { carregarAtendimentosSala(); }, []);
+
+  const criarAtendimentoSala = async (e) => {
+    e.preventDefault();
+    setStatusAtendimentoSala("");
+    if (!novoAtendimentoSala.categoria) { setStatusAtendimentoSala("Escolha a categoria."); return; }
+    if (!supabaseConfigurado) { setStatusAtendimentoSala("ok"); return; }
+    setSalvandoAtendimentoSala(true);
+    try {
+      const { data, error } = await supabase.from("sala_atendimentos").insert({
+        categoria: novoAtendimentoSala.categoria,
+        detalhe: novoAtendimentoSala.detalhe.trim() || null,
+        data: novoAtendimentoSala.data,
+        observacoes: novoAtendimentoSala.observacoes.trim() || null,
+      }).select().single();
+      if (error) throw error;
+      setAtendimentosSala((atual) => [data, ...(atual ?? [])]);
+      setNovoAtendimentoSala(atendimentoSalaVazio);
+      setStatusAtendimentoSala("ok");
+    } catch (err) {
+      setStatusAtendimentoSala(err.message || "Não foi possível registrar o atendimento.");
+    } finally {
+      setSalvandoAtendimentoSala(false);
+    }
+  };
+
+  const iniciarEdicaoAtendimento = (a) => {
+    setEditandoAtendimentoId(a.id);
+    setFormEdicaoAtendimento({ categoria: a.categoria, detalhe: a.detalhe || "", data: a.data, observacoes: a.observacoes || "" });
+  };
+
+  const salvarEdicaoAtendimento = async (id) => {
+    setStatusAtendimentoSala("");
+    const registro = {
+      categoria: formEdicaoAtendimento.categoria,
+      detalhe: formEdicaoAtendimento.detalhe.trim() || null,
+      data: formEdicaoAtendimento.data,
+      observacoes: formEdicaoAtendimento.observacoes.trim() || null,
+    };
+    if (!supabaseConfigurado) {
+      setAtendimentosSala((atual) => atual.map((a) => (a.id === id ? { ...a, ...registro } : a)));
+      setEditandoAtendimentoId(null);
+      return;
+    }
+    const { error } = await supabase.from("sala_atendimentos").update(registro).eq("id", id);
+    if (!error) {
+      setAtendimentosSala((atual) => atual.map((a) => (a.id === id ? { ...a, ...registro } : a)));
+      setEditandoAtendimentoId(null);
+    } else {
+      setStatusAtendimentoSala(error.message || "Não foi possível salvar a edição.");
+    }
+  };
+
+  const apagarAtendimentoSala = async (id) => {
+    setStatusAtendimentoSala("");
+    if (!supabaseConfigurado) { setAtendimentosSala((atual) => atual.filter((a) => a.id !== id)); return; }
+    const { error } = await supabase.from("sala_atendimentos").delete().eq("id", id);
+    if (!error) setAtendimentosSala((atual) => atual.filter((a) => a.id !== id));
+    else setStatusAtendimentoSala(error.message || "Não foi possível excluir o registro.");
+  };
+
+  const anosDisponiveisSala = useMemo(() => {
+    const anos = new Set((atendimentosSala ?? []).map((a) => Number(a.data.slice(0, 4))));
+    anos.add(new Date().getFullYear());
+    return Array.from(anos).sort((a, b) => b - a);
+  }, [atendimentosSala]);
+
+  const relatorioSala = useMemo(() => {
+    const doAno = (atendimentosSala ?? []).filter((a) => Number(a.data.slice(0, 4)) === anoRelatorioSala);
+    const linhas = CATEGORIAS_SALA_EMPREENDEDOR.map((categoria) => {
+      const meses = Array(12).fill(0);
+      doAno.filter((a) => a.categoria === categoria).forEach((a) => {
+        const mes = Number(a.data.slice(5, 7)) - 1;
+        meses[mes] += 1;
+      });
+      const total = meses.reduce((s, v) => s + v, 0);
+      return { categoria, meses, total };
+    }).filter((l) => l.total > 0);
+    const totaisMeses = Array(12).fill(0);
+    linhas.forEach((l) => l.meses.forEach((v, i) => { totaisMeses[i] += v; }));
+    const totalGeral = totaisMeses.reduce((s, v) => s + v, 0);
+    return { linhas, totaisMeses, totalGeral };
+  }, [atendimentosSala, anoRelatorioSala]);
+
+  const exportarRelatorioSalaExcel = () => {
+    const cabecalho = ["Categoria", "Total", ...MESES_ABREV];
+    const linhas = relatorioSala.linhas.map((l) => [l.categoria, l.total, ...l.meses]);
+    linhas.push(["TOTAL GERAL", relatorioSala.totalGeral, ...relatorioSala.totaisMeses]);
+    const csv = [cabecalho, ...linhas].map((linha) => linha.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sala-empreendedor-${anoRelatorioSala}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportarRelatorioSalaPDF = () => {
+    const janela = window.open("", "_blank");
+    if (!janela) return;
+    const linhasHtml = relatorioSala.linhas.map((l) => `
+      <tr><td>${l.categoria}</td><td class="num">${l.total}</td>${l.meses.map((v) => `<td class="num">${v}</td>`).join("")}</tr>
+    `).join("");
+    janela.document.write(`
+      <html><head><title>Sala do Empreendedor ${anoRelatorioSala} — Ivatuba</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:24px;color:#0E2233}
+        h2{margin-bottom:4px} p{color:#5C7186;margin-top:0;font-size:12px}
+        table{width:100%;border-collapse:collapse;margin-top:16px}
+        th,td{border:1px solid #DCE7F2;padding:6px 8px;text-align:left;font-size:12px}
+        th{background:#EAF2FB;color:#0A5AA8}
+        td.num,th.num{text-align:center}
+        tfoot td{font-weight:bold;background:#EAF2FB}
+      </style></head>
+      <body>
+        <h2>Relatório de Atendimento — Sala do Empreendedor — Ano ${anoRelatorioSala} — Ivatuba</h2>
+        <p>Totalizado por atendimentos · gerado em ${new Date().toLocaleDateString("pt-BR")}</p>
+        <table>
+          <thead><tr><th>Serviços prestados</th><th class="num">Totais</th>${MESES_ABREV.map((m) => `<th class="num">${m}</th>`).join("")}</tr></thead>
+          <tbody>${linhasHtml}</tbody>
+          <tfoot><tr><td>TOTALIZAÇÃO GERAL</td><td class="num">${relatorioSala.totalGeral}</td>${relatorioSala.totaisMeses.map((v) => `<td class="num">${v}</td>`).join("")}</tr></tfoot>
+        </table>
+      </body></html>
+    `);
+    janela.document.close();
+    janela.focus();
+    setTimeout(() => janela.print(), 300);
+  };
 
   // -------------------------------------------------------------------------
   // Dashboard — números e gráficos reais (nada de valores fixos de exemplo).
@@ -4724,6 +4899,7 @@ function AdminPanel() {
     { id: "credenciais", label: "Credenciamento", icon: BadgeCheck },
     { id: "cursos", label: "Cursos", icon: GraduationCap },
     { id: "servicos", label: "Serviços do Empreendedor", icon: Landmark },
+    { id: "sala-empreendedor", label: "Sala do Empreendedor - Atendimentos", icon: ClipboardList },
     { id: "licitacoes", label: "Editais e Licitações", icon: FileText },
     { id: "turismo", label: "Turismo", icon: MapPinned },
     { id: "utilidade", label: "Utilidade pública", icon: Phone },
@@ -6771,6 +6947,128 @@ function AdminPanel() {
               className="font-body text-xs font-bold mt-4 px-3 py-2 rounded-lg border flex items-center gap-1.5" style={{ borderColor: C.line, color: "#425A70" }}>
               <PlusCircle size={14} /> Adicionar novo serviço
             </button>
+          </div>
+        )}
+
+        {tab === "sala-empreendedor" && (
+          <div>
+            <SectionHeader eyebrow="Empreendedorismo" title="Sala do Empreendedor — Atendimentos" sub="Registro interno dos atendimentos prestados, com relatório por ano e mês" />
+            {!supabaseConfigurado && (
+              <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2 max-w-2xl" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
+                <BadgeCheck size={14} className="mt-0.5 shrink-0" />
+                Modo demonstração: conecte o Supabase para esses registros serem salvos de verdade.
+              </div>
+            )}
+
+            <form onSubmit={criarAtendimentoSala} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl mb-6" style={{ borderColor: C.line }}>
+              <select value={novoAtendimentoSala.categoria} onChange={(e) => setNovoAtendimentoSala((v) => ({ ...v, categoria: e.target.value }))}
+                className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white sm:col-span-2" style={{ borderColor: C.line }}>
+                {CATEGORIAS_SALA_EMPREENDEDOR.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <input value={novoAtendimentoSala.detalhe} onChange={(e) => setNovoAtendimentoSala((v) => ({ ...v, detalhe: e.target.value }))}
+                placeholder="Detalhe (opcional, ex: Impressão DAS Atrasado)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              <label className="font-body text-xs font-semibold flex flex-col gap-1" style={{ color: "#425A70" }}>
+                Data
+                <input type="date" value={novoAtendimentoSala.data} onChange={(e) => setNovoAtendimentoSala((v) => ({ ...v, data: e.target.value }))}
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              </label>
+              <input value={novoAtendimentoSala.observacoes} onChange={(e) => setNovoAtendimentoSala((v) => ({ ...v, observacoes: e.target.value }))}
+                placeholder="Observação (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              {statusAtendimentoSala && statusAtendimentoSala !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusAtendimentoSala}</p>}
+              {statusAtendimentoSala === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Atendimento registrado!</p>}
+              <button type="submit" disabled={salvandoAtendimentoSala} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                {salvandoAtendimentoSala ? "Registrando..." : "Registrar atendimento"}
+              </button>
+            </form>
+
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Relatório por ano e mês</p>
+              <div className="flex items-center gap-2">
+                <select value={anoRelatorioSala} onChange={(e) => setAnoRelatorioSala(Number(e.target.value))}
+                  className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                  {anosDisponiveisSala.map((ano) => <option key={ano} value={ano}>{ano}</option>)}
+                </select>
+                <button onClick={exportarRelatorioSalaExcel} className="font-body text-xs font-bold px-3 py-2 rounded-lg border flex items-center gap-1.5" style={{ borderColor: C.line, color: "#425A70" }}>
+                  <FileText size={13} /> Excel
+                </button>
+                <button onClick={exportarRelatorioSalaPDF} className="font-body text-xs font-bold px-3 py-2 rounded-lg border flex items-center gap-1.5" style={{ borderColor: C.line, color: "#425A70" }}>
+                  <FileText size={13} /> PDF
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border mb-8" style={{ borderColor: C.line }}>
+              <table className="w-full" style={{ borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: C.blueTint }}>
+                    <th className="font-body text-[11px] font-bold text-left px-3 py-2" style={{ color: C.blue }}>Serviço</th>
+                    <th className="font-body text-[11px] font-bold px-2 py-2" style={{ color: C.blue }}>Total</th>
+                    {MESES_ABREV.map((m) => <th key={m} className="font-body text-[11px] font-bold px-2 py-2" style={{ color: C.blue }}>{m}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {relatorioSala.linhas.map((l) => (
+                    <tr key={l.categoria} className="border-t" style={{ borderColor: C.line }}>
+                      <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{l.categoria}</td>
+                      <td className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{l.total}</td>
+                      {l.meses.map((v, i) => <td key={i} className="font-body text-xs text-center px-2 py-2" style={{ color: "#5C7186" }}>{v}</td>)}
+                    </tr>
+                  ))}
+                  {relatorioSala.linhas.length === 0 && (
+                    <tr><td colSpan={14} className="font-body text-xs text-center px-3 py-4" style={{ color: "#8896A6" }}>Nenhum atendimento registrado em {anoRelatorioSala}.</td></tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                    <td className="font-body text-xs font-bold px-3 py-2" style={{ color: C.ink }}>TOTALIZAÇÃO GERAL</td>
+                    <td className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{relatorioSala.totalGeral}</td>
+                    {relatorioSala.totaisMeses.map((v, i) => <td key={i} className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{v}</td>)}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <p className="font-display font-bold text-sm mb-2" style={{ color: C.ink }}>Últimos registros</p>
+            <div className="flex flex-col gap-2 max-w-3xl">
+              {(atendimentosSala ?? []).slice(0, 30).map((a) => (
+                <div key={a.id} className="rounded-xl border p-3" style={{ borderColor: C.line }}>
+                  {editandoAtendimentoId === a.id ? (
+                    <div className="flex flex-col gap-2">
+                      <select value={formEdicaoAtendimento.categoria} onChange={(e) => setFormEdicaoAtendimento((f) => ({ ...f, categoria: e.target.value }))}
+                        className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                        {CATEGORIAS_SALA_EMPREENDEDOR.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <div className="flex gap-2 flex-wrap">
+                        <input value={formEdicaoAtendimento.detalhe} onChange={(e) => setFormEdicaoAtendimento((f) => ({ ...f, detalhe: e.target.value }))}
+                          placeholder="Detalhe" className="flex-1 font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                        <input type="date" value={formEdicaoAtendimento.data} onChange={(e) => setFormEdicaoAtendimento((f) => ({ ...f, data: e.target.value }))}
+                          className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      </div>
+                      <input value={formEdicaoAtendimento.observacoes} onChange={(e) => setFormEdicaoAtendimento((f) => ({ ...f, observacoes: e.target.value }))}
+                        placeholder="Observação" className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      <div className="flex gap-2">
+                        <button onClick={() => salvarEdicaoAtendimento(a.id)} className="font-body text-xs font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
+                        <button onClick={() => setEditandoAtendimentoId(null)} className="font-body text-xs font-bold px-3 py-1.5 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-body text-xs font-bold truncate" style={{ color: C.ink }}>{a.categoria}{a.detalhe ? ` — ${a.detalhe}` : ""}</p>
+                        <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>{a.data.split("-").reverse().join("/")}{a.observacoes ? ` · ${a.observacoes}` : ""}</p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button onClick={() => iniciarEdicaoAtendimento(a)} className="font-body text-xs font-bold px-2.5 py-1.5 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
+                        <button onClick={() => { if (window.confirm("Excluir esse registro de atendimento?")) apagarAtendimentoSala(a.id); }} className="font-body text-xs font-bold px-2.5 py-1.5 rounded-lg" style={{ color: "#B4462F" }}>Excluir</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(atendimentosSala ?? []).length === 0 && atendimentosSala !== null && (
+                <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum atendimento registrado ainda.</p>
+              )}
+            </div>
           </div>
         )}
 
