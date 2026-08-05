@@ -3148,6 +3148,77 @@ function AdminPanel() {
   };
   const totalConcedidoFomento = (fomentoLeadsAdmin ?? []).reduce((s, l) => s + (Number(l.valor_concedido) || 0), 0);
 
+  // Cadastro manual de pedido do Fomento direto pelo admin (sem precisar
+  // que a pessoa preencha o formulário público), tudo na aba Sala do
+  // Empreendedor: valor, orientação, proposta, anexo e status.
+  const leadFomentoAdminVazio = { nome: "", whatsapp: "", orientacao: "", proposta: "", valor_concedido: "", status: "recebido" };
+  const [novoLeadFomentoAdmin, setNovoLeadFomentoAdmin] = useState(leadFomentoAdminVazio);
+  const [anexoLeadFomentoAdmin, setAnexoLeadFomentoAdmin] = useState(null);
+  const [criandoLeadFomentoAdmin, setCriandoLeadFomentoAdmin] = useState(false);
+  const [statusCriarLeadFomento, setStatusCriarLeadFomento] = useState("");
+
+  const criarLeadFomentoAdmin = async (e) => {
+    e.preventDefault();
+    setStatusCriarLeadFomento("");
+    if (!novoLeadFomentoAdmin.nome.trim()) { setStatusCriarLeadFomento("Informe o nome."); return; }
+    setCriandoLeadFomentoAdmin(true);
+    try {
+      let anexoUrl = null;
+      if (anexoLeadFomentoAdmin) {
+        const caminho = `propostas/${Date.now()}-${anexoLeadFomentoAdmin.name}`;
+        const { error: erroUpload } = await supabase.storage.from("documentos-fomento").upload(caminho, anexoLeadFomentoAdmin);
+        if (!erroUpload) {
+          const { data: pub } = supabase.storage.from("documentos-fomento").getPublicUrl(caminho);
+          anexoUrl = pub.publicUrl;
+        }
+      }
+      const { data, error } = await supabase.from("fomento_leads").insert({
+        nome: novoLeadFomentoAdmin.nome,
+        whatsapp: novoLeadFomentoAdmin.whatsapp || null,
+        orientacao: novoLeadFomentoAdmin.orientacao || null,
+        proposta: novoLeadFomentoAdmin.proposta || null,
+        valor_concedido: novoLeadFomentoAdmin.valor_concedido ? Number(novoLeadFomentoAdmin.valor_concedido) : null,
+        status: novoLeadFomentoAdmin.status,
+        anexo_url: anexoUrl,
+      }).select().single();
+      if (error) throw error;
+      setFomentoLeadsAdmin((atual) => [data, ...(atual ?? [])]);
+      setNovoLeadFomentoAdmin(leadFomentoAdminVazio);
+      setAnexoLeadFomentoAdmin(null);
+      setStatusCriarLeadFomento("ok");
+    } catch (err) {
+      setStatusCriarLeadFomento(err.message || "Não foi possível cadastrar o pedido.");
+    } finally {
+      setCriandoLeadFomentoAdmin(false);
+    }
+  };
+
+  const [detalhesFomentoEdicao, setDetalhesFomentoEdicao] = useState({}); // { [id]: { orientacao, proposta } }
+  const salvarDetalhesFomento = async (id) => {
+    const v = detalhesFomentoEdicao[id];
+    if (!v) return;
+    const registro = { orientacao: v.orientacao?.trim() || null, proposta: v.proposta?.trim() || null };
+    const { error } = await supabase.from("fomento_leads").update(registro).eq("id", id);
+    if (!error) {
+      setFomentoLeadsAdmin((atual) => atual.map((l) => (l.id === id ? { ...l, ...registro } : l)));
+      setDetalhesFomentoEdicao((atual) => { const { [id]: _omit, ...resto } = atual; return resto; });
+    } else {
+      notificar(error.message || "Não foi possível salvar.", "erro");
+    }
+  };
+
+  const enviarAnexoFomentoLead = (id) => async (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    const caminho = `propostas/${Date.now()}-${arquivo.name}`;
+    const { error: erroUpload } = await supabase.storage.from("documentos-fomento").upload(caminho, arquivo);
+    if (erroUpload) { notificar("Não foi possível enviar o anexo.", "erro"); return; }
+    const { data: pub } = supabase.storage.from("documentos-fomento").getPublicUrl(caminho);
+    const { error } = await supabase.from("fomento_leads").update({ anexo_url: pub.publicUrl }).eq("id", id);
+    if (!error) setFomentoLeadsAdmin((atual) => atual.map((l) => (l.id === id ? { ...l, anexo_url: pub.publicUrl } : l)));
+    else notificar("Não foi possível salvar o anexo.", "erro");
+  };
+
   const enviarFotoFomento = (e) => {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
@@ -7033,6 +7104,106 @@ function AdminPanel() {
                 </div>
               </>
             )}
+
+            <div className="mt-4 border-t pt-6" style={{ borderColor: C.line }}>
+              <SectionHeader eyebrow="Crédito" title="Fomento Paraná — pedidos" sub="Cadastre e acompanhe cada pedido de crédito: valor, orientação, proposta, anexo e status" />
+
+              <div className="flex flex-wrap gap-2 mb-4">
+                {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => (
+                  <span key={chave} className="font-body text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: C.blueTint, color: C.blue }}>
+                    {rotulo}: {contagemStatusFomento[chave] || 0}
+                  </span>
+                ))}
+                <span className="font-body text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: C.amber, color: C.blueDeep }}>
+                  Total concedido: R$ {totalConcedidoFomento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <form onSubmit={criarLeadFomentoAdmin} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl mb-6" style={{ borderColor: C.line }}>
+                <input value={novoLeadFomentoAdmin.nome} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, nome: e.target.value }))}
+                  placeholder="Nome" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <input value={novoLeadFomentoAdmin.whatsapp} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, whatsapp: e.target.value }))}
+                  placeholder="WhatsApp (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <textarea value={novoLeadFomentoAdmin.orientacao} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, orientacao: e.target.value }))}
+                  placeholder="Orientação dada" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                <textarea value={novoLeadFomentoAdmin.proposta} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, proposta: e.target.value }))}
+                  placeholder="Proposta (ex: capital de giro R$ 5.000, 24x)" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                <input value={novoLeadFomentoAdmin.valor_concedido} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, valor_concedido: e.target.value }))}
+                  type="number" min={0} step="0.01" placeholder="Valor concedido (R$, opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <select value={novoLeadFomentoAdmin.status} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, status: e.target.value }))}
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                  {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => <option key={chave} value={chave}>{rotulo}</option>)}
+                </select>
+                <label className="font-body text-xs font-semibold flex items-center gap-2 cursor-pointer w-fit sm:col-span-2" style={{ color: C.blue }}>
+                  <FileText size={14} />
+                  {anexoLeadFomentoAdmin ? anexoLeadFomentoAdmin.name : "Anexar proposta/documento (opcional)"}
+                  <input type="file" hidden onChange={(e) => setAnexoLeadFomentoAdmin(e.target.files?.[0] || null)} />
+                </label>
+                {statusCriarLeadFomento && statusCriarLeadFomento !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusCriarLeadFomento}</p>}
+                {statusCriarLeadFomento === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Pedido cadastrado!</p>}
+                <button type="submit" disabled={criandoLeadFomentoAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                  {criandoLeadFomentoAdmin ? "Cadastrando..." : "Cadastrar pedido"}
+                </button>
+              </form>
+
+              <div className="flex flex-col gap-3 max-w-2xl">
+                {(fomentoLeadsAdmin ?? []).map((l) => {
+                  const edicao = detalhesFomentoEdicao[l.id] ?? { orientacao: l.orientacao || "", proposta: l.proposta || "" };
+                  return (
+                    <div key={l.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{l.nome}</p>
+                        <select value={l.status || "recebido"} onChange={(e) => atualizarStatusFomentoLead(l.id, e.target.value)}
+                          className="font-body text-xs border rounded-lg px-2 py-1 outline-none bg-white" style={{ borderColor: C.line }}>
+                          {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => <option key={chave} value={chave}>{rotulo}</option>)}
+                        </select>
+                      </div>
+                      <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
+                        {l.whatsapp || "—"} · {l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}
+                      </p>
+
+                      {(l.documentos_urls || []).length > 0 && (
+                        <button type="button" className="font-body text-xs font-bold underline mt-1" style={{ color: C.blue }}
+                          onClick={async () => {
+                            for (const caminho of l.documentos_urls) {
+                              const { data, error } = await supabase.storage.from("documentos-fomento").createSignedUrl(caminho, 300);
+                              if (!error && data?.signedUrl) window.open(data.signedUrl, "_blank");
+                            }
+                          }}>
+                          Baixar documentos enviados ({l.documentos_urls.length})
+                        </button>
+                      )}
+
+                      <div className="grid sm:grid-cols-2 gap-2 mt-3">
+                        <textarea value={edicao.orientacao} onChange={(e) => setDetalhesFomentoEdicao((atual) => ({ ...atual, [l.id]: { ...edicao, orientacao: e.target.value } }))}
+                          placeholder="Orientação dada" rows={2} className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                        <textarea value={edicao.proposta} onChange={(e) => setDetalhesFomentoEdicao((atual) => ({ ...atual, [l.id]: { ...edicao, proposta: e.target.value } }))}
+                          placeholder="Proposta" rows={2} className="font-body text-xs border rounded-lg px-2.5 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                      </div>
+
+                      <div className="flex items-center flex-wrap gap-2 mt-2">
+                        <input type="number" min={0} step="0.01" placeholder="R$ concedido"
+                          value={valorConcedidoEdicao[l.id] ?? (l.valor_concedido ?? "")}
+                          onChange={(e) => setValorConcedidoEdicao((atual) => ({ ...atual, [l.id]: e.target.value }))}
+                          className="w-28 font-body text-xs border rounded-lg px-2 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                        {valorConcedidoEdicao[l.id] !== undefined && (
+                          <button onClick={() => salvarValorConcedidoFomento(l.id)} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg text-white" style={{ background: C.blue }}>Salvar valor</button>
+                        )}
+                        <button onClick={() => salvarDetalhesFomento(l.id)} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Salvar orientação/proposta</button>
+                        <label className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg border cursor-pointer" style={{ borderColor: C.line, color: "#425A70" }}>
+                          {l.anexo_url ? "Trocar anexo" : "Anexar proposta"}
+                          <input type="file" hidden onChange={enviarAnexoFomentoLead(l.id)} />
+                        </label>
+                        {l.anexo_url && (
+                          <a href={l.anexo_url} target="_blank" rel="noopener noreferrer" className="font-body text-[11px] font-bold underline" style={{ color: C.blue }}>Ver anexo</a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {(fomentoLeadsAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum pedido cadastrado ainda.</p>}
+              </div>
+            </div>
           </div>
         )}
 
@@ -8293,79 +8464,9 @@ function AdminPanel() {
               </button>
             </form>
 
-            {fomentoLeadsAdmin && fomentoLeadsAdmin.length > 0 && (
-              <div className="mt-6 max-w-2xl">
-                <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Pessoas interessadas ({fomentoLeadsAdmin.length})</p>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => (
-                    <span key={chave} className="font-body text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: C.blueTint, color: C.blue }}>
-                      {rotulo}: {contagemStatusFomento[chave] || 0}
-                    </span>
-                  ))}
-                  <span className="font-body text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: C.amber, color: C.blueDeep }}>
-                    Total concedido: R$ {totalConcedidoFomento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Nome</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>WhatsApp</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Data</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Documentos</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Status</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Valor concedido</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fomentoLeadsAdmin.map((l) => (
-                        <tr key={l.id} style={{ borderBottom: `1px solid ${C.line}` }}>
-                          <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{l.nome}</td>
-                          <td className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.whatsapp}</td>
-                          <td className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
-                          <td className="font-body text-xs px-3 py-2" style={{ color: C.blue }}>
-                            {(l.documentos_urls || []).length === 0 ? (
-                              <span style={{ color: "#8896A6" }}>—</span>
-                            ) : (
-                              <button
-                                type="button"
-                                className="font-bold underline"
-                                onClick={async () => {
-                                  for (const caminho of l.documentos_urls) {
-                                    const { data, error } = await supabase.storage.from("documentos-fomento").createSignedUrl(caminho, 300);
-                                    if (!error && data?.signedUrl) window.open(data.signedUrl, "_blank");
-                                  }
-                                }}
-                              >
-                                Baixar ({l.documentos_urls.length})
-                              </button>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            <select value={l.status || "recebido"} onChange={(e) => atualizarStatusFomentoLead(l.id, e.target.value)}
-                              className="font-body text-xs border rounded-lg px-2 py-1 outline-none bg-white" style={{ borderColor: C.line }}>
-                              {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => <option key={chave} value={chave}>{rotulo}</option>)}
-                            </select>
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-1.5">
-                              <input type="number" min={0} step="0.01" placeholder="R$"
-                                value={valorConcedidoEdicao[l.id] ?? (l.valor_concedido ?? "")}
-                                onChange={(e) => setValorConcedidoEdicao((atual) => ({ ...atual, [l.id]: e.target.value }))}
-                                className="w-24 font-body text-xs border rounded-lg px-2 py-1 outline-none" style={{ borderColor: C.line }} />
-                              {valorConcedidoEdicao[l.id] !== undefined && (
-                                <button onClick={() => salvarValorConcedidoFomento(l.id)} className="font-body text-[10px] font-bold px-2 py-1 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            <p className="font-body text-xs mt-6 max-w-lg" style={{ color: "#8896A6" }}>
+              A lista de pedidos de crédito (com valor, orientação, proposta e status) agora fica na aba <b>"Sala do Empreendedor - Atendimentos"</b>.
+            </p>
 
             <SectionHeader eyebrow="Emprego" title="Agência do Trabalhador" sub="Card no site, no mesmo estilo do Fomento Paraná, com endereço e WhatsApp" />
             <form onSubmit={salvarIdentidade} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg" style={{ borderColor: C.line }}>
@@ -8855,6 +8956,36 @@ function EmpresarioPanel({ siteConfig }) {
   // gravar de verdade em vez de mostrar valores fixos.
   const [empresaId, setEmpresaId] = useState(null);
   const [empresaNaoEncontrada, setEmpresaNaoEncontrada] = useState(false);
+  const [usuarioIdAtual, setUsuarioIdAtual] = useState(null);
+  const [formCriarEmpresa, setFormCriarEmpresa] = useState({ nome: "", whatsapp: "", categoria: "" });
+  const [criandoEmpresaAgora, setCriandoEmpresaAgora] = useState(false);
+  const [statusCriarEmpresaAgora, setStatusCriarEmpresaAgora] = useState("");
+
+  const criarMinhaEmpresaAgora = async (e) => {
+    e.preventDefault();
+    setStatusCriarEmpresaAgora("");
+    if (!formCriarEmpresa.nome.trim()) { setStatusCriarEmpresaAgora("Informe o nome da empresa."); return; }
+    if (!usuarioIdAtual) { setStatusCriarEmpresaAgora("Sessão expirada — saia e entre de novo."); return; }
+    setCriandoEmpresaAgora(true);
+    try {
+      const { data, error } = await supabase.from("empresas").insert({
+        dono_id: usuarioIdAtual,
+        nome: formCriarEmpresa.nome,
+        whatsapp: formCriarEmpresa.whatsapp || null,
+        categoria: formCriarEmpresa.categoria || "A definir",
+        status: "aprovada",
+      }).select().single();
+      if (error) throw error;
+      setEmpresaId(data.id);
+      setEmpresaNaoEncontrada(false);
+      setPerfilForm((f) => ({ ...f, nome: data.nome || "", whatsapp: data.whatsapp || "" }));
+      setStatusCriarEmpresaAgora("ok");
+    } catch (err) {
+      setStatusCriarEmpresaAgora(err.message || "Não foi possível cadastrar a empresa.");
+    } finally {
+      setCriandoEmpresaAgora(false);
+    }
+  };
   const [perfilForm, setPerfilForm] = useState({
     nome: "", whatsapp: "", instagram: "", endereco: "", horario_atendimento: "", horario_funcionamento: null, chave_pix: "",
     logo_url: "", banner_url: "", fotos_urls: [], email: "", facebook: "", site: "",
@@ -9001,6 +9132,7 @@ function EmpresarioPanel({ siteConfig }) {
       const { data: sessaoAtual } = await supabase.auth.getSession();
       const usuarioId = sessaoAtual?.session?.user?.id;
       if (!usuarioId) return;
+      setUsuarioIdAtual(usuarioId);
       const { data, error } = await supabase.from("empresas").select("*").eq("dono_id", usuarioId).single();
       if (error) {
         console.error("Falha ao carregar a empresa do usuário logado:", error);
@@ -9423,9 +9555,23 @@ function EmpresarioPanel({ siteConfig }) {
               </div>
             )}
             {empresaNaoEncontrada && (
-              <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2 max-w-2xl" style={{ background: "#FDEEEA", color: "#B4462F" }}>
-                <BadgeCheck size={14} className="mt-0.5 shrink-0" />
-                Não encontramos uma empresa vinculada a este login, então nada aqui vai salvar. Fale com o suporte.
+              <div className="mb-4 rounded-2xl border p-5 max-w-2xl" style={{ borderColor: "#F0B8A8", background: "#FDEEEA" }}>
+                <p className="font-body text-xs flex items-start gap-2 mb-3" style={{ color: "#B4462F" }}>
+                  <BadgeCheck size={14} className="mt-0.5 shrink-0" />
+                  Não encontramos uma empresa vinculada a este login ainda. Cadastre agora pra liberar o resto do painel:
+                </p>
+                <form onSubmit={criarMinhaEmpresaAgora} className="grid sm:grid-cols-2 gap-2">
+                  <input value={formCriarEmpresa.nome} onChange={(e) => setFormCriarEmpresa((f) => ({ ...f, nome: e.target.value }))}
+                    placeholder="Nome da empresa" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+                  <input value={formCriarEmpresa.whatsapp} onChange={(e) => setFormCriarEmpresa((f) => ({ ...f, whatsapp: e.target.value }))}
+                    placeholder="WhatsApp" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  <input value={formCriarEmpresa.categoria} onChange={(e) => setFormCriarEmpresa((f) => ({ ...f, categoria: e.target.value }))}
+                    placeholder="Categoria (ex: Alimentação)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  {statusCriarEmpresaAgora && statusCriarEmpresaAgora !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusCriarEmpresaAgora}</p>}
+                  <button type="submit" disabled={criandoEmpresaAgora} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>
+                    {criandoEmpresaAgora ? "Cadastrando..." : "Cadastrar minha empresa"}
+                  </button>
+                </form>
               </div>
             )}
             <form onSubmit={salvarPerfil} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl" style={{ borderColor: C.line }}>
@@ -13063,9 +13209,10 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
 
       const userId = data.user?.id;
       if (userId) {
-        await supabase.from("perfis").insert({
+        const { error: erroPerfil } = await supabase.from("perfis").insert({
           id: userId, nome: form.get("nome"), tipo, telefone: form.get("whatsapp"), email: form.get("email"),
         });
+        if (erroPerfil) throw new Error("Não foi possível criar seu perfil: " + erroPerfil.message);
 
         if (tipo === "empresario") {
           let logoUrl = null;
@@ -13077,7 +13224,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               logoUrl = pub.publicUrl;
             }
           }
-          await supabase.from("empresas").insert({
+          const { error: erroEmpresa } = await supabase.from("empresas").insert({
             dono_id: userId,
             nome: form.get("nomeEmpresa"),
             categoria: form.get("categoria") || "A definir",
@@ -13095,6 +13242,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
             // site assim que o empresário termina o cadastro.
             status: "aprovada",
           });
+          if (erroEmpresa) throw new Error("Seu login foi criado, mas a empresa não pôde ser cadastrada: " + erroEmpresa.message);
         }
 
         if (tipo === "prestador") {
@@ -13107,7 +13255,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               fotoUrl = pub.publicUrl;
             }
           }
-          await supabase.from("prestadores").insert({
+          const { error: erroPrestador } = await supabase.from("prestadores").insert({
             dono_id: userId,
             nome: form.get("nome"),
             servico: form.get("servico"),
@@ -13123,6 +13271,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
             // acontece com empresa, aparece no site assim que termina.
             status: "aprovado",
           });
+          if (erroPrestador) throw new Error("Seu login foi criado, mas o cadastro de prestador não pôde ser concluído: " + erroPrestador.message);
         }
       }
       setEnviado(true);
