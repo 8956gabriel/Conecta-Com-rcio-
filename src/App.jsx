@@ -127,6 +127,17 @@ function planoPremiumAtivo(e) {
 const LIMITE_FOTOS_GRATUITO = 3;
 const LIMITE_FOTOS_PREMIUM = 15;
 
+// Campos type="number" sempre usam ponto como separador decimal (padrão do
+// HTML, ignora o idioma do navegador) — então "20.000" vira 20, não 20 mil.
+// Por isso valores em R$ usam campo de texto e essa função pra interpretar
+// o jeito brasileiro de digitar (ponto separa milhar, vírgula separa centavos).
+function parseMoedaBR(texto) {
+  if (texto == null || texto === "") return null;
+  const limpo = String(texto).trim().replace(/\./g, "").replace(",", ".");
+  const numero = Number(limpo);
+  return Number.isFinite(numero) ? numero : null;
+}
+
 // Categorias estáveis do relatório oficial da Sala do Empreendedor (Sebrae) —
 // os subitens variam de ano pra ano, mas esses grupos se repetem, por isso
 // usamos eles como categoria fixa e deixamos um campo livre pro detalhe.
@@ -3137,7 +3148,7 @@ function AdminPanel() {
   const salvarValorConcedidoFomento = async (id) => {
     const texto = valorConcedidoEdicao[id];
     if (texto === undefined) return;
-    const valor = texto.trim() === "" ? null : Number(texto);
+    const valor = texto.trim() === "" ? null : parseMoedaBR(texto);
     const { error } = await supabase.from("fomento_leads").update({ valor_concedido: valor }).eq("id", id);
     if (!error) {
       setFomentoLeadsAdmin((atual) => atual.map((l) => (l.id === id ? { ...l, valor_concedido: valor } : l)));
@@ -3176,7 +3187,7 @@ function AdminPanel() {
         categoria: novoLeadFomentoAdmin.categoria,
         orientacao: novoLeadFomentoAdmin.orientacao || null,
         proposta: novoLeadFomentoAdmin.proposta || null,
-        valor_concedido: novoLeadFomentoAdmin.valor_concedido ? Number(novoLeadFomentoAdmin.valor_concedido) : null,
+        valor_concedido: parseMoedaBR(novoLeadFomentoAdmin.valor_concedido),
         status: novoLeadFomentoAdmin.status,
         anexo_url: anexoUrl,
       }).select().single();
@@ -7164,7 +7175,7 @@ function AdminPanel() {
                 <textarea value={novoLeadFomentoAdmin.proposta} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, proposta: e.target.value }))}
                   placeholder="Proposta (ex: capital de giro R$ 5.000, 24x)" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
                 <input value={novoLeadFomentoAdmin.valor_concedido} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, valor_concedido: e.target.value }))}
-                  type="number" min={0} step="0.01" placeholder="Valor concedido (R$, opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  type="text" inputMode="decimal" placeholder="Valor concedido (ex: 20.000,00 — opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 <select value={novoLeadFomentoAdmin.status} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, status: e.target.value }))}
                   className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white" style={{ borderColor: C.line }}>
                   {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => <option key={chave} value={chave}>{rotulo}</option>)}
@@ -7218,10 +7229,10 @@ function AdminPanel() {
                       </div>
 
                       <div className="flex items-center flex-wrap gap-2 mt-2">
-                        <input type="number" min={0} step="0.01" placeholder="R$ concedido"
-                          value={valorConcedidoEdicao[l.id] ?? (l.valor_concedido ?? "")}
+                        <input type="text" inputMode="decimal" placeholder="R$ concedido (ex: 20.000,00)"
+                          value={valorConcedidoEdicao[l.id] ?? (l.valor_concedido != null ? Number(l.valor_concedido).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "")}
                           onChange={(e) => setValorConcedidoEdicao((atual) => ({ ...atual, [l.id]: e.target.value }))}
-                          className="w-28 font-body text-xs border rounded-lg px-2 py-1.5 outline-none" style={{ borderColor: C.line }} />
+                          className="w-32 font-body text-xs border rounded-lg px-2 py-1.5 outline-none" style={{ borderColor: C.line }} />
                         {valorConcedidoEdicao[l.id] !== undefined && (
                           <button onClick={() => salvarValorConcedidoFomento(l.id)} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg text-white" style={{ background: C.blue }}>Salvar valor</button>
                         )}
