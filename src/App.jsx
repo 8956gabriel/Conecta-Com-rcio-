@@ -8,7 +8,7 @@ import {
   Pencil, Trash2, Tag, UserCircle2, ChevronLeft, ShieldCheck, BarChart3, Vote, Sparkles,
   FileText, Receipt, ClipboardList, HandCoins, ExternalLink,
   Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
-  Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw
+  Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw, Zap, Activity
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -3151,7 +3151,8 @@ function AdminPanel() {
   // Cadastro manual de pedido do Fomento direto pelo admin (sem precisar
   // que a pessoa preencha o formulário público), tudo na aba Sala do
   // Empreendedor: valor, orientação, proposta, anexo e status.
-  const leadFomentoAdminVazio = { nome: "", whatsapp: "", orientacao: "", proposta: "", valor_concedido: "", status: "recebido" };
+  const CATEGORIAS_FOMENTO = ["Microcrédito", "Capital de giro", "Máquinas e equipamentos", "Outros"];
+  const leadFomentoAdminVazio = { categoria: CATEGORIAS_FOMENTO[0], orientacao: "", proposta: "", valor_concedido: "", status: "recebido" };
   const [novoLeadFomentoAdmin, setNovoLeadFomentoAdmin] = useState(leadFomentoAdminVazio);
   const [anexoLeadFomentoAdmin, setAnexoLeadFomentoAdmin] = useState(null);
   const [criandoLeadFomentoAdmin, setCriandoLeadFomentoAdmin] = useState(false);
@@ -3160,7 +3161,6 @@ function AdminPanel() {
   const criarLeadFomentoAdmin = async (e) => {
     e.preventDefault();
     setStatusCriarLeadFomento("");
-    if (!novoLeadFomentoAdmin.nome.trim()) { setStatusCriarLeadFomento("Informe o nome."); return; }
     setCriandoLeadFomentoAdmin(true);
     try {
       let anexoUrl = null;
@@ -3173,8 +3173,7 @@ function AdminPanel() {
         }
       }
       const { data, error } = await supabase.from("fomento_leads").insert({
-        nome: novoLeadFomentoAdmin.nome,
-        whatsapp: novoLeadFomentoAdmin.whatsapp || null,
+        categoria: novoLeadFomentoAdmin.categoria,
         orientacao: novoLeadFomentoAdmin.orientacao || null,
         proposta: novoLeadFomentoAdmin.proposta || null,
         valor_concedido: novoLeadFomentoAdmin.valor_concedido ? Number(novoLeadFomentoAdmin.valor_concedido) : null,
@@ -7059,6 +7058,42 @@ function AdminPanel() {
               <p className="font-body text-sm" style={{ color: "#5C7186" }}>Carregando...</p>
             ) : (
               <>
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
+                  className="rounded-3xl overflow-hidden mb-5 relative" style={{ background: `linear-gradient(135deg, ${C.blueDeep}, ${C.blue})` }}>
+                  <div className="p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Activity size={15} color="#8FC1F2" />
+                      <p className="font-body text-[11px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.7)" }}>
+                        Painel ao vivo — {anoTotaisSala}
+                      </p>
+                    </div>
+                    <div className="grid sm:grid-cols-3 gap-3 mb-4">
+                      <div className="rounded-2xl p-3.5" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                        <p className="font-display font-extrabold text-2xl text-white">{relatorioSala.totalGeral}</p>
+                        <p className="font-body text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>Total no ano</p>
+                      </div>
+                      <div className="rounded-2xl p-3.5" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                        <p className="font-display font-extrabold text-2xl text-white">{relatorioSala.linhas.length}</p>
+                        <p className="font-body text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>Categorias com movimento</p>
+                      </div>
+                      <div className="rounded-2xl p-3.5" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                        <p className="font-display font-extrabold text-2xl text-white">
+                          {relatorioSala.totaisMeses[new Date().getMonth()]}
+                        </p>
+                        <p className="font-body text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>Neste mês</p>
+                      </div>
+                    </div>
+                    <ResponsiveContainer width="100%" height={140}>
+                      <BarChart data={MESES_ABREV.map((m, i) => ({ mes: m, total: relatorioSala.totaisMeses[i] }))}>
+                        <XAxis dataKey="mes" stroke="rgba(255,255,255,0.5)" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis hide />
+                        <Tooltip contentStyle={{ background: C.blueDeep, border: "none", borderRadius: 8, color: "#fff" }} cursor={{ fill: "rgba(255,255,255,0.06)" }} />
+                        <Bar dataKey="total" fill="#8FC1F2" radius={[5, 5, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </motion.div>
+
                 <div className="overflow-x-auto rounded-2xl border mb-3" style={{ borderColor: C.line }}>
                   <table className="w-full" style={{ borderCollapse: "collapse" }}>
                     <thead>
@@ -7120,10 +7155,10 @@ function AdminPanel() {
               </div>
 
               <form onSubmit={criarLeadFomentoAdmin} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl mb-6" style={{ borderColor: C.line }}>
-                <input value={novoLeadFomentoAdmin.nome} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, nome: e.target.value }))}
-                  placeholder="Nome" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-                <input value={novoLeadFomentoAdmin.whatsapp} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, whatsapp: e.target.value }))}
-                  placeholder="WhatsApp (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                <select value={novoLeadFomentoAdmin.categoria} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, categoria: e.target.value }))}
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white sm:col-span-2" style={{ borderColor: C.line }}>
+                  {CATEGORIAS_FOMENTO.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
                 <textarea value={novoLeadFomentoAdmin.orientacao} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, orientacao: e.target.value }))}
                   placeholder="Orientação dada" rows={2} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
                 <textarea value={novoLeadFomentoAdmin.proposta} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, proposta: e.target.value }))}
@@ -7152,14 +7187,15 @@ function AdminPanel() {
                   return (
                     <div key={l.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{l.nome}</p>
+                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{l.nome || l.categoria || "Pedido"}</p>
                         <select value={l.status || "recebido"} onChange={(e) => atualizarStatusFomentoLead(l.id, e.target.value)}
                           className="font-body text-xs border rounded-lg px-2 py-1 outline-none bg-white" style={{ borderColor: C.line }}>
                           {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => <option key={chave} value={chave}>{rotulo}</option>)}
                         </select>
                       </div>
                       <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
-                        {l.whatsapp || "—"} · {l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}
+                        {l.nome ? `${l.whatsapp || "—"} · ` : l.categoria ? `${l.categoria} · ` : ""}
+                        {l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}
                       </p>
 
                       {(l.documentos_urls || []).length > 0 && (
@@ -12302,12 +12338,12 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         </section>
       )}
 
-      {/* Sala do Empreendedor — números oficiais divulgados */}
+      {/* Sala do Empreendedor — dashboard tecnológico */}
       {relatorioSalaPublico.linhas.length > 0 && (
         <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
           <Reveal>
             <div className="flex items-end justify-between flex-wrap gap-3">
-              <SectionHeader eyebrow="Empreendedorismo" title="Sala do Empreendedor" sub={`Atendimentos prestados em ${anoSalaPublico} — números oficiais (fonte: Sebrae)`} />
+              <SectionHeader eyebrow="Empreendedorismo · dados em tempo real" title="Sala do Empreendedor" sub={`Atendimentos prestados em ${anoSalaPublico} — números oficiais (fonte: Sebrae)`} />
               {anosSalaPublico.length > 1 && (
                 <select value={anoSalaPublico} onChange={(e) => setAnoSalaPublicoEscolhido(Number(e.target.value))}
                   className="font-body text-sm font-bold border rounded-lg px-3 py-2 outline-none bg-white" style={{ borderColor: C.line, color: C.blue }}>
@@ -12316,55 +12352,63 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
               )}
             </div>
           </Reveal>
-          <Reveal>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-              <div className="rounded-2xl border p-4" style={{ borderColor: C.line, background: C.blueTint }}>
-                <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{relatorioSalaPublico.totalGeral}</p>
-                <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Atendimentos realizados em {anoSalaPublico}</p>
+
+          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+            className="rounded-3xl overflow-hidden mt-5 relative" style={{ background: `linear-gradient(135deg, ${C.blueDeep}, ${C.blue})` }}>
+            <div aria-hidden="true" className="absolute inset-0 opacity-20 pointer-events-none"
+              style={{ backgroundImage: "radial-gradient(circle at 20% 20%, white 1px, transparent 1px), radial-gradient(circle at 80% 60%, white 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
+            <div className="relative p-5 md:p-7">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  { icon: Activity, valor: relatorioSalaPublico.totalGeral, rotulo: `Atendimentos em ${anoSalaPublico}` },
+                  { icon: Zap, valor: mesAtualSalaPublico.total, rotulo: `Atendimentos em ${mesAtualSalaPublico.nome}` },
+                  { icon: GraduationCap, valor: qtdCursosPublico ?? "—", rotulo: "Cursos oferecidos" },
+                  { icon: HandCoins, valor: totalConcedidoFomentoPublico != null ? `R$ ${totalConcedidoFomentoPublico.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—", rotulo: "Concedido via Fomento Paraná", pequeno: true },
+                ].map((s, i) => (
+                  <motion.div key={s.rotulo} initial={{ opacity: 0, scale: 0.92 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: i * 0.08 }}
+                    className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                    <s.icon size={18} color="#8FC1F2" />
+                    <p className={`font-display font-extrabold ${s.pequeno ? "text-xl" : "text-3xl"} text-white mt-2`}>{s.valor}</p>
+                    <p className="font-body text-xs mt-1" style={{ color: "rgba(255,255,255,0.7)" }}>{s.rotulo}</p>
+                  </motion.div>
+                ))}
               </div>
-              <div className="rounded-2xl border p-4" style={{ borderColor: C.line, background: C.blueTint }}>
-                <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{mesAtualSalaPublico.total}</p>
-                <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Atendimentos em {mesAtualSalaPublico.nome}</p>
-              </div>
-              <div className="rounded-2xl border p-4" style={{ borderColor: C.line, background: C.blueTint }}>
-                <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{qtdCursosPublico ?? "—"}</p>
-                <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Cursos oferecidos</p>
-              </div>
-              <div className="rounded-2xl border p-4" style={{ borderColor: C.line, background: C.blueTint }}>
-                <p className="font-display font-extrabold text-2xl" style={{ color: C.blue }}>
-                  {totalConcedidoFomentoPublico != null ? `R$ ${totalConcedidoFomentoPublico.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
-                </p>
-                <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Já concedido via Fomento Paraná</p>
+
+              <div className="mt-6 rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <p className="font-body text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "rgba(255,255,255,0.6)" }}>Evolução mensal</p>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={MESES_ABREV.map((m, i) => ({ mes: m, total: relatorioSalaPublico.totaisMeses[i] }))}>
+                    <XAxis dataKey="mes" stroke="rgba(255,255,255,0.5)" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis hide />
+                    <Tooltip contentStyle={{ background: C.blueDeep, border: "none", borderRadius: 8, color: "#fff" }} cursor={{ fill: "rgba(255,255,255,0.06)" }} />
+                    <Bar dataKey="total" fill="#8FC1F2" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
-          </Reveal>
+          </motion.div>
+
           <Reveal>
-            <div className="overflow-x-auto rounded-2xl border mt-4" style={{ borderColor: C.line }}>
-              <table className="w-full" style={{ borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ background: C.blueTint }}>
-                    <th className="font-body text-[11px] font-bold text-left px-3 py-2" style={{ color: C.blue }}>Serviço</th>
-                    <th className="font-body text-[11px] font-bold px-2 py-2" style={{ color: C.blue }}>Total</th>
-                    {MESES_ABREV.map((m) => <th key={m} className="font-body text-[11px] font-bold px-1.5 py-2" style={{ color: C.blue }}>{m}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {relatorioSalaPublico.linhas.map((l) => (
-                    <tr key={l.categoria} className="border-t" style={{ borderColor: C.line }}>
-                      <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{l.categoria}</td>
-                      <td className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{l.total}</td>
-                      {l.meses.map((v, i) => <td key={i} className="font-body text-xs text-center px-1.5 py-2" style={{ color: "#5C7186" }}>{v}</td>)}
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t" style={{ borderColor: C.line, background: C.blueTint2 }}>
-                    <td className="font-body text-xs font-bold px-3 py-2" style={{ color: C.ink }}>TOTALIZAÇÃO GERAL</td>
-                    <td className="font-body text-xs font-bold text-center px-2 py-2" style={{ color: C.ink }}>{relatorioSalaPublico.totalGeral}</td>
-                    {relatorioSalaPublico.totaisMeses.map((v, i) => <td key={i} className="font-body text-xs font-bold text-center px-1.5 py-2" style={{ color: C.ink }}>{v}</td>)}
-                  </tr>
-                </tfoot>
-              </table>
+            <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: C.line }}>
+              <p className="font-body text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: "#5C7186" }}>Por categoria de serviço</p>
+              <div className="flex flex-col gap-2.5">
+                {relatorioSalaPublico.linhas.map((l) => {
+                  const pct = relatorioSalaPublico.totalGeral > 0 ? Math.round((l.total / relatorioSalaPublico.totalGeral) * 100) : 0;
+                  return (
+                    <div key={l.categoria}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-body text-xs" style={{ color: C.ink }}>{l.categoria}</span>
+                        <span className="font-body text-xs font-bold" style={{ color: C.blue }}>{l.total}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: C.blueTint }}>
+                        <motion.div initial={{ width: 0 }} whileInView={{ width: `${pct}%` }} viewport={{ once: true }} transition={{ duration: 0.7, ease: "easeOut" }}
+                          className="h-full rounded-full" style={{ background: `linear-gradient(90deg, ${C.blue}, ${C.blueDeep})` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </Reveal>
         </section>
