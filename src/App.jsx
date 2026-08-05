@@ -3133,7 +3133,7 @@ function AdminPanel() {
       if (!error) setFomentoLeadsAdmin(data || []);
     });
   }, []);
-  const ROTULO_STATUS_FOMENTO = { recebido: "Recebido", em_analise: "Em análise", concedido: "Concedido", negado: "Negado" };
+  const ROTULO_STATUS_FOMENTO = { recebido: "Recebido", em_analise: "Em processo", concedido: "Concedido", negado: "Negado" };
   const CONTAGEM_STATUS_FOMENTO_VAZIA = { recebido: 0, em_analise: 0, concedido: 0, negado: 0 };
   const contagemStatusFomento = (fomentoLeadsAdmin ?? []).reduce(
     (acc, l) => ({ ...acc, [l.status || "recebido"]: (acc[l.status || "recebido"] || 0) + 1 }),
@@ -11064,6 +11064,16 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       if (!error) setTotalConcedidoFomentoPublico(Number(data) || 0);
     });
   }, []);
+  const [contagemStatusFomentoPublico, setContagemStatusFomentoPublico] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.rpc("contagem_status_fomento").then(({ data, error }) => {
+      if (!error) {
+        const mapa = Object.fromEntries((data || []).map((r) => [r.status, Number(r.total)]));
+        setContagemStatusFomentoPublico(mapa);
+      }
+    });
+  }, []);
   const [licitacaoNome, setLicitacaoNome] = useState("");
   const [licitacaoWhatsapp, setLicitacaoWhatsapp] = useState("");
   const [enviandoLicitacao, setEnviandoLicitacao] = useState(false);
@@ -12375,6 +12385,8 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
                   { icon: Zap, valor: mesAtualSalaPublico.total, rotulo: `Atendimentos em ${mesAtualSalaPublico.nome}` },
                   { icon: GraduationCap, valor: qtdCursosPublico ?? "—", rotulo: "Cursos oferecidos" },
                   { icon: HandCoins, valor: totalConcedidoFomentoPublico != null ? `R$ ${totalConcedidoFomentoPublico.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—", rotulo: "Concedido via Fomento Paraná", pequeno: true },
+                  { icon: CheckCircle2, valor: contagemStatusFomentoPublico?.concedido ?? 0, rotulo: "Pedidos concedidos" },
+                  { icon: RefreshCw, valor: contagemStatusFomentoPublico?.em_analise ?? 0, rotulo: "Pedidos em processo" },
                 ].map((s, i) => (
                   <motion.div key={s.rotulo} initial={{ opacity: 0, scale: 0.92 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
                     transition={{ duration: 0.4, delay: i * 0.08 }}
