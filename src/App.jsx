@@ -10825,10 +10825,12 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       if (!error) setTotaisSalaPublicos(data || []);
     });
   }, []);
-  const anoSalaPublico = useMemo(() => {
-    if (!totaisSalaPublicos || totaisSalaPublicos.length === 0) return null;
-    return Math.max(...totaisSalaPublicos.map((r) => r.ano));
+  const anosSalaPublico = useMemo(() => {
+    if (!totaisSalaPublicos) return [];
+    return Array.from(new Set(totaisSalaPublicos.filter((r) => r.total > 0).map((r) => r.ano))).sort((a, b) => b - a);
   }, [totaisSalaPublicos]);
+  const [anoSalaPublicoEscolhido, setAnoSalaPublicoEscolhido] = useState(null);
+  const anoSalaPublico = anoSalaPublicoEscolhido ?? (anosSalaPublico.length > 0 ? anosSalaPublico[0] : null);
   const relatorioSalaPublico = useMemo(() => {
     if (!totaisSalaPublicos || anoSalaPublico === null) return { linhas: [], totaisMeses: Array(12).fill(0), totalGeral: 0 };
     const doAno = totaisSalaPublicos.filter((r) => r.ano === anoSalaPublico);
@@ -10860,6 +10862,13 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       supabase.from("eventos_calendario").select("*", { count: "exact", head: true }).eq("tipo", "curso"),
     ]).then(([{ count: qtdCursos }, { count: qtdEventosCurso }]) => {
       setQtdCursosPublico((qtdCursos ?? 0) + (qtdEventosCurso ?? 0));
+    });
+  }, []);
+  const [totalConcedidoFomentoPublico, setTotalConcedidoFomentoPublico] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.rpc("total_concedido_fomento").then(({ data, error }) => {
+      if (!error) setTotalConcedidoFomentoPublico(Number(data) || 0);
     });
   }, []);
   const [licitacaoNome, setLicitacaoNome] = useState("");
@@ -12150,9 +12159,19 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       {/* Sala do Empreendedor — números oficiais divulgados */}
       {relatorioSalaPublico.linhas.length > 0 && (
         <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
-          <Reveal><SectionHeader eyebrow="Empreendedorismo" title="Sala do Empreendedor" sub={`Atendimentos prestados em ${anoSalaPublico} — números oficiais (fonte: Sebrae)`} /></Reveal>
           <Reveal>
-            <div className="grid sm:grid-cols-3 gap-3 mt-4">
+            <div className="flex items-end justify-between flex-wrap gap-3">
+              <SectionHeader eyebrow="Empreendedorismo" title="Sala do Empreendedor" sub={`Atendimentos prestados em ${anoSalaPublico} — números oficiais (fonte: Sebrae)`} />
+              {anosSalaPublico.length > 1 && (
+                <select value={anoSalaPublico} onChange={(e) => setAnoSalaPublicoEscolhido(Number(e.target.value))}
+                  className="font-body text-sm font-bold border rounded-lg px-3 py-2 outline-none bg-white" style={{ borderColor: C.line, color: C.blue }}>
+                  {anosSalaPublico.map((ano) => <option key={ano} value={ano}>{ano}</option>)}
+                </select>
+              )}
+            </div>
+          </Reveal>
+          <Reveal>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
               <div className="rounded-2xl border p-4" style={{ borderColor: C.line, background: C.blueTint }}>
                 <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{relatorioSalaPublico.totalGeral}</p>
                 <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Atendimentos realizados em {anoSalaPublico}</p>
@@ -12164,6 +12183,12 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
               <div className="rounded-2xl border p-4" style={{ borderColor: C.line, background: C.blueTint }}>
                 <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{qtdCursosPublico ?? "—"}</p>
                 <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Cursos oferecidos</p>
+              </div>
+              <div className="rounded-2xl border p-4" style={{ borderColor: C.line, background: C.blueTint }}>
+                <p className="font-display font-extrabold text-2xl" style={{ color: C.blue }}>
+                  {totalConcedidoFomentoPublico != null ? `R$ ${totalConcedidoFomentoPublico.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                </p>
+                <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Já concedido via Fomento Paraná</p>
               </div>
             </div>
           </Reveal>
