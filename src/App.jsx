@@ -7228,16 +7228,43 @@ function AdminPanel() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 mb-4 mt-3">
-                {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => (
-                  <span key={chave} className="font-body text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: C.blueTint, color: C.blue }}>
-                    {rotulo}: {contagemStatusFomento[chave] || 0}
-                  </span>
-                ))}
-                <span className="font-body text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: C.amber, color: C.blueDeep }}>
-                  Total concedido: R$ {totalConcedidoFomento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                </span>
-              </div>
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
+                className="rounded-3xl overflow-hidden mt-3 mb-5 relative" style={{ background: `linear-gradient(135deg, ${C.blueDeep}, ${C.blue})` }}>
+                <div className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <HandCoins size={15} color="#8FC1F2" />
+                    <p className="font-body text-[11px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.7)" }}>
+                      Painel ao vivo — Fomento Paraná
+                    </p>
+                  </div>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+                    <div className="rounded-2xl p-3.5 lg:col-span-2" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                      <p className="font-display font-extrabold text-2xl text-white">R$ {totalConcedidoFomento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                      <p className="font-body text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>Total concedido</p>
+                    </div>
+                    {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => (
+                      <div key={chave} className="rounded-2xl p-3.5" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                        <p className="font-display font-extrabold text-2xl text-white">{contagemStatusFomento[chave] || 0}</p>
+                        <p className="font-body text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>{rotulo}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {(fomentoLeadsAdmin ?? []).length > 0 && (
+                    <ResponsiveContainer width="100%" height={140}>
+                      <PieChart>
+                        <Pie data={Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => ({ name: rotulo, value: contagemStatusFomento[chave] || 0 })).filter((d) => d.value > 0)}
+                          dataKey="value" nameKey="name" innerRadius={35} outerRadius={55} paddingAngle={3}>
+                          {Object.keys(ROTULO_STATUS_FOMENTO).map((chave, i) => (
+                            <Cell key={chave} fill={["#8FC1F2", "#F2D98F", "#8FF2C4", "#F28F8F"][i % 4]} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ background: C.blueDeep, border: "none", borderRadius: 8, color: "#fff" }} />
+                        <Legend wrapperStyle={{ fontSize: 11, color: "rgba(255,255,255,0.8)" }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </motion.div>
 
               <form onSubmit={criarLeadFomentoAdmin} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-2xl mb-6" style={{ borderColor: C.line }}>
                 <select value={novoLeadFomentoAdmin.categoria} onChange={(e) => setNovoLeadFomentoAdmin((v) => ({ ...v, categoria: e.target.value }))}
