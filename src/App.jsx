@@ -10853,7 +10853,14 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   const [qtdCursosPublico, setQtdCursosPublico] = useState(null);
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.from("cursos").select("*", { count: "exact", head: true }).then(({ count }) => setQtdCursosPublico(count ?? 0));
+    // Cursos vêm de duas tabelas (aba própria "cursos" e eventos do
+    // calendário com tipo "curso") — igual à lista pública de cursos.
+    Promise.all([
+      supabase.from("cursos").select("*", { count: "exact", head: true }),
+      supabase.from("eventos_calendario").select("*", { count: "exact", head: true }).eq("tipo", "curso"),
+    ]).then(([{ count: qtdCursos }, { count: qtdEventosCurso }]) => {
+      setQtdCursosPublico((qtdCursos ?? 0) + (qtdEventosCurso ?? 0));
+    });
   }, []);
   const [licitacaoNome, setLicitacaoNome] = useState("");
   const [licitacaoWhatsapp, setLicitacaoWhatsapp] = useState("");
