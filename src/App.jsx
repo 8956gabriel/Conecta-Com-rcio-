@@ -5761,14 +5761,14 @@ function AdminPanel() {
                             </span>
                           </td>
                           <td data-label="Ações" className="px-3 py-2.5">
-                            <div className="flex items-center gap-2.5">
-                              <button onClick={() => iniciarEdicaoUsuarioAdmin(u)} title="Editar" style={{ color: "#425A70" }}><Pencil size={14} /></button>
-                              <button onClick={() => alternarBloqueioUsuarioAdmin(u)} title={u.bloqueado ? "Desbloquear" : "Bloquear"} style={{ color: u.bloqueado ? "#1E8E5A" : "#C6811F" }}>
-                                <ShieldCheck size={14} />
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => iniciarEdicaoUsuarioAdmin(u)} title="Editar" className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-black/5 shrink-0" style={{ color: "#425A70" }}><Pencil size={16} /></button>
+                              <button onClick={() => alternarBloqueioUsuarioAdmin(u)} title={u.bloqueado ? "Desbloquear" : "Bloquear"} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-black/5 shrink-0" style={{ color: u.bloqueado ? "#1E8E5A" : "#C6811F" }}>
+                                <ShieldCheck size={16} />
                               </button>
                               <button onClick={() => { if (confirmarExclusao("Excluir esse usuário? A conta de login também será removida. Essa ação não pode ser desfeita.")) apagarUsuarioAdmin(u.id); }}
-                                disabled={processandoUsuarioAdmin === u.id} title="Excluir" style={{ color: "#B4462F" }}>
-                                <Trash2 size={14} />
+                                disabled={processandoUsuarioAdmin === u.id} title="Excluir" className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-black/5 shrink-0 disabled:opacity-40" style={{ color: "#B4462F" }}>
+                                <Trash2 size={16} />
                               </button>
                             </div>
                           </td>
@@ -7074,14 +7074,14 @@ function AdminPanel() {
                             </button>
                           </td>
                           <td data-label="Ações" className="px-3 py-2.5">
-                            <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-1">
                               {editandoCredencial === c.id ? (
-                                <button onClick={() => salvarEdicaoCredencial(c.id)} className="font-body text-xs font-bold" style={{ color: C.blue }}>Salvar</button>
+                                <button onClick={() => salvarEdicaoCredencial(c.id)} className="font-body text-xs font-bold px-2" style={{ color: C.blue }}>Salvar</button>
                               ) : (
                                 <>
-                                  <button onClick={() => setCredencialDigitalAberta(c)} title="Ver credencial digital" style={{ color: C.blue }}><BadgeCheck size={15} /></button>
-                                  <button onClick={() => iniciarEdicaoCredencial(c)} title="Editar" style={{ color: "#425A70" }}><Pencil size={14} /></button>
-                                  <button onClick={() => { if (confirmarExclusao()) { removerCredencial(c.id); notificar("Credencial excluída."); } }} title="Excluir" style={{ color: "#B4462F" }}><Trash2 size={14} /></button>
+                                  <button onClick={() => setCredencialDigitalAberta(c)} title="Ver credencial digital" className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-black/5 shrink-0" style={{ color: C.blue }}><BadgeCheck size={16} /></button>
+                                  <button onClick={() => iniciarEdicaoCredencial(c)} title="Editar" className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-black/5 shrink-0" style={{ color: "#425A70" }}><Pencil size={16} /></button>
+                                  <button onClick={() => { if (confirmarExclusao()) { removerCredencial(c.id); notificar("Credencial excluída."); } }} title="Excluir" className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-black/5 shrink-0" style={{ color: "#B4462F" }}><Trash2 size={16} /></button>
                                 </>
                               )}
                             </div>
