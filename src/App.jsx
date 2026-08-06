@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useContext, createContext } from "react";
+import { createPortal } from "react-dom";
 import {
   Search, MapPin, Star, Heart, MessageCircle, Briefcase, GraduationCap,
   Newspaper, Menu, X, ChevronRight, Building2, ShoppingBag, Smartphone,
@@ -11256,7 +11257,49 @@ function ModalDetalheFeirante({ f, onFechar }) {
   );
 }
 
-function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
+// ---------------------------------------------------------------------------
+// Bottom Navigation Bar — só aparece no celular (a barra do topo já cobre
+// desktop). Mesma ideia de app nativo: fixa embaixo, ícone + rótulo,
+// indicador da aba ativa e feedback de toque.
+// ---------------------------------------------------------------------------
+const ITENS_BOTTOM_NAV = [
+  { id: "inicio", label: "Início", icon: Store, secao: "Home" },
+  { id: "empresas", label: "Empresas", icon: Building2, secao: "Empresas" },
+  { id: "produtos", label: "Produtos", icon: ShoppingBag, secao: "Produtos" },
+  { id: "promocoes", label: "Promoções", icon: Tag, secao: "Promoções" },
+  { id: "eventos", label: "Eventos", icon: CalendarDays, secao: "Calendário" },
+  { id: "vagas", label: "Vagas", icon: Briefcase, secao: "Vagas" },
+  { id: "perfil", label: "Perfil", icon: UserCircle2, secao: "Perfil" },
+];
+
+function BottomNavMobile({ ativo, onSelect }) {
+  // Portal direto pro <body>: o wrapper ".page-transition" da página tem uma
+  // animação com transform, e qualquer transform em um ancestral quebra o
+  // "position: fixed" (o elemento passa a se ancorar nesse ancestral em vez
+  // da tela) — o portal evita isso de vez.
+  return createPortal(
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t flex items-stretch"
+      style={{ width: "100vw", borderColor: C.line, paddingBottom: "env(safe-area-inset-bottom)", boxShadow: "0 -8px 24px -12px rgba(10,34,58,0.18)" }}>
+      {ITENS_BOTTOM_NAV.map((it) => {
+        const Icon = it.icon;
+        const estaAtivo = ativo === it.id;
+        return (
+          <button key={it.id} type="button" onClick={() => onSelect(it)}
+            className="flex flex-col items-center justify-center gap-0.5 py-2 transition-transform duration-150 active:scale-90"
+            style={{ flex: "1 1 0%", minWidth: 0, color: estaAtivo ? C.blue : "#8896A6" }}>
+            <Icon size={18} strokeWidth={estaAtivo ? 2.5 : 2} />
+            <span className="font-body text-[9px] font-bold leading-none"
+              style={{ color: estaAtivo ? C.blue : "#8896A6", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.label}</span>
+            <span className="w-1 h-1 rounded-full mt-0.5" style={{ background: estaAtivo ? C.blue : "transparent" }} />
+          </button>
+        );
+      })}
+    </nav>,
+    document.body
+  );
+}
+
+function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaModo }) {
   const { nomeCidade, nomeCidadeUF } = useCidade();
   const [menuOpen, setMenuOpen] = useState(false);
   const categoriasReaisHome = useCategoriasReais();
@@ -11850,6 +11893,15 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
     refs[item]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  // Bottom Navigation Bar (só no mobile) — mesma lógica de rolagem do menu
+  // do topo, só que sempre visível embaixo, estilo app nativo.
+  const [bottomNavAtivo, setBottomNavAtivo] = useState("inicio");
+  const irBottomNav = (it) => {
+    setBottomNavAtivo(it.id);
+    if (it.id === "perfil") { irParaModo?.("conta"); return; }
+    irParaSecaoNav(it.secao);
+  };
+
   useEffect(() => {
     if (!supabaseConfigurado) return;
     supabase
@@ -12125,7 +12177,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
   ];
 
   return (
-    <div className="font-body min-h-screen" style={{ background: "#fff", color: C.ink }}>
+    <div className="font-body min-h-screen pb-16 md:pb-0" style={{ background: "#fff", color: C.ink }}>
       {/* Barra institucional */}
       <div className="text-white text-[11px] font-body" style={{ background: `linear-gradient(90deg, ${C.blueDeep}, ${C.blue})` }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6 py-1.5 flex items-center justify-between">
@@ -12370,6 +12422,105 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
       <div ref={promocoesSecaoRef}><BannerPromocoes /></div>
       <CapaComercianteDestaque empresas={listaBase} onAbrir={abrirEmpresa} />
       <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="apos_destaques" compacto /></div>
+
+      {/* O que abriu essa semana — empresas e prestadores aprovados nos últimos 7 dias */}
+      {novidadesSemana.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 md:px-6 py-10">
+          <Reveal><SectionHeader eyebrow="Novidades" title="O que abriu essa semana" sub="Comércios e prestadores recém-chegados na plataforma" /></Reveal>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {novidadesSemana.slice(0, 6).map((item, i) => (
+              <Reveal key={`${item.tipo}-${item.dados.id || item.dados.nome}`} delay={i * 70}>
+                {item.tipo === "empresa" ? (
+                  <EmpresaCard e={item.dados} fav={!!favs[item.dados.id || item.dados.nome]}
+                    onFav={() => setFavs((f) => ({ ...f, [item.dados.id || item.dados.nome]: !f[item.dados.id || item.dados.nome] }))}
+                    onAbrir={() => abrirEmpresa(item.dados)} />
+                ) : (
+                  <PrestadorCard p={item.dados} agendamentoAtivo={!!siteConfig?.agendamento_ativo}
+                    avaliacoes={avaliacoesPorPrestador[item.dados.id] || []} onAvaliacaoEnviada={carregarAvaliacoesPrestadores} />
+                )}
+              </Reveal>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Empresas em destaque */}
+      <section ref={empresasSecaoRef} className="py-12" style={{ background: C.blueTint2 }}>
+        <div className="max-w-6xl mx-auto px-4 md:px-6">
+          <div className="flex items-end justify-between gap-3 flex-wrap">
+            <Reveal><SectionHeader eyebrow="Vitrine local" title="Empresas em destaque" linkLabel="Ver mapa de empresas" onLinkClick={() => window.open("https://www.google.com/maps/search/com%C3%A9rcio+Ivatuba+PR", "_blank")} /></Reveal>
+            <select value={ordenacaoEmpresas} onChange={(e) => setOrdenacaoEmpresas(e.target.value)}
+              className="font-body text-xs border rounded-lg px-3 py-2 outline-none bg-white mb-1" style={{ borderColor: C.line, color: "#425A70" }}>
+              <option value="recentes">Mais recentes</option>
+              <option value="az">Ordem alfabética</option>
+              <option value="avaliacao">Melhor avaliação</option>
+            </select>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {empresasFiltradas.slice(0, qtdEmpresasVisiveis).map((e, i) => (
+              <Reveal key={e.nome} delay={i * 70}>
+                <EmpresaCard e={e} fav={!!favs[e.id || e.nome]} onFav={() => setFavs((f) => ({ ...f, [e.id || e.nome]: !f[e.id || e.nome] }))} onAbrir={() => abrirEmpresa(e)} />
+              </Reveal>
+            ))}
+            {empresasFiltradas.length === 0 && (
+              <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>
+                {query.trim() ? `Nenhuma empresa encontrada para "${query}".` : "Nenhuma empresa cadastrada ainda. Assim que a primeira for aprovada, aparece aqui."}
+              </p>
+            )}
+          </div>
+          {empresasFiltradas.length > qtdEmpresasVisiveis && (
+            <div className="flex justify-center mt-6">
+              <button onClick={() => setQtdEmpresasVisiveis((n) => n + PAGINA_EMPRESAS)}
+                className="font-body text-sm font-bold px-5 py-2.5 rounded-xl border bg-white" style={{ borderColor: C.line, color: C.blue }}>
+                Carregar mais empresas
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="entre_empresas" compacto /></div>
+
+      {/* Produtos em destaque */}
+      <section ref={produtosSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <Reveal><SectionHeader eyebrow="Ofertas" title="Produtos em destaque" linkLabel="Ver todos" onLinkClick={() => setQtdProdutosVisiveis(produtosFiltrados.length)} /></Reveal>
+          {(produtosReais ?? []).length > 0 && (
+            <div className="flex items-center gap-2 mb-1">
+              <input value={queryProdutos} onChange={(e) => setQueryProdutos(e.target.value)} placeholder="Buscar produto..."
+                className="font-body text-xs border rounded-lg px-3 py-2 outline-none w-36" style={{ borderColor: C.line }} />
+              <select value={ordenacaoProdutos} onChange={(e) => setOrdenacaoProdutos(e.target.value)}
+                className="font-body text-xs border rounded-lg px-3 py-2 outline-none bg-white" style={{ borderColor: C.line, color: "#425A70" }}>
+                <option value="recentes">Mais recentes</option>
+                <option value="menor-preco">Menor preço</option>
+                <option value="maior-preco">Maior preço</option>
+                <option value="az">Ordem alfabética</option>
+              </select>
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {produtosFiltrados.slice(0, qtdProdutosVisiveis).map((p, i) => (
+            <Reveal key={`${p.nome}-${i}`} delay={i * 70}>
+              <ProdutoCard p={p} onAdicionarCarrinho={adicionarAoCarrinho}
+                fav={!!favsProdutos[p.id]} onFav={() => setFavsProdutos((f) => ({ ...f, [p.id]: !f[p.id] }))} />
+            </Reveal>
+          ))}
+          {(produtosReais ?? []).length === 0 && (
+            <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhum produto cadastrado ainda. Assim que um empresário publicar, aparece aqui.</p>
+          )}
+          {(produtosReais ?? []).length > 0 && produtosFiltrados.length === 0 && (
+            <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhum produto encontrado para "{queryProdutos}".</p>
+          )}
+        </div>
+        {produtosFiltrados.length > qtdProdutosVisiveis && (
+          <div className="flex justify-center mt-6">
+            <button onClick={() => setQtdProdutosVisiveis((n) => n + PAGINA_PRODUTOS)}
+              className="font-body text-sm font-bold px-5 py-2.5 rounded-xl border bg-white" style={{ borderColor: C.line, color: C.blue }}>
+              Carregar mais produtos
+            </button>
+          </div>
+        )}
+      </section>
 
       {/* Categorias */}
       <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
@@ -12863,105 +13014,6 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
         <div ref={calendarioSecaoRef} className="max-w-md">
           <CalendarioEventos />
         </div>
-      </section>
-
-      {/* O que abriu essa semana — empresas e prestadores aprovados nos últimos 7 dias */}
-      {novidadesSemana.length > 0 && (
-        <section className="max-w-6xl mx-auto px-4 md:px-6 py-10">
-          <Reveal><SectionHeader eyebrow="Novidades" title="O que abriu essa semana" sub="Comércios e prestadores recém-chegados na plataforma" /></Reveal>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {novidadesSemana.slice(0, 6).map((item, i) => (
-              <Reveal key={`${item.tipo}-${item.dados.id || item.dados.nome}`} delay={i * 70}>
-                {item.tipo === "empresa" ? (
-                  <EmpresaCard e={item.dados} fav={!!favs[item.dados.id || item.dados.nome]}
-                    onFav={() => setFavs((f) => ({ ...f, [item.dados.id || item.dados.nome]: !f[item.dados.id || item.dados.nome] }))}
-                    onAbrir={() => abrirEmpresa(item.dados)} />
-                ) : (
-                  <PrestadorCard p={item.dados} agendamentoAtivo={!!siteConfig?.agendamento_ativo}
-                    avaliacoes={avaliacoesPorPrestador[item.dados.id] || []} onAvaliacaoEnviada={carregarAvaliacoesPrestadores} />
-                )}
-              </Reveal>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Empresas em destaque */}
-      <section ref={empresasSecaoRef} className="py-12" style={{ background: C.blueTint2 }}>
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
-          <div className="flex items-end justify-between gap-3 flex-wrap">
-            <Reveal><SectionHeader eyebrow="Vitrine local" title="Empresas em destaque" linkLabel="Ver mapa de empresas" onLinkClick={() => window.open("https://www.google.com/maps/search/com%C3%A9rcio+Ivatuba+PR", "_blank")} /></Reveal>
-            <select value={ordenacaoEmpresas} onChange={(e) => setOrdenacaoEmpresas(e.target.value)}
-              className="font-body text-xs border rounded-lg px-3 py-2 outline-none bg-white mb-1" style={{ borderColor: C.line, color: "#425A70" }}>
-              <option value="recentes">Mais recentes</option>
-              <option value="az">Ordem alfabética</option>
-              <option value="avaliacao">Melhor avaliação</option>
-            </select>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {empresasFiltradas.slice(0, qtdEmpresasVisiveis).map((e, i) => (
-              <Reveal key={e.nome} delay={i * 70}>
-                <EmpresaCard e={e} fav={!!favs[e.id || e.nome]} onFav={() => setFavs((f) => ({ ...f, [e.id || e.nome]: !f[e.id || e.nome] }))} onAbrir={() => abrirEmpresa(e)} />
-              </Reveal>
-            ))}
-            {empresasFiltradas.length === 0 && (
-              <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>
-                {query.trim() ? `Nenhuma empresa encontrada para "${query}".` : "Nenhuma empresa cadastrada ainda. Assim que a primeira for aprovada, aparece aqui."}
-              </p>
-            )}
-          </div>
-          {empresasFiltradas.length > qtdEmpresasVisiveis && (
-            <div className="flex justify-center mt-6">
-              <button onClick={() => setQtdEmpresasVisiveis((n) => n + PAGINA_EMPRESAS)}
-                className="font-body text-sm font-bold px-5 py-2.5 rounded-xl border bg-white" style={{ borderColor: C.line, color: C.blue }}>
-                Carregar mais empresas
-              </button>
-            </div>
-          )}
-        </div>
-      </section>
-      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="entre_empresas" compacto /></div>
-
-      {/* Produtos em destaque */}
-      <section ref={produtosSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
-        <div className="flex items-end justify-between gap-3 flex-wrap">
-          <Reveal><SectionHeader eyebrow="Ofertas" title="Produtos em destaque" linkLabel="Ver todos" onLinkClick={() => setQtdProdutosVisiveis(produtosFiltrados.length)} /></Reveal>
-          {(produtosReais ?? []).length > 0 && (
-            <div className="flex items-center gap-2 mb-1">
-              <input value={queryProdutos} onChange={(e) => setQueryProdutos(e.target.value)} placeholder="Buscar produto..."
-                className="font-body text-xs border rounded-lg px-3 py-2 outline-none w-36" style={{ borderColor: C.line }} />
-              <select value={ordenacaoProdutos} onChange={(e) => setOrdenacaoProdutos(e.target.value)}
-                className="font-body text-xs border rounded-lg px-3 py-2 outline-none bg-white" style={{ borderColor: C.line, color: "#425A70" }}>
-                <option value="recentes">Mais recentes</option>
-                <option value="menor-preco">Menor preço</option>
-                <option value="maior-preco">Maior preço</option>
-                <option value="az">Ordem alfabética</option>
-              </select>
-            </div>
-          )}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {produtosFiltrados.slice(0, qtdProdutosVisiveis).map((p, i) => (
-            <Reveal key={`${p.nome}-${i}`} delay={i * 70}>
-              <ProdutoCard p={p} onAdicionarCarrinho={adicionarAoCarrinho}
-                fav={!!favsProdutos[p.id]} onFav={() => setFavsProdutos((f) => ({ ...f, [p.id]: !f[p.id] }))} />
-            </Reveal>
-          ))}
-          {(produtosReais ?? []).length === 0 && (
-            <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhum produto cadastrado ainda. Assim que um empresário publicar, aparece aqui.</p>
-          )}
-          {(produtosReais ?? []).length > 0 && produtosFiltrados.length === 0 && (
-            <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhum produto encontrado para "{queryProdutos}".</p>
-          )}
-        </div>
-        {produtosFiltrados.length > qtdProdutosVisiveis && (
-          <div className="flex justify-center mt-6">
-            <button onClick={() => setQtdProdutosVisiveis((n) => n + PAGINA_PRODUTOS)}
-              className="font-body text-sm font-bold px-5 py-2.5 rounded-xl border bg-white" style={{ borderColor: C.line, color: C.blue }}>
-              Carregar mais produtos
-            </button>
-          </div>
-        )}
       </section>
 
       {/* Vagas */}
@@ -13466,6 +13518,8 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil }) {
           </div>
         </div>
       )}
+
+      <BottomNavMobile ativo={bottomNavAtivo} onSelect={irBottomNav} />
     </div>
   );
 }
@@ -15482,7 +15536,7 @@ export default function ConectaComercio() {
       </div>
 
       <div key={modo} className="page-transition">
-      {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} siteConfig={siteConfig} sessao={sessao} perfil={perfil} />}
+      {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} siteConfig={siteConfig} sessao={sessao} perfil={perfil} irParaModo={setModo} />}
       {modo === "estatisticas" && <EstatisticasPublicas />}
       {modo === "turismo" && <PaginaTurismo siteConfig={siteConfig} />}
       {modo === "mural" && <PaginaMural perfil={perfil} />}
