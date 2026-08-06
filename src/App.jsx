@@ -405,6 +405,49 @@ textarea:focus-visible, [tabindex]:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .blob, .marquee-track, .pulse-dot, .ring-pulse, .grad-text, .stamp, .promo-slide, .tech-grid, .scan-line, .price-pop, .hero-in-left, .hero-in-right, .page-transition, .nav-link::after, .mobile-menu-in { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
 }
+
+/* Tabelas do admin viram cards no celular — cada <td data-label="..."> vira
+   uma linha "rótulo: valor", sem precisar de scroll horizontal. Só entra em
+   efeito abaixo de 768px; no desktop a tabela continua normal. */
+@media (max-width: 767px) {
+  .tabela-responsiva { border: none !important; }
+  .tabela-responsiva table { min-width: 0 !important; display: block; }
+  .tabela-responsiva thead { display: none; }
+  .tabela-responsiva tbody { display: block; }
+  .tabela-responsiva tr {
+    display: block;
+    border: 1px solid #E4EAF1;
+    border-radius: 16px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: #fff;
+    box-shadow: 0 2px 10px -6px rgba(10,34,58,0.12);
+  }
+  .tabela-responsiva tr:last-child { margin-bottom: 0; }
+  .tabela-responsiva td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: right;
+    padding: 7px 0 !important;
+    border-bottom: 1px solid #F2F5F8;
+  }
+  .tabela-responsiva td:last-child { border-bottom: none; }
+  .tabela-responsiva td::before {
+    content: attr(data-label);
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: #8896A6;
+    text-align: left;
+    flex-shrink: 0;
+  }
+  .tabela-responsiva td[data-label=""]::before,
+  .tabela-responsiva td:not([data-label])::before { content: none; }
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -5646,7 +5689,7 @@ function AdminPanel() {
               </div>
             </div>
 
-            <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
+            <div className="tabela-responsiva rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
               <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
@@ -5673,35 +5716,35 @@ function AdminPanel() {
                     <tr key={u.id} style={{ borderBottom: `1px solid ${C.line}`, opacity: u.bloqueado ? 0.55 : 1 }}>
                       {editandoUsuarioAdmin === u.id ? (
                         <>
-                          <td className="px-3 py-2"><input value={formUsuarioAdmin.nome} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, nome: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-28" style={{ borderColor: C.line }} /></td>
-                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.email || "—"}</td>
-                          <td className="px-3 py-2.5">
+                          <td data-label="Nome" className="px-3 py-2"><input value={formUsuarioAdmin.nome} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, nome: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-28" style={{ borderColor: C.line }} /></td>
+                          <td data-label="E-mail" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.email || "—"}</td>
+                          <td data-label="Perfil" className="px-3 py-2.5">
                             <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
                           </td>
-                          <td className="px-3 py-2"><input value={formUsuarioAdmin.telefone} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, telefone: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
-                          <td className="px-3 py-2"><input value={formUsuarioAdmin.instagram} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, instagram: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
-                          <td className="px-3 py-2"><input value={formUsuarioAdmin.cpf} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, cpf: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
-                          <td className="px-3 py-2"><input value={formUsuarioAdmin.cnpj} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, cnpj: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
-                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
-                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{formatarUltimoAcesso(u.ultimo_acesso)}</td>
-                          <td className="px-3 py-2.5">{u.bloqueado ? "Bloqueado" : "Ativo"}</td>
-                          <td className="px-3 py-2.5">
+                          <td data-label="WhatsApp" className="px-3 py-2"><input value={formUsuarioAdmin.telefone} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, telefone: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
+                          <td data-label="Instagram" className="px-3 py-2"><input value={formUsuarioAdmin.instagram} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, instagram: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
+                          <td data-label="CPF" className="px-3 py-2"><input value={formUsuarioAdmin.cpf} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, cpf: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
+                          <td data-label="CNPJ" className="px-3 py-2"><input value={formUsuarioAdmin.cnpj} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, cnpj: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
+                          <td data-label="Cadastro" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td data-label="Último acesso" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{formatarUltimoAcesso(u.ultimo_acesso)}</td>
+                          <td data-label="Status" className="px-3 py-2.5">{u.bloqueado ? "Bloqueado" : "Ativo"}</td>
+                          <td data-label="Ações" className="px-3 py-2.5">
                             <button onClick={() => salvarEdicaoUsuarioAdmin(u.id)} className="font-body text-xs font-bold" style={{ color: C.blue }}>Salvar</button>
                           </td>
                         </>
                       ) : (
                         <>
-                          <td className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{u.nome || "—"}</td>
-                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.email || "—"}</td>
-                          <td className="px-3 py-2.5">
+                          <td data-label="Nome" className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{u.nome || "—"}</td>
+                          <td data-label="E-mail" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.email || "—"}</td>
+                          <td data-label="Perfil" className="px-3 py-2.5">
                             <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
                           </td>
-                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.telefone || "—"}</td>
-                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.instagram || "—"}</td>
-                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.cpf || "—"}</td>
-                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.cnpj || "—"}</td>
-                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
-                          <td className="px-3 py-2.5">
+                          <td data-label="WhatsApp" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.telefone || "—"}</td>
+                          <td data-label="Instagram" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.instagram || "—"}</td>
+                          <td data-label="CPF" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.cpf || "—"}</td>
+                          <td data-label="CNPJ" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.cnpj || "—"}</td>
+                          <td data-label="Cadastro" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td data-label="Último acesso" className="px-3 py-2.5">
                             <span className="font-body text-xs flex items-center gap-1.5" style={{ color: estaOnline(u.ultimo_acesso) ? "#1E8E5A" : "#5C7186" }}>
                               {estaOnline(u.ultimo_acesso) && (
                                 <span className="relative flex h-1.5 w-1.5 shrink-0">
@@ -5712,12 +5755,12 @@ function AdminPanel() {
                               {estaOnline(u.ultimo_acesso) ? "Online agora" : formatarUltimoAcesso(u.ultimo_acesso)}
                             </span>
                           </td>
-                          <td className="px-3 py-2.5">
+                          <td data-label="Status" className="px-3 py-2.5">
                             <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: u.bloqueado ? "#FBEAE5" : "#E7F6EE", color: u.bloqueado ? "#B4462F" : "#1E8E5A" }}>
                               {u.bloqueado ? "Bloqueado" : "Ativo"}
                             </span>
                           </td>
-                          <td className="px-3 py-2.5">
+                          <td data-label="Ações" className="px-3 py-2.5">
                             <div className="flex items-center gap-2.5">
                               <button onClick={() => iniciarEdicaoUsuarioAdmin(u)} title="Editar" style={{ color: "#425A70" }}><Pencil size={14} /></button>
                               <button onClick={() => alternarBloqueioUsuarioAdmin(u)} title={u.bloqueado ? "Desbloquear" : "Bloquear"} style={{ color: u.bloqueado ? "#1E8E5A" : "#C6811F" }}>
@@ -5800,7 +5843,7 @@ function AdminPanel() {
               <option value="admin">Administrador</option>
             </select>
 
-            <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
+            <div className="tabela-responsiva rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
               <table className="w-full text-left border-collapse min-w-[640px]">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
@@ -5818,12 +5861,12 @@ function AdminPanel() {
                   ))}
                   {relatorioAcessosAdmin.lista.map((u) => (
                     <tr key={u.id} style={{ borderBottom: `1px solid ${C.line}` }}>
-                      <td className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{u.nome || "—"}</td>
-                      <td className="px-3 py-2.5">
+                      <td data-label="Nome" className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{u.nome || "—"}</td>
+                      <td data-label="Perfil" className="px-3 py-2.5">
                         <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
                       </td>
-                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
-                      <td className="px-3 py-2.5">
+                      <td data-label="Cadastro" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                      <td data-label="Último acesso" className="px-3 py-2.5">
                         <span className="font-body text-xs flex items-center gap-1.5" style={{ color: estaOnline(u.ultimo_acesso) ? "#1E8E5A" : "#5C7186" }}>
                           {estaOnline(u.ultimo_acesso) && (
                             <span className="relative flex h-1.5 w-1.5 shrink-0">
@@ -6112,7 +6155,7 @@ function AdminPanel() {
             <SectionHeader eyebrow="Seleção" title="Critérios de participação" sub="Quem tem MEI e quem já participou de verdade de cursos, eventos e feiras — pra ajudar a decidir quem chamar pras próximas festas" />
             <input value={buscaCriteriosAdmin} onChange={(e) => setBuscaCriteriosAdmin(e.target.value)} placeholder="Buscar empresa pelo nome..."
               className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none w-full max-w-sm mb-4" style={{ borderColor: C.line }} />
-            <div className="overflow-x-auto">
+            <div className="tabela-responsiva overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
@@ -6126,17 +6169,17 @@ function AdminPanel() {
                 <tbody>
                   {criteriosFiltrados.map((e) => (
                     <tr key={e.id} className="border-t" style={{ borderColor: C.line }}>
-                      <td className="font-body text-sm px-3 py-2.5" style={{ color: C.ink }}>{e.nome}</td>
-                      <td className="px-3 py-2.5">
+                      <td data-label="Empresa" className="font-body text-sm px-3 py-2.5" style={{ color: C.ink }}>{e.nome}</td>
+                      <td data-label="MEI" className="px-3 py-2.5">
                         {e.possui_mei ? (
                           <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>Tem MEI</span>
                         ) : (
                           <span className="font-body text-[10px] px-2 py-0.5 rounded-full" style={{ background: C.blueTint2, color: "#8896A6" }}>Sem MEI</span>
                         )}
                       </td>
-                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{e.eventosComparecidos}</td>
-                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{e.cursosConcluidos}</td>
-                      <td className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{e.feirasParticipadas}</td>
+                      <td data-label="Eventos" className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{e.eventosComparecidos}</td>
+                      <td data-label="Cursos" className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{e.cursosConcluidos}</td>
+                      <td data-label="Feiras" className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{e.feirasParticipadas}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -6150,7 +6193,7 @@ function AdminPanel() {
             {feirantesAvulsos.length > 0 && (
               <div className="mt-8">
                 <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Feirantes sem empresa vinculada</p>
-                <div className="overflow-x-auto">
+                <div className="tabela-responsiva overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>
@@ -6162,15 +6205,15 @@ function AdminPanel() {
                     <tbody>
                       {feirantesAvulsos.map((f) => (
                         <tr key={f.id} className="border-t" style={{ borderColor: C.line }}>
-                          <td className="font-body text-sm px-3 py-2.5" style={{ color: C.ink }}>{f.nome}</td>
-                          <td className="px-3 py-2.5">
+                          <td data-label="Nome" className="font-body text-sm px-3 py-2.5" style={{ color: C.ink }}>{f.nome}</td>
+                          <td data-label="MEI" className="px-3 py-2.5">
                             {f.possui_mei ? (
                               <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>Tem MEI</span>
                             ) : (
                               <span className="font-body text-[10px] px-2 py-0.5 rounded-full" style={{ background: C.blueTint2, color: "#8896A6" }}>Sem MEI</span>
                             )}
                           </td>
-                          <td className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{f.compareceu ? "Sim" : "Não"}</td>
+                          <td data-label="Compareceu na feira" className="font-body text-xs px-3 py-2.5" style={{ color: "#425A70" }}>{f.compareceu ? "Sim" : "Não"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -6965,7 +7008,7 @@ function AdminPanel() {
                   </select>
                 </div>
 
-                <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
+                <div className="tabela-responsiva rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
                   <table className="w-full text-left border-collapse min-w-[640px]">
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
@@ -6992,7 +7035,7 @@ function AdminPanel() {
                       ))}
                       {credenciaisFiltradasAdmin.map((c) => (
                         <tr key={c.id} style={{ borderBottom: `1px solid ${C.line}` }}>
-                          <td className="px-3 py-2.5">
+                          <td data-label="Foto" className="px-3 py-2.5">
                             {c.foto_url ? (
                               <img loading="lazy" decoding="async" src={c.foto_url} alt="" className="w-8 h-8 rounded-full object-cover" />
                             ) : (
@@ -7001,9 +7044,9 @@ function AdminPanel() {
                           </td>
                           {editandoCredencial === c.id ? (
                             <>
-                              <td className="px-3 py-2.5"><input value={formCredencial.nome} onChange={(e) => setFormCredencial((f) => ({ ...f, nome: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-32" style={{ borderColor: C.line }} /></td>
-                              <td className="px-3 py-2.5"><input value={formCredencial.telefone} onChange={(e) => setFormCredencial((f) => ({ ...f, telefone: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-28" style={{ borderColor: C.line }} /></td>
-                              <td className="px-3 py-2.5">
+                              <td data-label="Nome" className="px-3 py-2.5"><input value={formCredencial.nome} onChange={(e) => setFormCredencial((f) => ({ ...f, nome: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-32" style={{ borderColor: C.line }} /></td>
+                              <td data-label="Telefone" className="px-3 py-2.5"><input value={formCredencial.telefone} onChange={(e) => setFormCredencial((f) => ({ ...f, telefone: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-28" style={{ borderColor: C.line }} /></td>
+                              <td data-label="Tipo" className="px-3 py-2.5">
                                 <select value={formCredencial.tipo} onChange={(e) => setFormCredencial((f) => ({ ...f, tipo: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-32 bg-white" style={{ borderColor: C.line }}>
                                   {TIPOS_CREDENCIAL.map((t) => <option key={t} value={t}>{t}</option>)}
                                 </select>
@@ -7011,26 +7054,26 @@ function AdminPanel() {
                             </>
                           ) : (
                             <>
-                              <td className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{c.nome}</td>
-                              <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{c.telefone || "—"}</td>
-                              <td className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{c.tipo}</td>
+                              <td data-label="Nome" className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{c.nome}</td>
+                              <td data-label="Telefone" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{c.telefone || "—"}</td>
+                              <td data-label="Tipo" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{c.tipo}</td>
                             </>
                           )}
-                          <td className="px-3 py-2.5">
+                          <td data-label="Status" className="px-3 py-2.5">
                             <button onClick={() => alternarStatusCredencial(c.id, c.status)}
                               className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
                               style={{ background: c.status === "ativa" ? "#E7F6EE" : "#FBEAE5", color: c.status === "ativa" ? "#1E8E5A" : "#B4462F" }}>
                               {c.status === "ativa" ? "Ativa" : "Inativa"}
                             </button>
                           </td>
-                          <td className="px-3 py-2.5">
+                          <td data-label="Check-in" className="px-3 py-2.5">
                             <button onClick={() => alternarCheckinCredencial(c.id, c.checkin_feito)}
                               className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
                               style={{ background: c.checkin_feito ? C.blueTint : "#F3F0FA", color: c.checkin_feito ? C.blue : "#7E5BEF" }}>
                               {c.checkin_feito ? "Feito ✓" : "Fazer check-in"}
                             </button>
                           </td>
-                          <td className="px-3 py-2.5">
+                          <td data-label="Ações" className="px-3 py-2.5">
                             <div className="flex items-center gap-2.5">
                               {editandoCredencial === c.id ? (
                                 <button onClick={() => salvarEdicaoCredencial(c.id)} className="font-body text-xs font-bold" style={{ color: C.blue }}>Salvar</button>
@@ -7482,7 +7525,7 @@ function AdminPanel() {
             {licitacaoLeadsAdmin && licitacaoLeadsAdmin.length > 0 && (
               <div className="max-w-lg">
                 <p className="font-body text-xs font-bold mb-2" style={{ color: C.ink }}>Empresários que querem ser avisados ({licitacaoLeadsAdmin.length})</p>
-                <div className="rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
+                <div className="tabela-responsiva rounded-2xl border overflow-x-auto" style={{ borderColor: C.line }}>
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
@@ -7494,9 +7537,9 @@ function AdminPanel() {
                     <tbody>
                       {licitacaoLeadsAdmin.map((l) => (
                         <tr key={l.id} style={{ borderBottom: `1px solid ${C.line}` }}>
-                          <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{l.nome}</td>
-                          <td className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.whatsapp}</td>
-                          <td className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td data-label="Nome" className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{l.nome}</td>
+                          <td data-label="WhatsApp" className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.whatsapp}</td>
+                          <td data-label="Data" className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
