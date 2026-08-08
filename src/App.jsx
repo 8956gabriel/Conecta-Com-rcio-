@@ -3962,6 +3962,69 @@ function AdminPanel() {
     if (!error) { setVagasAdmin((atual) => (atual ?? []).map((v) => (v.id === id ? { ...v, ...atualizacao } : v))); setEditandoVagaAdmin(null); }
     else notificar("Não consegui salvar: " + error.message, "erro");
   };
+    const [fidelidadeAdmin, setFidelidadeAdmin] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.from("fidelidade_config").select("*, empresas(nome)").then(({ data, error }) => {
+      if (!error) setFidelidadeAdmin(data || []);
+    });
+  }, []);
+  const fidelidadeAdminVazio = { empresa_id: "", meta_carimbos: "10", recompensa: "", ativo: true };
+  const [novoFidelidadeAdmin, setNovoFidelidadeAdmin] = useState(fidelidadeAdminVazio);
+  const [criandoFidelidadeAdmin, setCriandoFidelidadeAdmin] = useState(false);
+  const [statusFidelidadeAdmin, setStatusFidelidadeAdmin] = useState("");
+  const [editandoFidelidadeAdmin, setEditandoFidelidadeAdmin] = useState(null);
+  const [formEdicaoFidelidadeAdmin, setFormEdicaoFidelidadeAdmin] = useState({ meta_carimbos: "", recompensa: "", ativo: true });
+
+  const criarFidelidadeAdmin = async (e) => {
+    e.preventDefault();
+    setStatusFidelidadeAdmin("");
+    if (!novoFidelidadeAdmin.empresa_id) { setStatusFidelidadeAdmin("Escolha a empresa."); return; }
+    setCriandoFidelidadeAdmin(true);
+    try {
+      const { data, error } = await supabase.from("fidelidade_config").upsert({
+        empresa_id: novoFidelidadeAdmin.empresa_id,
+        meta_carimbos: Number(novoFidelidadeAdmin.meta_carimbos) || 10,
+        recompensa: novoFidelidadeAdmin.recompensa || null,
+        ativo: novoFidelidadeAdmin.ativo,
+      }, { onConflict: "empresa_id" }).select("*, empresas(nome)").single();
+      if (error) throw error;
+      setFidelidadeAdmin((atual) => [data, ...(atual ?? []).filter((f) => f.empresa_id !== data.empresa_id)]);
+      setNovoFidelidadeAdmin(fidelidadeAdminVazio);
+      setStatusFidelidadeAdmin("ok");
+      notificar("Cartão fidelidade salvo.");
+    } catch (err) {
+      setStatusFidelidadeAdmin(err.message || "Erro ao salvar.");
+    } finally {
+      setCriandoFidelidadeAdmin(false);
+    }
+  };
+
+  const alternarAtivoFidelidadeAdmin = async (id, ativo) => {
+    setFidelidadeAdmin((atual) => (atual ?? []).map((f) => (f.id === id ? { ...f, ativo } : f)));
+    if (!supabaseConfigurado) return;
+    await supabase.from("fidelidade_config").update({ ativo }).eq("id", id);
+  };
+
+  const apagarFidelidadeAdmin = async (id) => {
+    if (!supabaseConfigurado) { setFidelidadeAdmin((atual) => (atual ?? []).filter((f) => f.id !== id)); return; }
+    const { error } = await supabase.from("fidelidade_config").delete().eq("id", id);
+    if (!error) setFidelidadeAdmin((atual) => atual.filter((f) => f.id !== id));
+  };
+
+  const iniciarEdicaoFidelidadeAdmin = (f) => {
+    setEditandoFidelidadeAdmin(f.id);
+    setFormEdicaoFidelidadeAdmin({ meta_carimbos: f.meta_carimbos ?? "", recompensa: f.recompensa || "", ativo: f.ativo });
+  };
+
+  const salvarEdicaoFidelidadeAdmin = async (id) => {
+    if (!supabaseConfigurado) { setEditandoFidelidadeAdmin(null); return; }
+    const atualizacao = { meta_carimbos: Number(formEdicaoFidelidadeAdmin.meta_carimbos) || 10, recompensa: formEdicaoFidelidadeAdmin.recompensa || null, ativo: formEdicaoFidelidadeAdmin.ativo };
+    const { error } = await supabase.from("fidelidade_config").update(atualizacao).eq("id", id);
+    if (!error) { setFidelidadeAdmin((atual) => (atual ?? []).map((f) => (f.id === id ? { ...f, ...atualizacao } : f))); setEditandoFidelidadeAdmin(null); }
+    else notificar("Não consegui salvar: " + error.message, "erro");
+  };
+
   const removerVaga = async (id) => {
     if (!supabaseConfigurado || String(id).startsWith("demo-")) {
       setVagasAdmin((atual) => (atual ?? []).filter((v) => v.id !== id));
@@ -5208,6 +5271,7 @@ function AdminPanel() {
     { id: "faq", label: "FAQ", icon: FileText },
     { id: "noticias", label: "Notícias", icon: Newspaper },
     { id: "vagas", label: "Vagas", icon: Briefcase },
+      { id: "fidelidade", label: "Cartão fidelidade", icon: BadgeCheck },
     { id: "banners", label: "Banners", icon: ImageIcon },
     { id: "notificacoes", label: "Notificações", icon: Bell },
     { id: "identidade", label: "Identidade do site", icon: Palette },
@@ -8525,6 +8589,56 @@ function AdminPanel() {
                 </div>
               ))}
               {(cursosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum curso cadastrado ainda.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "fidelidade" && (
+          <div>
+            <SectionHeader eyebrow="Fidelização" title="Cartão fidelidade" sub="Cadastre ou ative o cartão fidelidade de qualquer empresa" />
+            <form onSubmit={criarFidelidadeAdmin} className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
+              <select value={novoFidelidadeAdmin.empresa_id} onChange={(e) => setNovoFidelidadeAdmin((v) => ({ ...v, empresa_id: e.target.value }))} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }}>
+                <option value="">Selecione a empresa</option>
+                {listaEmpresas.map((emp) => <option key={emp.id} value={emp.id}>{emp.nome}</option>)}
+              </select>
+              <input value={novoFidelidadeAdmin.meta_carimbos} onChange={(e) => setNovoFidelidadeAdmin((v) => ({ ...v, meta_carimbos: e.target.value }))} type="number" min="1" placeholder="Carimbos para resgatar" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <input value={novoFidelidadeAdmin.recompensa} onChange={(e) => setNovoFidelidadeAdmin((v) => ({ ...v, recompensa: e.target.value }))} placeholder="Recompensa (ex: 1 produto grátis)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <label className="font-body text-sm flex items-center gap-2 sm:col-span-2">
+                <input type="checkbox" checked={novoFidelidadeAdmin.ativo} onChange={(e) => setNovoFidelidadeAdmin((v) => ({ ...v, ativo: e.target.checked }))} />
+                Ativo
+              </label>
+              {statusFidelidadeAdmin && statusFidelidadeAdmin !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusFidelidadeAdmin}</p>}
+              {statusFidelidadeAdmin === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Cartão salvo!</p>}
+              <button type="submit" disabled={criandoFidelidadeAdmin} className="font-body text-sm font-bold text-white rounded-lg py-2.5 sm:col-span-2 disabled:opacity-60" style={{ background: C.blue }}>Salvar</button>
+            </form>
+            <SectionHeader eyebrow="Moderação" title="Cartões cadastrados" sub="Ativar/desativar e editar já grava direto no banco" />
+            <div className="flex flex-col gap-3">
+              {(fidelidadeAdmin ?? []).map((f) => (
+                <div key={f.id} className="rounded-2xl border p-4 flex items-center gap-4 flex-wrap" style={{ borderColor: C.line }}>
+                  <span className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: C.blueTint, color: C.blue }}>
+                    <BadgeCheck size={17} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.empresas?.nome || "—"}</p>
+                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>{f.meta_carimbos} carimbos · {f.recompensa || "sem recompensa definida"}</p>
+                  </div>
+                  <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: f.ativo ? "#E7F6EE" : C.blueTint, color: f.ativo ? "#1E8E5A" : "#5C7186" }}>{f.ativo ? "Ativo" : "Inativo"}</span>
+                  <button onClick={() => alternarAtivoFidelidadeAdmin(f.id, !f.ativo)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>{f.ativo ? "Desativar" : "Ativar"}</button>
+                  <button onClick={() => iniciarEdicaoFidelidadeAdmin(f)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
+                  <button onClick={() => { if (confirmarExclusao("Excluir esse cartão fidelidade?")) apagarFidelidadeAdmin(f.id); }} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Excluir</button>
+                  {editandoFidelidadeAdmin === f.id && (
+                    <div className="w-full rounded-2xl border p-4 grid sm:grid-cols-2 gap-3" style={{ borderColor: C.blue }}>
+                      <input value={formEdicaoFidelidadeAdmin.meta_carimbos} onChange={(e) => setFormEdicaoFidelidadeAdmin((v) => ({ ...v, meta_carimbos: e.target.value }))} type="number" min="1" placeholder="Carimbos para resgatar" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoFidelidadeAdmin.recompensa} onChange={(e) => setFormEdicaoFidelidadeAdmin((v) => ({ ...v, recompensa: e.target.value }))} placeholder="Recompensa" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <div className="flex gap-2 sm:col-span-2">
+                        <button onClick={() => salvarEdicaoFidelidadeAdmin(f.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
+                        <button onClick={() => setEditandoFidelidadeAdmin(null)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(fidelidadeAdmin ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#7E93A7" }}>Nenhum cartão fidelidade cadastrado ainda.</p>}
             </div>
           </div>
         )}
