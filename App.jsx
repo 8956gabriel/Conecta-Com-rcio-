@@ -2820,7 +2820,7 @@ function ModalCadastroFeirante({ onFechar }) {
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                   WhatsApp
-                  <input name="whatsapp" required placeholder="(44) 90000-0000" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  <input name="whatsapp" placeholder="(44) 90000-0000" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 </label>
                 <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                   Instagram (opcional)
@@ -4029,7 +4029,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 </label>
                 <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                   WhatsApp
-                  <input name="whatsapp" required placeholder="(44) 90000-0000" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  <input name="whatsapp" placeholder="(44) 90000-0000" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 </label>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -4080,7 +4080,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 </label>
                 <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
                   WhatsApp
-                  <input name="whatsapp" required placeholder="(44) 90000-0000" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  <input name="whatsapp" placeholder="(44) 90000-0000" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                 </label>
               </div>
               <label className="font-body text-xs font-semibold" style={{ color: "#425A70" }}>
