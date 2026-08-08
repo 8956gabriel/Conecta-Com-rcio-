@@ -618,11 +618,11 @@ const faqItens = [
   },
   {
     pergunta: "Como cadastro minha empresa ou serviço?",
-    resposta: "Clique em \"Entrar / Cadastro\" no menu, escolha \"Tenho uma Empresa\" ou \"Sou Prestador de Serviço\" e preencha o formulário. Seu cadastro fica em análise até ser aprovado pelo administrador.",
+    resposta: "Clique em \"Entrar / Cadastro\" no menu, escolha \"Tenho uma Empresa\" ou \"Sou Prestador de Serviço\" e preencha o formulário. Assim que você envia, já aparece na vitrine do site — sem espera.",
   },
   {
-    pergunta: "Quanto tempo leva para meu cadastro ser aprovado?",
-    resposta: "Normalmente em até 1 dia útil. Assim que aprovado, você aparece automaticamente na vitrine do site.",
+    pergunta: "Preciso esperar aprovação para aparecer no site?",
+    resposta: "Não. Assim que você termina o cadastro, sua empresa ou serviço já aparece automaticamente na vitrine do site.",
   },
   {
     pergunta: "Posso editar minhas informações depois?",
@@ -12706,7 +12706,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
           {[
             { n: "1", titulo: "Cadastre-se grátis", desc: "Como cliente, empresário ou prestador de serviço — leva menos de 2 minutos.", icon: UserCircle2 },
             { n: "2", titulo: "Publique seu conteúdo", desc: "Empresa, produtos, vagas ou seu serviço, com fotos de verdade.", icon: Upload },
-            { n: "3", titulo: "Admin aprova rapidinho", desc: "Uma checagem simples pra manter a plataforma confiável pra todo mundo.", icon: BadgeCheck },
+            { n: "3", titulo: "Publicado na hora", desc: "Assim que voce envia, ja aparece no site pra cidade toda ver.", icon: BadgeCheck },
             { n: "4", titulo: "Apareça pra cidade toda", desc: "Clientes te encontram, favoritam e chamam direto no WhatsApp.", icon: TrendingUp },
           ].map((etapa, i) => {
             const Icon = etapa.icon;
@@ -14394,7 +14394,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 {carregando ? "Enviando..." : "Cadastrar meu serviço"}
               </button>
               <p className="font-body text-[11px] text-center" style={{ color: "#B7C6D6" }}>
-                Seu cadastro fica em análise até ser aprovado pelo administrador da plataforma.
+                Pronto! Assim que enviar, seu cadastro já aparece no site na hora.
               </p>
             </form>
           ) : (
