@@ -2537,6 +2537,30 @@ function AdminPanel() {
     if (!error) setProdutosAdmin((atual) => atual.filter((p) => p.id !== id));
   };
 
+  const iniciarEdicaoProdutoAdmin = (p) => {
+    setEditandoProdutoAdmin(p.id);
+    setFormEdicaoProdutoAdmin({ empresa_id: p.empresa_id || "", nome: p.nome || "", descricao: p.descricao || "", preco: p.preco ?? "", preco_promocional: p.preco_promocional ?? "", estoque: p.estoque ?? "", categoria: p.categoria || "" });
+  };
+
+  const salvarEdicaoProdutoAdmin = async (id) => {
+    if (!supabaseConfigurado) { setEditandoProdutoAdmin(null); return; }
+    const atualizacao = {
+      nome: formEdicaoProdutoAdmin.nome,
+      descricao: formEdicaoProdutoAdmin.descricao,
+      preco: formEdicaoProdutoAdmin.preco !== "" ? Number(formEdicaoProdutoAdmin.preco) : null,
+      preco_promocional: formEdicaoProdutoAdmin.preco_promocional !== "" ? Number(formEdicaoProdutoAdmin.preco_promocional) : null,
+      estoque: formEdicaoProdutoAdmin.estoque !== "" ? Number(formEdicaoProdutoAdmin.estoque) : null,
+      categoria: formEdicaoProdutoAdmin.categoria,
+    };
+    const { error } = await supabase.from("produtos").update(atualizacao).eq("id", id);
+    if (!error) {
+      setProdutosAdmin((atual) => (atual || listaProdutos).map((p) => (p.id === id ? { ...p, ...atualizacao } : p)));
+      setEditandoProdutoAdmin(null);
+    } else {
+      notificar("Não consegui salvar: " + error.message, "erro");
+    }
+  };
+
   // -------------------------------------------------------------------------
   // Promoções — cadastro real vinculado a um produto (nome, desconto,
   // imagem, período de validade e status). Antes essa tabela existia no
@@ -2607,6 +2631,19 @@ function AdminPanel() {
     await supabase.from("promocoes").update({ ativa }).eq("id", id);
   };
 
+  const [editandoPromocaoAdmin, setEditandoPromocaoAdmin] = useState(null);
+  const [formEdicaoPromocaoAdmin, setFormEdicaoPromocaoAdmin] = useState({ nome: "", descricao: "", desconto_percentual: "", valida_ate: "" });
+  const iniciarEdicaoPromocaoAdmin = (p) => {
+    setEditandoPromocaoAdmin(p.id);
+    setFormEdicaoPromocaoAdmin({ nome: p.nome || "", descricao: p.descricao || "", desconto_percentual: p.desconto_percentual ?? "", valida_ate: p.valida_ate || "" });
+  };
+  const salvarEdicaoPromocaoAdmin = async (id) => {
+    if (!supabaseConfigurado) { setEditandoPromocaoAdmin(null); return; }
+    const atualizacao = { nome: formEdicaoPromocaoAdmin.nome, descricao: formEdicaoPromocaoAdmin.descricao, desconto_percentual: formEdicaoPromocaoAdmin.desconto_percentual !== "" ? Number(formEdicaoPromocaoAdmin.desconto_percentual) : null, valida_ate: formEdicaoPromocaoAdmin.valida_ate || null };
+    const { error } = await supabase.from("promocoes").update(atualizacao).eq("id", id);
+    if (!error) { setPromocoesAdmin((atual) => (atual ?? []).map((p) => (p.id === id ? { ...p, ...atualizacao } : p))); setEditandoPromocaoAdmin(null); }
+    else notificar("Não consegui salvar: " + error.message, "erro");
+  };
   const removerPromocao = async (id) => {
     if (!supabaseConfigurado || String(id).startsWith("demo-")) {
       setPromocoesAdmin((atual) => (atual ?? []).filter((p) => p.id !== id));
@@ -3912,6 +3949,19 @@ function AdminPanel() {
     }
   };
 
+  const [editandoVagaAdmin, setEditandoVagaAdmin] = useState(null);
+  const [formEdicaoVagaAdmin, setFormEdicaoVagaAdmin] = useState({ cargo: "", salario: "", requisitos: "", cidade: "", tipo: "", beneficios: "", prazo: "" });
+  const iniciarEdicaoVagaAdmin = (v) => {
+    setEditandoVagaAdmin(v.id);
+    setFormEdicaoVagaAdmin({ cargo: v.cargo || "", salario: v.salario || "", requisitos: v.requisitos || "", cidade: v.cidade || "", tipo: v.tipo || "", beneficios: v.beneficios || "", prazo: v.prazo || "" });
+  };
+  const salvarEdicaoVagaAdmin = async (id) => {
+    if (!supabaseConfigurado) { setEditandoVagaAdmin(null); return; }
+    const atualizacao = { ...formEdicaoVagaAdmin };
+    const { error } = await supabase.from("vagas").update(atualizacao).eq("id", id);
+    if (!error) { setVagasAdmin((atual) => (atual ?? []).map((v) => (v.id === id ? { ...v, ...atualizacao } : v))); setEditandoVagaAdmin(null); }
+    else notificar("Não consegui salvar: " + error.message, "erro");
+  };
   const removerVaga = async (id) => {
     if (!supabaseConfigurado || String(id).startsWith("demo-")) {
       setVagasAdmin((atual) => (atual ?? []).filter((v) => v.id !== id));
@@ -4013,6 +4063,8 @@ function AdminPanel() {
   const [fotoProdutoAdmin, setFotoProdutoAdmin] = useState(null);
   const [cadastrandoProdutoAdmin, setCadastrandoProdutoAdmin] = useState(false);
   const [statusProdutoAdmin, setStatusProdutoAdmin] = useState("");
+  const [editandoProdutoAdmin, setEditandoProdutoAdmin] = useState(null);
+  const [formEdicaoProdutoAdmin, setFormEdicaoProdutoAdmin] = useState(produtoAdminVazio);
 
   // IA no cadastro de produto do admin — gera descrição e foto ilustrativa
   // só com base no nome do produto (FASE 26). Reaproveita os mesmos
@@ -4175,6 +4227,19 @@ function AdminPanel() {
     if (!error) { setCuponsAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ativo } : c))); notificar(ativo ? "Cupom ativado." : "Cupom desativado."); }
   };
 
+  const [editandoCupomAdmin, setEditandoCupomAdmin] = useState(null);
+  const [formEdicaoCupomAdmin, setFormEdicaoCupomAdmin] = useState({ titulo: "", descricao: "", desconto_percentual: "", validade: "" });
+  const iniciarEdicaoCupomAdmin = (c) => {
+    setEditandoCupomAdmin(c.id);
+    setFormEdicaoCupomAdmin({ titulo: c.titulo || "", descricao: c.descricao || "", desconto_percentual: c.desconto_percentual ?? "", validade: c.validade || "" });
+  };
+  const salvarEdicaoCupomAdmin = async (id) => {
+    if (!supabaseConfigurado) { setEditandoCupomAdmin(null); return; }
+    const atualizacao = { titulo: formEdicaoCupomAdmin.titulo, descricao: formEdicaoCupomAdmin.descricao, desconto_percentual: formEdicaoCupomAdmin.desconto_percentual !== "" ? Number(formEdicaoCupomAdmin.desconto_percentual) : null, validade: formEdicaoCupomAdmin.validade || null };
+    const { error } = await supabase.from("cupons").update(atualizacao).eq("id", id);
+    if (!error) { setCuponsAdmin((atual) => (atual ?? []).map((c) => (c.id === id ? { ...c, ...atualizacao } : c))); setEditandoCupomAdmin(null); }
+    else notificar("Não consegui salvar: " + error.message, "erro");
+  };
   const apagarCupomAdmin = async (id) => {
     const { error } = await supabase.from("cupons").delete().eq("id", id);
     if (!error) { setCuponsAdmin((atual) => atual.filter((c) => c.id !== id)); notificar("Cupom excluído."); }
@@ -4225,6 +4290,19 @@ function AdminPanel() {
     if (!error) { setCombosAdmin((atual) => atual.map((c) => (c.id === id ? { ...c, ativo } : c))); notificar(ativo ? "Combo ativado." : "Combo desativado."); }
   };
 
+  const [editandoComboAdmin, setEditandoComboAdmin] = useState(null);
+  const [formEdicaoComboAdmin, setFormEdicaoComboAdmin] = useState({ titulo: "", descricao: "", preco: "" });
+  const iniciarEdicaoComboAdmin = (c) => {
+    setEditandoComboAdmin(c.id);
+    setFormEdicaoComboAdmin({ titulo: c.titulo || "", descricao: c.descricao || "", preco: c.preco ?? "" });
+  };
+  const salvarEdicaoComboAdmin = async (id) => {
+    if (!supabaseConfigurado) { setEditandoComboAdmin(null); return; }
+    const atualizacao = { titulo: formEdicaoComboAdmin.titulo, descricao: formEdicaoComboAdmin.descricao, preco: formEdicaoComboAdmin.preco !== "" ? Number(formEdicaoComboAdmin.preco) : null };
+    const { error } = await supabase.from("combos").update(atualizacao).eq("id", id);
+    if (!error) { setCombosAdmin((atual) => (atual ?? []).map((c) => (c.id === id ? { ...c, ...atualizacao } : c))); setEditandoComboAdmin(null); }
+    else notificar("Não consegui salvar: " + error.message, "erro");
+  };
   const apagarComboAdmin = async (id) => {
     const { error } = await supabase.from("combos").delete().eq("id", id);
     if (!error) { setCombosAdmin((atual) => atual.filter((c) => c.id !== id)); notificar("Combo excluído."); }
@@ -6390,7 +6468,21 @@ function AdminPanel() {
                     <div>
                       <p className="font-body text-[11px] font-semibold" style={{ color: "#1E8E5A" }}>Foto ilustrativa gerada!</p>
                       <button type="button" onClick={() => setImagemIAProdutoAdmin(null)} className="font-body text-[11px] font-bold" style={{ color: "#B4462F" }}>Remover</button>
+                    {editandoProdutoAdmin === p.id && (
+                    <div className="w-full rounded-2xl border p-4 grid sm:grid-cols-2 gap-3" style={{ borderColor: C.blue }}>
+                      <input value={formEdicaoProdutoAdmin.nome} onChange={(e) => setFormEdicaoProdutoAdmin((f) => ({ ...f, nome: e.target.value }))} placeholder="Nome" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoProdutoAdmin.categoria} onChange={(e) => setFormEdicaoProdutoAdmin((f) => ({ ...f, categoria: e.target.value }))} placeholder="Categoria" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoProdutoAdmin.preco} onChange={(e) => setFormEdicaoProdutoAdmin((f) => ({ ...f, preco: e.target.value }))} placeholder="Preço" type="number" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoProdutoAdmin.preco_promocional} onChange={(e) => setFormEdicaoProdutoAdmin((f) => ({ ...f, preco_promocional: e.target.value }))} placeholder="Preço promocional" type="number" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoProdutoAdmin.estoque} onChange={(e) => setFormEdicaoProdutoAdmin((f) => ({ ...f, estoque: e.target.value }))} placeholder="Estoque" type="number" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <textarea value={formEdicaoProdutoAdmin.descricao} onChange={(e) => setFormEdicaoProdutoAdmin((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descrição" className="font-body text-sm border rounded-lg px-3 py-2 sm:col-span-2" style={{ borderColor: C.line }} />
+                      <div className="flex gap-2 sm:col-span-2">
+                        <button onClick={() => salvarEdicaoProdutoAdmin(p.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
+                        <button onClick={() => setEditandoProdutoAdmin(null)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Cancelar</button>
+                      </div>
                     </div>
+                  )}
+                                      </div>
                   </div>
                 )}
                 <p className="font-body text-[10px]" style={{ color: "#5C7186" }}>Se você anexar uma foto de verdade abaixo, ela tem prioridade sobre a foto gerada por IA.</p>
@@ -6430,6 +6522,7 @@ function AdminPanel() {
                   <button onClick={() => alternarAtivoProduto(p.id, !p.ativo)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
                     {p.ativo ? "Despublicar" : "Publicar"}
                   </button>
+                  <button onClick={() => iniciarEdicaoProdutoAdmin(p)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
                   <button onClick={() => { if (confirmarExclusao()) { removerProduto(p.id); notificar("Produto removido."); } }} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
                 </div>
               ))}
@@ -6492,7 +6585,20 @@ function AdminPanel() {
                   <button onClick={() => alternarAtivaPromocao(p.id, !p.ativa)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
                     {p.ativa ? "Desativar" : "Ativar"}
                   </button>
+                  <button onClick={() => iniciarEdicaoPromocaoAdmin(p)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
                   <button onClick={() => { if (confirmarExclusao()) { removerPromocao(p.id); notificar("Promoção removida."); } }} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
+                  {editandoPromocaoAdmin === p.id && (
+                    <div className="w-full rounded-2xl border p-4 grid sm:grid-cols-2 gap-3" style={{ borderColor: C.blue }}>
+                      <input value={formEdicaoPromocaoAdmin.nome} onChange={(e) => setFormEdicaoPromocaoAdmin((f) => ({ ...f, nome: e.target.value }))} placeholder="Nome" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoPromocaoAdmin.desconto_percentual} onChange={(e) => setFormEdicaoPromocaoAdmin((f) => ({ ...f, desconto_percentual: e.target.value }))} placeholder="Desconto %" type="number" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoPromocaoAdmin.valida_ate} onChange={(e) => setFormEdicaoPromocaoAdmin((f) => ({ ...f, valida_ate: e.target.value }))} placeholder="" type="date" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <textarea value={formEdicaoPromocaoAdmin.descricao} onChange={(e) => setFormEdicaoPromocaoAdmin((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descrição" className="font-body text-sm border rounded-lg px-3 py-2 sm:col-span-2" style={{ borderColor: C.line }} />
+                      <div className="flex gap-2 sm:col-span-2">
+                        <button onClick={() => salvarEdicaoPromocaoAdmin(p.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
+                        <button onClick={() => setEditandoPromocaoAdmin(null)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {promocoesAdmin && promocoesAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma promoção cadastrada ainda.</p>}
@@ -8010,7 +8116,20 @@ function AdminPanel() {
                   </p>
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => alternarAtivoCupomAdmin(c.id, !c.ativo)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>{c.ativo ? "Desativar" : "Ativar"}</button>
+                    <button onClick={() => iniciarEdicaoCupomAdmin(c)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
                     <button onClick={() => { if (confirmarExclusao("Excluir esse cupom?")) apagarCupomAdmin(c.id); }} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ color: "#B4462F" }}>Excluir</button>
+                  {editandoCupomAdmin === c.id && (
+                    <div className="w-full rounded-2xl border p-4 grid sm:grid-cols-2 gap-3" style={{ borderColor: C.blue }}>
+                      <input value={formEdicaoCupomAdmin.titulo} onChange={(e) => setFormEdicaoCupomAdmin((f) => ({ ...f, titulo: e.target.value }))} placeholder="Título" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoCupomAdmin.desconto_percentual} onChange={(e) => setFormEdicaoCupomAdmin((f) => ({ ...f, desconto_percentual: e.target.value }))} placeholder="Desconto %" type="number" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoCupomAdmin.validade} onChange={(e) => setFormEdicaoCupomAdmin((f) => ({ ...f, validade: e.target.value }))} type="date" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <textarea value={formEdicaoCupomAdmin.descricao} onChange={(e) => setFormEdicaoCupomAdmin((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descrição" className="font-body text-sm border rounded-lg px-3 py-2 sm:col-span-2" style={{ borderColor: C.line }} />
+                      <div className="flex gap-2 sm:col-span-2">
+                        <button onClick={() => salvarEdicaoCupomAdmin(c.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
+                        <button onClick={() => setEditandoCupomAdmin(null)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
                   </div>
                 </div>
               ))}
@@ -8049,7 +8168,19 @@ function AdminPanel() {
                   {c.preco && <p className="font-body text-xs mt-1 font-bold" style={{ color: C.blue }}>R$ {Number(c.preco).toFixed(2).replace(".", ",")}</p>}
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => alternarAtivoComboAdmin(c.id, !c.ativo)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>{c.ativo ? "Desativar" : "Ativar"}</button>
+                    <button onClick={() => iniciarEdicaoComboAdmin(c)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
                     <button onClick={() => { if (confirmarExclusao("Excluir esse combo?")) apagarComboAdmin(c.id); }} className="font-body text-xs font-bold rounded-lg px-3 py-1.5" style={{ color: "#B4462F" }}>Excluir</button>
+                  {editandoComboAdmin === c.id && (
+                    <div className="w-full rounded-2xl border p-4 grid sm:grid-cols-2 gap-3" style={{ borderColor: C.blue }}>
+                      <input value={formEdicaoComboAdmin.titulo} onChange={(e) => setFormEdicaoComboAdmin((f) => ({ ...f, titulo: e.target.value }))} placeholder="Título" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoComboAdmin.preco} onChange={(e) => setFormEdicaoComboAdmin((f) => ({ ...f, preco: e.target.value }))} placeholder="Preço" type="number" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <textarea value={formEdicaoComboAdmin.descricao} onChange={(e) => setFormEdicaoComboAdmin((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descrição" className="font-body text-sm border rounded-lg px-3 py-2 sm:col-span-2" style={{ borderColor: C.line }} />
+                      <div className="flex gap-2 sm:col-span-2">
+                        <button onClick={() => salvarEdicaoComboAdmin(c.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
+                        <button onClick={() => setEditandoComboAdmin(null)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
                   </div>
                 </div>
               ))}
@@ -8437,7 +8568,23 @@ function AdminPanel() {
                       {v.empresas?.nome} · {v.salario}{v.tipo ? ` · ${v.tipo}` : ""}{v.prazo ? ` · até ${v.prazo}` : ""}
                     </p>
                   </div>
+                  <button onClick={() => iniciarEdicaoVagaAdmin(v)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
                   <button onClick={() => { if (confirmarExclusao()) { removerVaga(v.id); notificar("Vaga removida."); } }} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
+                  {editandoVagaAdmin === v.id && (
+                    <div className="w-full rounded-2xl border p-4 grid sm:grid-cols-2 gap-3" style={{ borderColor: C.blue }}>
+                      <input value={formEdicaoVagaAdmin.cargo} onChange={(e) => setFormEdicaoVagaAdmin((f) => ({ ...f, cargo: e.target.value }))} placeholder="Cargo" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoVagaAdmin.salario} onChange={(e) => setFormEdicaoVagaAdmin((f) => ({ ...f, salario: e.target.value }))} placeholder="Salário" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoVagaAdmin.cidade} onChange={(e) => setFormEdicaoVagaAdmin((f) => ({ ...f, cidade: e.target.value }))} placeholder="Cidade" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoVagaAdmin.tipo} onChange={(e) => setFormEdicaoVagaAdmin((f) => ({ ...f, tipo: e.target.value }))} placeholder="Tipo (CLT, PJ...)" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoVagaAdmin.beneficios} onChange={(e) => setFormEdicaoVagaAdmin((f) => ({ ...f, beneficios: e.target.value }))} placeholder="Benefícios" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <input value={formEdicaoVagaAdmin.prazo} onChange={(e) => setFormEdicaoVagaAdmin((f) => ({ ...f, prazo: e.target.value }))} placeholder="Prazo" type="date" className="font-body text-sm border rounded-lg px-3 py-2" style={{ borderColor: C.line }} />
+                      <textarea value={formEdicaoVagaAdmin.requisitos} onChange={(e) => setFormEdicaoVagaAdmin((f) => ({ ...f, requisitos: e.target.value }))} placeholder="Requisitos" className="font-body text-sm border rounded-lg px-3 py-2 sm:col-span-2" style={{ borderColor: C.line }} />
+                      <div className="flex gap-2 sm:col-span-2">
+                        <button onClick={() => salvarEdicaoVagaAdmin(v.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: C.blue }}>Salvar</button>
+                        <button onClick={() => setEditandoVagaAdmin(null)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
