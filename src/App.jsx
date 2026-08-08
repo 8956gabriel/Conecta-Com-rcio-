@@ -9541,6 +9541,8 @@ function EmpresarioPanel({ siteConfig }) {
       if (!error) {
         const { data: pub } = supabase.storage.from("logos").getPublicUrl(caminho);
         setPerfilForm((f) => ({ ...f, logo_url: pub.publicUrl }));
+      } else {
+        setStatusPerfil(error.message || "Não foi possível enviar o logo. Verifique sua conexão e tente novamente.");
       }
     });
   };
@@ -9556,6 +9558,8 @@ function EmpresarioPanel({ siteConfig }) {
       if (!error) {
         const { data: pub } = supabase.storage.from("fotos-empresas").getPublicUrl(caminho);
         setPerfilForm((f) => ({ ...f, banner_url: pub.publicUrl }));
+      } else {
+        setStatusPerfil(error.message || "Não foi possível enviar o banner. Verifique sua conexão e tente novamente.");
       }
     });
   };
@@ -9577,6 +9581,8 @@ function EmpresarioPanel({ siteConfig }) {
       if (!error) {
         const { data: pub } = supabase.storage.from("fotos-empresas").getPublicUrl(caminho);
         setPerfilForm((f) => ({ ...f, fotos_urls: [...f.fotos_urls, pub.publicUrl] }));
+      } else {
+        setStatusPerfil(error.message || "Não foi possível enviar a foto. Verifique sua conexão e tente novamente.");
       }
     });
   };
