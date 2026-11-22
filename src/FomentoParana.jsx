@@ -262,8 +262,8 @@ function CardRankingIvatuba({ registro, anterior, compacto = false }) {
   if (!registro) return null;
   const variacao = anterior?.posicao_geral && registro.posicao_geral ? anterior.posicao_geral - registro.posicao_geral : null;
   const itens = [
-    registro.posicao_geral ? [`${registro.posicao_geral}º`, "no Paraná (geral)"] : null,
-    registro.posicao_faixa ? [`${registro.posicao_faixa}º`, registro.faixa ? `na faixa ${registro.faixa}` : "na faixa"] : null,
+    registro.posicao_geral ? [`${registro.posicao_geral}º`, registro.total_geral ? `de ${registro.total_geral} agentes no Paraná` : "no Paraná (geral)"] : null,
+    registro.posicao_faixa ? [`${registro.posicao_faixa}º`, `${registro.total_faixa ? `de ${registro.total_faixa} agentes` : ""}${registro.faixa ? ` · faixa ${registro.faixa}` : " na faixa"}`.trim()] : null,
     registro.pontuacao != null ? [Number(registro.pontuacao).toLocaleString("pt-BR"), "pontos"] : null,
   ].filter(Boolean);
   return (
@@ -1291,7 +1291,8 @@ function AbaInteresses(ctx) {
 
 // ---------------------------------------------------------------- Ranking
 function RankingOficialIvatuba({ rankingOficial, setRankingOficial, avisar }) {
-  const vazio = { data_referencia: hojeLocal(), posicao_geral: "", pontuacao: "", faixa: "Até 5 mil hab", posicao_faixa: "", observacao: "", publicar: true };
+  const ultimo = (rankingOficial || [])[0];
+  const vazio = { data_referencia: hojeLocal(), posicao_geral: "", total_geral: String(ultimo?.total_geral ?? 722), pontuacao: "", faixa: ultimo?.faixa || "Até 5 mil hab", posicao_faixa: "", total_faixa: String(ultimo?.total_faixa ?? 54), observacao: "", publicar: true };
   const [f, setF] = useState(vazio);
   const [salvando, setSalvando] = useState(false);
   const lista = rankingOficial || [];
@@ -1301,7 +1302,8 @@ function RankingOficialIvatuba({ rankingOficial, setRankingOficial, avisar }) {
     e.preventDefault();
     const dados = {
       data_referencia: f.data_referencia, posicao_geral: f.posicao_geral ? Number(f.posicao_geral) : null, pontuacao: parseValor(f.pontuacao),
-      faixa: f.faixa || null, posicao_faixa: f.posicao_faixa ? Number(f.posicao_faixa) : null, observacao: f.observacao.trim() || null, publicar: f.publicar,
+      faixa: f.faixa || null, posicao_faixa: f.posicao_faixa ? Number(f.posicao_faixa) : null,
+      total_geral: f.total_geral ? Number(f.total_geral) : null, total_faixa: f.total_faixa ? Number(f.total_faixa) : null, observacao: f.observacao.trim() || null, publicar: f.publicar,
     };
     if (!dados.posicao_geral && !dados.posicao_faixa && dados.pontuacao == null) { avisar("Informe ao menos a posição ou a pontuação.", "erro"); return; }
     setSalvando(true);
@@ -1334,10 +1336,12 @@ function RankingOficialIvatuba({ rankingOficial, setRankingOficial, avisar }) {
       <div className="grid lg:grid-cols-2 gap-4">
         <form onSubmit={salvar} className="rounded-2xl border p-4 grid grid-cols-2 gap-3 h-fit" style={{ borderColor: F.line }}>
           <Campo label="Data da consulta"><input type="date" value={f.data_referencia} onChange={set("data_referencia")} className={inputCls} style={inputSty} /></Campo>
+          <Campo label="Pontuação"><input value={f.pontuacao} onChange={set("pontuacao")} inputMode="decimal" placeholder="Ex.: 3500" className={inputCls} style={inputSty} /></Campo>
           <Campo label="Posição geral (PR)"><input value={f.posicao_geral} onChange={set("posicao_geral")} inputMode="numeric" placeholder="Ex.: 12" className={inputCls} style={inputSty} /></Campo>
+          <Campo label="Total de agentes (geral)"><input value={f.total_geral} onChange={set("total_geral")} inputMode="numeric" className={inputCls} style={inputSty} /></Campo>
           <Campo label="Faixa"><select value={f.faixa} onChange={set("faixa")} className={inputCls} style={inputSty}>{FAIXAS_RANKING.map((x) => <option key={x}>{x}</option>)}</select></Campo>
           <Campo label="Posição na faixa"><input value={f.posicao_faixa} onChange={set("posicao_faixa")} inputMode="numeric" placeholder="Ex.: 2" className={inputCls} style={inputSty} /></Campo>
-          <Campo label="Pontuação" className="col-span-2"><input value={f.pontuacao} onChange={set("pontuacao")} inputMode="decimal" placeholder="Ex.: 3500" className={inputCls} style={inputSty} /></Campo>
+          <Campo label="Total de agentes na faixa" className="col-span-2"><input value={f.total_faixa} onChange={set("total_faixa")} inputMode="numeric" className={inputCls} style={inputSty} /></Campo>
           <Campo label="Observação (opcional)" className="col-span-2"><input value={f.observacao} onChange={set("observacao")} placeholder="Ex.: Pódio da faixa no mês de novembro" className={inputCls} style={inputSty} /></Campo>
           <label className="col-span-2 font-body text-sm flex items-center gap-2" style={{ color: F.ink }}><input type="checkbox" checked={f.publicar} onChange={set("publicar")} className="accent-green-600" /> Mostrar na página pública do Fomento</label>
           <div className="col-span-2 flex gap-2 flex-wrap">
@@ -1353,7 +1357,7 @@ function RankingOficialIvatuba({ rankingOficial, setRankingOficial, avisar }) {
               {lista.map((r) => (
                 <div key={r.id} className="flex items-center gap-2 px-3 py-2 font-body text-xs" style={{ borderColor: F.line, color: F.ink }}>
                   <span className="w-20 shrink-0" style={{ color: F.muted }}>{dataBR(r.data_referencia)}</span>
-                  <span className="flex-1">{r.posicao_geral ? `${r.posicao_geral}º geral` : ""}{r.posicao_faixa ? ` · ${r.posicao_faixa}º na faixa` : ""}{r.pontuacao != null ? ` · ${Number(r.pontuacao).toLocaleString("pt-BR")} pts` : ""}</span>
+                  <span className="flex-1">{r.posicao_geral ? `${r.posicao_geral}º/${r.total_geral || "?"} geral` : ""}{r.posicao_faixa ? ` · ${r.posicao_faixa}º/${r.total_faixa || "?"} na faixa` : ""}{r.pontuacao != null ? ` · ${Number(r.pontuacao).toLocaleString("pt-BR")} pts` : ""}</span>
                   <button onClick={() => alternarPublicar(r)} className="font-bold" style={{ color: r.publicar ? F.green : F.soft }}>{r.publicar ? "No site" : "Oculto"}</button>
                   <button onClick={() => apagar(r)} title="Excluir"><Trash2 size={12} color={F.danger} /></button>
                 </div>
