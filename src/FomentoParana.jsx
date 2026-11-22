@@ -104,6 +104,15 @@ export const moeda = (v) => (v == null || v === "" || isNaN(Number(v)) ? "—" :
 const dataBR = (d) => (d ? new Date(d.length === 10 ? `${d}T12:00:00` : d).toLocaleDateString("pt-BR") : "—");
 const dataHoraBR = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 const hojeLocal = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+// Ciclo anual da Fomento: novembro a outubro. O 1º ciclo reúne tudo até
+// 31/10/2026 ("2025 – out/2026"); depois nov/2026 – out/2027, e assim por diante.
+// O ciclo é identificado pelo ano em que termina (2026, 2027, ...).
+export function cicloFim(data) {
+  const d = data ? new Date(String(data).length === 10 ? `${data}T12:00:00` : data) : new Date();
+  if (isNaN(d)) return 2026;
+  return Math.max(2026, d.getFullYear() + (d.getMonth() >= 10 ? 1 : 0));
+}
+export const rotuloCiclo = (fim) => (Number(fim) <= 2026 ? "2025 – out/2026" : `nov/${fim - 1} – out/${fim}`);
 const soDigitos = (s) => String(s || "").replace(/\D/g, "");
 function parseValor(texto) {
   if (texto == null || texto === "") return null;
@@ -302,8 +311,14 @@ function CardRankingIvatuba({ registro, anterior, compacto = false }) {
 // Painel de crédito público — só totais (nenhum dado pessoal), via função
 // fomento_resumo_publico() do banco.
 // ---------------------------------------------------------------------------
-function PainelCreditoPublico({ resumo }) {
-  if (!resumo) return null;
+function PainelCreditoPublico({ ciclos }) {
+  const lista = Array.isArray(ciclos) ? ciclos : [];
+  const atual = cicloFim();
+  const [ciclo, setCiclo] = useState(() => (lista.some((c) => c.ciclo === atual) ? atual : lista[0]?.ciclo ?? atual));
+  if (!lista.length) return null;
+  const vazio = { ciclo, total_propostas: 0, concedidos: 0, recusados: 0, valor_solicitado: 0, valor_concedido: 0, taxa_aprovacao: 0 };
+  const resumo = lista.find((c) => c.ciclo === ciclo) || vazio;
+  const opcoes = [...new Set([atual, ...lista.map((c) => c.ciclo)])].sort((a, b) => b - a);
   const itens = [
     ["Propostas", Number(resumo.total_propostas).toLocaleString("pt-BR"), ClipboardList, F.blue],
     ["Concedidas", Number(resumo.concedidos).toLocaleString("pt-BR"), CheckCircle2, F.green],
@@ -314,7 +329,15 @@ function PainelCreditoPublico({ resumo }) {
   ];
   return (
     <div>
-      <Titulo eyebrow="Painel de crédito · Ivatuba" title="Crédito que já chegou aos empreendedores" sub="Números do atendimento do Agente de Crédito da Fomento Paraná em Ivatuba." />
+      <Titulo eyebrow="Painel de crédito · Ivatuba" title="Crédito que já chegou aos empreendedores" sub={`Números do atendimento do Agente de Crédito da Fomento Paraná em Ivatuba · ciclo ${rotuloCiclo(ciclo)}.`} />
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {opcoes.map((c) => (
+          <button key={c} onClick={() => setCiclo(c)} className="font-body text-xs font-bold px-3 py-1.5 rounded-full border"
+            style={{ borderColor: ciclo === c ? F.green : F.line, background: ciclo === c ? F.greenTint : "#fff", color: ciclo === c ? F.green : "#425A70" }}>
+            {rotuloCiclo(c)}{c === atual ? " · atual" : ""}
+          </button>
+        ))}
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         {itens.map(([rotulo, valor, Icon, cor]) => (
           <div key={rotulo} className="rounded-2xl border p-4 bg-white" style={{ borderColor: F.line }}>
@@ -325,7 +348,7 @@ function PainelCreditoPublico({ resumo }) {
         ))}
       </div>
       <p className="font-body text-[10px] mt-2" style={{ color: F.soft }}>
-        Taxa de aprovação = concedidas ÷ (concedidas + recusadas). Propostas excluídas não entram na conta.{resumo.atualizado_em ? ` Atualizado em ${dataBR(resumo.atualizado_em)}.` : ""}
+        Ciclo anual de novembro a outubro, pela data de cadastro da proposta. Taxa de aprovação = concedidas ÷ (concedidas + recusadas). Propostas excluídas não entram na conta.{resumo.atualizado_em ? ` Atualizado em ${dataBR(resumo.atualizado_em)}.` : ""}
       </p>
     </div>
   );
@@ -569,7 +592,7 @@ export function FomentoPublico({ siteConfig }) {
   const [resumoPublico, setResumoPublico] = useState(null);
   useEffect(() => {
     if (!supabaseConfigurado) return;
-    supabase.rpc("fomento_resumo_publico").then(({ data, error }) => { if (!error && data) setResumoPublico(data); });
+    supabase.rpc("fomento_resumo_publico").then(({ data, error }) => { if (!error && Array.isArray(data)) setResumoPublico(data); });
   }, []);
   const [aberta, setAberta] = useState(null);
   const [linhaSimulador, setLinhaSimulador] = useState(null);
@@ -651,9 +674,9 @@ export function FomentoPublico({ siteConfig }) {
       )}
 
       {/* PAINEL DE CRÉDITO PÚBLICO */}
-      {resumoPublico && Number(resumoPublico.total_propostas) > 0 && (
+      {resumoPublico && resumoPublico.length > 0 && (
         <section className="max-w-6xl mx-auto px-4 md:px-6 mt-10">
-          <PainelCreditoPublico resumo={resumoPublico} />
+          <PainelCreditoPublico ciclos={resumoPublico} />
         </section>
       )}
 
@@ -913,7 +936,10 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
 
 // ---------------------------------------------------------------- Painel
 function AbaPainel({ propostas, interesses, lembretes, linhas, nomeLinha, setAba }) {
-  const lista = propostas || [];
+  const atual = cicloFim();
+  const [ciclo, setCiclo] = useState(String(atual));
+  const ciclosDisponiveis = [...new Set([atual, ...(propostas || []).map((p) => cicloFim(p.data_proposta || p.criado_em))])].sort((a, b) => b - a);
+  const lista = (propostas || []).filter((p) => ciclo === "todos" || cicloFim(p.data_proposta || p.criado_em) === Number(ciclo));
   const somar = (arr, campo) => arr.reduce((s, p) => s + (Number(p[campo]) || 0), 0);
   const concedidos = lista.filter((p) => p.status === "concedido");
   const porStatus = Object.entries(STATUS_PROPOSTA).map(([k, s]) => ({ nome: s.curto, qtd: lista.filter((p) => p.status === k).length, cor: s.cor }));
@@ -924,6 +950,15 @@ function AbaPainel({ propostas, interesses, lembretes, linhas, nomeLinha, setAba
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-body text-xs font-bold" style={{ color: F.muted }}>Ciclo (nov–out):</span>
+        {[...ciclosDisponiveis.map(String), "todos"].map((c) => (
+          <button key={c} onClick={() => setCiclo(c)} className="font-body text-xs font-bold px-3 py-1.5 rounded-full border"
+            style={{ borderColor: ciclo === c ? F.blue : F.line, background: ciclo === c ? F.blueTint : "#fff", color: ciclo === c ? F.blue : "#425A70" }}>
+            {c === "todos" ? "Todos" : `${rotuloCiclo(Number(c))}${Number(c) === atual ? " · atual" : ""}`}
+          </button>
+        ))}
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KPI titulo="Propostas" valor={propostas ? lista.filter((p) => p.status !== "excluido").length : "…"} sub="sem contar excluídas" icon={ClipboardList} />
         <KPI titulo="Valor solicitado" valor={moeda(somar(lista.filter((p) => p.status !== "excluido"), "valor_solicitado"))} icon={HandCoins} cor="#7E5BEF" />
