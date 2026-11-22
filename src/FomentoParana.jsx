@@ -59,7 +59,12 @@ const TIPOS_MATERIAL = {
   taxas: "Taxas e condições",
   documentacao: "Documentação necessária",
   informativo: "Informativo da modalidade",
+  modelo: "Modelo de declaração / formulário",
+  manual: "Manual / passo a passo",
+  planilha: "Planilha",
 };
+const ACEITA_MATERIAIS = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*";
+const extensaoArquivo = (url) => (String(url || "").split("?")[0].split(".").pop() || "").toUpperCase().slice(0, 4);
 
 const TIPOS_CONTATO = {
   atendimento: "Solicitar atendimento",
@@ -736,15 +741,15 @@ export function FomentoPublico({ siteConfig }) {
           </div>
         </div>
         <div>
-          <Titulo eyebrow="Informativos em PDF" title="Materiais para baixar" />
+          <Titulo eyebrow="Informativos e modelos" title="Materiais para baixar" />
           {pdfsGerais.length ? (
             <div className="flex flex-col gap-2">
               {pdfsGerais.map((m) => (
                 <a key={m.id} href={m.arquivo_url} target="_blank" rel="noopener noreferrer" className="rounded-2xl border p-3.5 flex items-center gap-3 hover:shadow-md transition-shadow" style={{ borderColor: F.line }}>
-                  <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#FBEAE5", color: F.danger }}><FileText size={18} /></span>
+                  <span className="w-10 h-10 rounded-xl flex flex-col items-center justify-center shrink-0" style={{ background: "#FBEAE5", color: F.danger }}><FileText size={16} /><span className="text-[8px] font-bold leading-none mt-0.5">{extensaoArquivo(m.arquivo_url)}</span></span>
                   <div className="min-w-0 flex-1">
                     <p className="font-display font-bold text-sm truncate" style={{ color: F.ink }}>{m.titulo}</p>
-                    <p className="font-body text-[11px]" style={{ color: F.muted }}>{TIPOS_MATERIAL[m.tipo]}{m.linha_id ? ` · ${ativas.find((l) => l.id === m.linha_id)?.nome || ""}` : ""} · atualizado em {dataBR(m.atualizado_em)}</p>
+                    <p className="font-body text-[11px]" style={{ color: F.muted }}>{TIPOS_MATERIAL[m.tipo] || m.tipo}{m.linha_id ? ` · ${ativas.find((l) => l.id === m.linha_id)?.nome || ""}` : ""} · atualizado em {dataBR(m.atualizado_em)}</p>
                   </div>
                   <Download size={16} color={F.blue} />
                 </a>
@@ -1803,7 +1808,7 @@ function normalizarSlug(s) { return String(s).normalize("NFD").replace(/[̀-ͯ]/
 
 // ---------------------------------------------------------------- Documentos e PDFs
 function AbaMateriais({ materiais, setMateriais, linhas, avisar, podeGerir, nomeLinha }) {
-  const vazio = { titulo: "", tipo: "cartilha", linha_id: "", arquivo: null, publicado: true };
+  const vazio = { titulo: "", tipo: "cartilha", linha_id: "", arquivo: null, publicado: false };
   const [novo, setNovo] = useState(vazio);
   const [enviando, setEnviando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
@@ -1811,7 +1816,7 @@ function AbaMateriais({ materiais, setMateriais, linhas, avisar, podeGerir, nome
 
   const subir = async (arquivo) => {
     const caminho = `materiais/${Date.now()}-${arquivo.name.replace(/[^\w.-]/g, "_")}`;
-    const { error } = await supabase.storage.from("fomento-materiais").upload(caminho, arquivo, { contentType: arquivo.type || "application/pdf" });
+    const { error } = await supabase.storage.from("fomento-materiais").upload(caminho, arquivo, { contentType: arquivo.type || "application/octet-stream" });
     if (error) throw error;
     return supabase.storage.from("fomento-materiais").getPublicUrl(caminho).data.publicUrl;
   };
@@ -1868,8 +1873,8 @@ function AbaMateriais({ materiais, setMateriais, linhas, avisar, podeGerir, nome
             <Campo label="Título" className="sm:col-span-2"><input value={novo.titulo} onChange={(e) => setNovo({ ...novo, titulo: e.target.value })} className={inputCls} style={inputSty} /></Campo>
             <Campo label="Tipo"><select value={novo.tipo} onChange={(e) => setNovo({ ...novo, tipo: e.target.value })} className={inputCls} style={inputSty}>{Object.entries(TIPOS_MATERIAL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
             <Campo label="Modalidade (opcional)"><select value={novo.linha_id} onChange={(e) => setNovo({ ...novo, linha_id: e.target.value })} className={inputCls} style={inputSty}><option value="">Geral (todas)</option>{(linhas || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}</select></Campo>
-            <label className="font-body text-xs font-bold px-3 py-2.5 rounded-lg border cursor-pointer flex items-center gap-1.5 w-fit" style={{ borderColor: F.line, color: F.blue }}><Upload size={13} /> {novo.arquivo ? novo.arquivo.name : "Escolher arquivo (PDF)"}<input type="file" accept="application/pdf,image/*" hidden onChange={(e) => setNovo({ ...novo, arquivo: e.target.files?.[0] || null })} /></label>
-            <label className="font-body text-sm flex items-center gap-2"><input type="checkbox" checked={novo.publicado} onChange={(e) => setNovo({ ...novo, publicado: e.target.checked })} /> Publicar no site agora</label>
+            <label className="font-body text-xs font-bold px-3 py-2.5 rounded-lg border cursor-pointer flex items-center gap-1.5 w-fit" style={{ borderColor: F.line, color: F.blue }}><Upload size={13} /> {novo.arquivo ? novo.arquivo.name : "Escolher arquivo (PDF, Word, Excel)"}<input type="file" accept={ACEITA_MATERIAIS} hidden onChange={(e) => setNovo({ ...novo, arquivo: e.target.files?.[0] || null })} /></label>
+            <label className="font-body text-sm flex items-center gap-2"><input type="checkbox" checked={novo.publicado} onChange={(e) => setNovo({ ...novo, publicado: e.target.checked })} className="accent-green-600" /> Já deixar visível para os empreendedores</label>
             <button type="submit" disabled={enviando} className="sm:col-span-2 glow-btn font-body text-sm font-bold text-white rounded-xl py-2.5 disabled:opacity-60" style={{ background: F.blue }}>{enviando ? "Enviando..." : "Publicar material"}</button>
           </form>
         )}
@@ -1882,13 +1887,19 @@ function AbaMateriais({ materiais, setMateriais, linhas, avisar, podeGerir, nome
               {editandoId === m.id ? (
                 <span className="flex gap-1.5"><input value={tituloEdit} onChange={(e) => setTituloEdit(e.target.value)} className={inputCls} style={inputSty} /><button onClick={async () => { await atualizar(m, { titulo: tituloEdit }); setEditandoId(null); }} className="font-body text-xs font-bold px-3 rounded-lg text-white" style={{ background: F.blue }}>OK</button></span>
               ) : <p className="font-display font-bold text-sm" style={{ color: F.ink }}>{m.titulo}</p>}
-              <p className="font-body text-[11px]" style={{ color: F.muted }}>{TIPOS_MATERIAL[m.tipo]} · {m.linha_id ? nomeLinha(m.linha_id) : "Geral"} · {m.publicado ? "Publicado" : "Retirado do site"} · {dataBR(m.atualizado_em)}</p>
+              <p className="font-body text-[11px]" style={{ color: F.muted }}>{extensaoArquivo(m.arquivo_url)} · {TIPOS_MATERIAL[m.tipo] || m.tipo} · {m.linha_id ? nomeLinha(m.linha_id) : "Geral"} · {m.publicado ? "visível para empreendedores" : "oculto (só a equipe vê)"} · {dataBR(m.atualizado_em)}</p>
             </div>
             <a href={m.arquivo_url} target="_blank" rel="noopener noreferrer" className="font-body text-[11px] font-bold underline" style={{ color: F.blue }}>Abrir</a>
             {podeGerir && <>
               <button onClick={() => { setEditandoId(m.id); setTituloEdit(m.titulo); }} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: F.line, color: "#425A70" }}>Editar</button>
-              <label className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border cursor-pointer" style={{ borderColor: F.line, color: "#425A70" }}>Atualizar arquivo<input type="file" accept="application/pdf,image/*" hidden onChange={(e) => trocarArquivo(m, e.target.files?.[0])} /></label>
-              <button onClick={() => atualizar(m, { publicado: !m.publicado })} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: F.line, color: m.publicado ? "#8A5A12" : F.green }}>{m.publicado ? "Retirar do site" : "Publicar"}</button>
+              <label className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border cursor-pointer" style={{ borderColor: F.line, color: "#425A70" }}>Atualizar arquivo<input type="file" accept={ACEITA_MATERIAIS} hidden onChange={(e) => trocarArquivo(m, e.target.files?.[0])} /></label>
+              <button onClick={() => atualizar(m, { publicado: !m.publicado })} role="switch" aria-checked={m.publicado} title={m.publicado ? "Visível para os empreendedores — clique para ocultar" : "Oculto — clique para mostrar aos empreendedores"}
+                className="flex items-center gap-1.5 font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: m.publicado ? F.green : F.line, color: m.publicado ? F.green : F.soft }}>
+                <span className="relative w-8 h-4 rounded-full transition-colors" style={{ background: m.publicado ? F.greenBright : "#CBD5E1" }}>
+                  <span className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all" style={{ left: m.publicado ? 18 : 2 }} />
+                </span>
+                {m.publicado ? "Visível" : "Oculto"}
+              </button>
               <button onClick={() => remover(m)} className="p-1.5 rounded-lg border" style={{ borderColor: F.line }} title="Excluir"><Trash2 size={12} color={F.danger} /></button>
             </>}
           </div>
