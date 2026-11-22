@@ -50,6 +50,10 @@ export const STATUS_PROPOSTA = {
   excluido: { rotulo: "Excluídos", curto: "Excluído", cor: "#8896A6", pontos: 0 },
 };
 
+// Ranking oficial dos agentes no FomentoNet (sistema da Fomento Paraná).
+// Só redireciona para o link oficial — o login é feito lá, no próprio FomentoNet.
+const FOMENTONET_RANKING_URL = "https://www.fomentonet.pr.gov.br/fomentonet/rankingAgente.do?action=exibirRankingGeral";
+
 const TIPOS_MATERIAL = {
   cartilha: "Cartilha de linhas de crédito",
   taxas: "Taxas e condições",
@@ -1245,7 +1249,16 @@ function AbaRanking({ propostas, agentes }) {
 
   return (
     <div>
-      <Titulo eyebrow="Ranking de pontuação" title="Desempenho dos agentes"
+      <a href={FOMENTONET_RANKING_URL} target="_blank" rel="noopener noreferrer"
+        className="rounded-2xl p-4 mb-5 flex items-center gap-3 text-white hover:opacity-95 transition-opacity" style={{ background: `linear-gradient(120deg, ${F.blueDeep}, ${F.blue})` }}>
+        <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(37,168,91,0.35)" }}><Trophy size={18} /></span>
+        <span className="flex-1 min-w-0">
+          <span className="block font-display font-extrabold text-sm">Ranking Geral oficial — FomentoNet</span>
+          <span className="block font-body text-[11px] text-white/75">Abre o sistema oficial da Fomento Paraná em nova aba (login no próprio FomentoNet).</span>
+        </span>
+        <ExternalLink size={16} className="shrink-0" />
+      </a>
+      <Titulo eyebrow="Ranking interno" title="Desempenho dos agentes nesta plataforma"
         direita={<select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className={`${inputCls} w-auto`} style={inputSty}><option value="mes">Este mês</option><option value="ano">Este ano</option><option value="tudo">Desde o início</option></select>} />
       <div className="flex flex-col gap-2">
         {ranking.map((a, i) => (
