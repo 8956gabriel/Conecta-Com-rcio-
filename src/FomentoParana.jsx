@@ -11,7 +11,7 @@
 //                           (e também dentro do Painel Admin, item "Fomento Paraná")
 //   • useFomentoAcesso()  → diz se o usuário logado pode abrir o painel
 // =============================================================================
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, Suspense, lazy } from "react";
 import {
   Landmark, HandCoins, MessageCircle, FileText, Download, Calculator, ClipboardList,
   CheckCircle2, X, Search, Bell, Trophy, Settings, LayoutDashboard, Users, Pencil,
@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
+import { Radar as RadarCentral } from "lucide-react";
+const CentralProspeccao = lazy(() => import("./central/Central.jsx"));
 
 // ---------------------------------------------------------------------------
 // Identidade do módulo — azul + branco com detalhes em verde, no mesmo padrão
@@ -876,7 +878,8 @@ function KPI({ titulo, valor, sub, cor = F.blue, icon: Icon }) {
 export function FomentoAdmin({ sessao, perfil, embutido = false }) {
   const podeAcessar = useFomentoAcesso(sessao, perfil);
   const [podeGerir, setPodeGerir] = useState(!supabaseConfigurado);
-  const [aba, setAba] = useState("painel");
+  const [aba, setAbaEstado] = useState(() => { try { return sessionStorage.getItem("fomento-aba") || "central"; } catch { return "central"; } });
+  const setAba = (a) => { setAbaEstado(a); try { sessionStorage.setItem("fomento-aba", a); } catch { /* */ } };
   const { config, setConfig, linhas, setLinhas, materiais, setMateriais, rankingOficial, setRankingOficial } = useFomentoPublico();
   const [propostas, setPropostas] = useState(null);
   const [interesses, setInteresses] = useState(null);
@@ -922,6 +925,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
   const lembretesPendentes = (lembretes || []).filter((l) => !l.concluido).length;
 
   const itens = [
+    { id: "central", label: "Central de Prospecção", icon: RadarCentral, destaque: true },
     { id: "painel", label: "Painel de crédito", icon: LayoutDashboard },
     { id: "propostas", label: "Cadastrar propostas", icon: PlusCircle },
     { id: "contratos", label: "Contratos e andamento", icon: Columns },
@@ -945,7 +949,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
         <div aria-hidden className="absolute -right-8 -top-10 w-40 h-40 rounded-full" style={{ background: "rgba(37,168,91,0.25)" }} />
         <div className="relative">
           <p className="font-body text-[11px] font-bold uppercase tracking-wider text-white/70 flex items-center gap-1.5"><Landmark size={12} /> Fomento Paraná · Agente de Crédito</p>
-          <h1 className="font-display text-xl md:text-2xl font-extrabold text-white mt-0.5">{itens.find((i) => i.id === aba)?.label}</h1>
+          <h1 className="font-display text-xl md:text-2xl font-extrabold text-white mt-0.5">{itens.find((i) => i.id === aba)?.label || "Painel"}</h1>
         </div>
         <div className="relative flex items-center gap-2">
           {[[(propostas || []).filter((p) => !["concedido", "negado", "excluido"].includes(p.status)).length, "Em andamento"], [(propostas || []).filter((p) => p.status === "concedido").length, "Concedidos"], [novosInteresses, "Novos interesses"]].map(([n, l]) => (
@@ -959,14 +963,14 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
 
       {!supabaseConfigurado && <div className="mb-4"><Aviso>Modo demonstração: conecte o Supabase para salvar os dados de verdade.</Aviso></div>}
 
-      <div className="grid md:grid-cols-[220px_1fr] gap-6">
-        <aside className="rounded-2xl border p-2 h-fit flex md:flex-col gap-1 overflow-x-auto no-scrollbar" style={{ borderColor: F.line }}>
+      <div className={aba === "central" ? "grid gap-4" : "grid md:grid-cols-[220px_1fr] gap-6"}>
+        <aside className={`rounded-2xl border p-2 h-fit flex gap-1 overflow-x-auto no-scrollbar ${aba === "central" ? "" : "md:flex-col"}`} style={{ borderColor: F.line }}>
           {itens.map((it) => {
             const Icon = it.icon;
             const ativo = aba === it.id;
             return (
-              <button key={it.id} onClick={() => setAba(it.id)} className="shrink-0 md:w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-body font-semibold text-left"
-                style={{ background: ativo ? F.blueTint : "transparent", color: ativo ? F.blue : "#425A70" }}>
+              <button key={it.id} onClick={() => setAba(it.id)} className={`shrink-0 ${aba === "central" ? "" : "md:w-full"} flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-body font-semibold text-left`}
+                style={{ background: ativo ? F.blueTint : it.destaque ? "#FFF7DB" : "transparent", color: ativo ? F.blue : it.destaque ? "#7A5800" : "#425A70" }}>
                 <Icon size={16} /> <span className="whitespace-nowrap">{it.label}</span>
                 {it.badge > 0 && <span className="ml-auto font-body text-[10px] font-bold px-1.5 rounded-full text-white" style={{ background: F.greenBright }}>{it.badge}</span>}
               </button>
@@ -974,6 +978,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
           })}
         </aside>
         <div className="min-w-0">
+          {aba === "central" && <Suspense fallback={<p className="font-body text-sm py-10 text-center" style={{ color: F.muted }}>Carregando a Central de Prospecção...</p>}><CentralProspeccao {...ctx} sessao={sessao} /></Suspense>}
           {aba === "painel" && <AbaPainel {...ctx} />}
           {aba === "propostas" && <AbaPropostas {...ctx} />}
           {aba === "contratos" && <AbaContratos {...ctx} />}
