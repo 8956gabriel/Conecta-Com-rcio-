@@ -10,6 +10,11 @@ import "./index.css";
 // controle da aba.
 registerSW({ immediate: true });
 
+// Link curto: conectacomercio.app.br/fomento abre direto a página do Fomento Paraná.
+if (/^\/fomento\/?$/i.test(window.location.pathname)) {
+  window.history.replaceState(null, "", "/#/fomento");
+}
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <App />

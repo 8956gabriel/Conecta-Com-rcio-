@@ -95,7 +95,10 @@ const LINHAS_DEMO = [
 const CONFIG_PADRAO = {
   ativo: true,
   whatsapp_oficial: "",
-  agente_nome: "Ademir",
+  agente_nome: "Gabriel Oliveira",
+  local_atendimento: "Sala do Empreendedor de Ivatuba",
+  whatsapp_sala: "",
+  logo_url: "",
   titulo: "Fomento Paraná — Crédito para Empreendedores",
   texto_intro: "Conheça as linhas de crédito da Fomento Paraná, agência oficial de crédito do Governo do Paraná, com atendimento do Agente de Crédito em Ivatuba.",
   link_oficial: "https://www.fomento.pr.gov.br/Linhas-de-Credito",
@@ -142,6 +145,13 @@ function formatarDoc(doc) {
   if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
   if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
   return doc || "—";
+}
+const LINK_CURTO_FOMENTO = "https://conectacomercio.app.br/fomento";
+function formatarFone(f) {
+  const d = soDigitos(f).replace(/^55(?=\d{10,11}$)/, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return f || "";
 }
 function mascararFone(f) {
   const d = soDigitos(f);
@@ -607,6 +617,7 @@ export function FomentoPublico({ siteConfig }) {
   const [linhaSimulador, setLinhaSimulador] = useState(null);
   const [preCadastro, setPreCadastro] = useState(null);
   const [docLinhaId, setDocLinhaId] = useState("");
+  const [linkCopiado, setLinkCopiado] = useState(false);
 
   useEffect(() => {
     document.title = "Fomento Paraná — Conecta Comércio";
@@ -639,6 +650,12 @@ export function FomentoPublico({ siteConfig }) {
           <div aria-hidden className="absolute -right-16 -top-16 w-72 h-72 rounded-full" style={{ background: "rgba(37,168,91,0.22)" }} />
           <div aria-hidden className="absolute right-24 -bottom-20 w-48 h-48 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }} />
           <div className="relative max-w-2xl">
+            {config?.logo_url && (
+              <span className="inline-flex items-center bg-white rounded-2xl px-4 py-2.5 mb-4 shadow-lg">
+                <img src={config.logo_url} alt="Fomento Paraná" className="h-10 md:h-12 w-auto object-contain" />
+              </span>
+            )}
+            <br className={config?.logo_url ? "" : "hidden"} />
             <span className="inline-flex items-center gap-2 font-body text-[11px] font-bold uppercase tracking-[0.16em] px-3 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.14)" }}>
               <Landmark size={13} /> Fomento Paraná · Ivatuba
             </span>
@@ -653,14 +670,15 @@ export function FomentoPublico({ siteConfig }) {
         </div>
       </section>
 
-      {/* CTA AGENTE */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 mt-5">
+      {/* CTA AGENTE + SALA DO EMPREENDEDOR */}
+      <section className="max-w-6xl mx-auto px-4 md:px-6 mt-5 grid md:grid-cols-[1.4fr_1fr] gap-3">
         <div className="rounded-2xl border p-4 md:p-5 flex items-center justify-between gap-4 flex-wrap" style={{ borderColor: F.line, background: F.greenTint }}>
           <div className="flex items-center gap-3">
             <span className="w-11 h-11 rounded-full flex items-center justify-center text-white shrink-0" style={{ background: F.green }}><HandCoins size={20} /></span>
             <div>
-              <p className="font-display font-extrabold text-sm md:text-base" style={{ color: F.ink }}>Atendimento com o Agente de Crédito</p>
-              <p className="font-body text-xs" style={{ color: F.muted }}>{nomeAgente} orienta você na escolha da linha e na documentação.</p>
+              <p className="font-body text-[11px] font-bold uppercase tracking-wide" style={{ color: F.green }}>Agente de Crédito</p>
+              <p className="font-display font-extrabold text-sm md:text-base" style={{ color: F.ink }}>{nomeAgente}</p>
+              <p className="font-body text-xs" style={{ color: F.muted }}>{whats ? `WhatsApp ${formatarFone(whats)}` : "Orientação na escolha da linha e na documentação."}</p>
             </div>
           </div>
           {zapPrincipal ? (
@@ -672,6 +690,28 @@ export function FomentoPublico({ siteConfig }) {
               <MessageCircle size={16} /> Quero falar com o agente de crédito
             </button>
           )}
+        </div>
+        <div className="rounded-2xl border p-4 md:p-5 flex items-center justify-between gap-3 flex-wrap" style={{ borderColor: F.line }}>
+          <div className="flex items-center gap-3">
+            <span className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ background: F.blueTint, color: F.blue }}><Landmark size={20} /></span>
+            <div>
+              <p className="font-body text-[11px] font-bold uppercase tracking-wide" style={{ color: F.blue }}>Atendimento presencial</p>
+              <p className="font-display font-extrabold text-sm md:text-base" style={{ color: F.ink }}>{config?.local_atendimento || CONFIG_PADRAO.local_atendimento}</p>
+              {config?.whatsapp_sala && <p className="font-body text-xs" style={{ color: F.muted }}>WhatsApp {formatarFone(config.whatsapp_sala)}</p>}
+            </div>
+          </div>
+          {config?.whatsapp_sala && (
+            <a href={linkWhats(config.whatsapp_sala, "Olá! Vim pela página do Fomento Paraná no Conecta Comércio e quero informações sobre crédito.")} target="_blank" rel="noopener noreferrer"
+              className="font-body text-xs font-bold rounded-xl px-4 py-2.5 border flex items-center gap-1.5" style={{ borderColor: F.line, color: F.green }}>
+              <MessageCircle size={14} /> Falar com a Sala
+            </a>
+          )}
+        </div>
+        <div className="md:col-span-2 flex items-center gap-2 flex-wrap font-body text-xs" style={{ color: F.muted }}>
+          <span>Link direto desta página:</span>
+          <a href={LINK_CURTO_FOMENTO} className="font-bold underline" style={{ color: F.blue }}>conectacomercio.app.br/fomento</a>
+          <button onClick={async () => { try { if (navigator.share) await navigator.share({ title: "Fomento Paraná — Crédito para empreendedores", url: LINK_CURTO_FOMENTO }); else { await navigator.clipboard.writeText(LINK_CURTO_FOMENTO); setLinkCopiado(true); setTimeout(() => setLinkCopiado(false), 2000); } } catch { /* cancelado */ } }}
+            className="font-bold px-2.5 py-1 rounded-lg border" style={{ borderColor: F.line, color: F.blue }}>{linkCopiado ? "Copiado!" : "Compartilhar"}</button>
         </div>
       </section>
 
@@ -1987,7 +2027,7 @@ function AbaConfig({ config, setConfig, agentes, setAgentes, avisar, podeGerir }
   if (!podeGerir) return <Aviso>Somente o gestor do módulo pode alterar as configurações.</Aviso>;
 
   const salvarConfig = async () => {
-    const dados = { ativo: f.ativo, mostrar_resumo: f.mostrar_resumo !== false, whatsapp_oficial: f.whatsapp_oficial, agente_nome: f.agente_nome, titulo: f.titulo, texto_intro: f.texto_intro, link_oficial: f.link_oficial, aviso_simulacao: f.aviso_simulacao, atualizado_em: new Date().toISOString() };
+    const dados = { ativo: f.ativo, mostrar_resumo: f.mostrar_resumo !== false, whatsapp_oficial: f.whatsapp_oficial, agente_nome: f.agente_nome, local_atendimento: f.local_atendimento, whatsapp_sala: f.whatsapp_sala, logo_url: f.logo_url || null, titulo: f.titulo, texto_intro: f.texto_intro, link_oficial: f.link_oficial, aviso_simulacao: f.aviso_simulacao, atualizado_em: new Date().toISOString() };
     if (supabaseConfigurado) { const { error } = await supabase.from("fomento_modulo_config").update(dados).eq("id", 1); if (error) { avisar(error.message, "erro"); return; } }
     setConfig({ ...config, ...dados });
     avisar("Configurações salvas.");
@@ -2023,6 +2063,26 @@ function AbaConfig({ config, setConfig, agentes, setAgentes, avisar, podeGerir }
         <div className="rounded-2xl border p-5 grid sm:grid-cols-2 gap-3" style={{ borderColor: F.line }}>
           <Campo label="WhatsApp oficial do Agente"><input value={f.whatsapp_oficial || ""} onChange={(e) => setF({ ...f, whatsapp_oficial: e.target.value })} placeholder="44999999999" className={inputCls} style={inputSty} /></Campo>
           <Campo label="Nome do Agente de Crédito"><input value={f.agente_nome || ""} onChange={(e) => setF({ ...f, agente_nome: e.target.value })} className={inputCls} style={inputSty} /></Campo>
+          <Campo label="Local de atendimento"><input value={f.local_atendimento || ""} onChange={(e) => setF({ ...f, local_atendimento: e.target.value })} className={inputCls} style={inputSty} /></Campo>
+          <Campo label="WhatsApp do local (Sala do Empreendedor)"><input value={f.whatsapp_sala || ""} onChange={(e) => setF({ ...f, whatsapp_sala: e.target.value })} placeholder="44999999999" className={inputCls} style={inputSty} /></Campo>
+          <Campo label="Logo da Fomento Paraná (aparece no topo da página pública)" className="sm:col-span-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              {f.logo_url && <span className="bg-white border rounded-xl px-3 py-2" style={{ borderColor: F.line }}><img src={f.logo_url} alt="Logo" className="h-10 w-auto object-contain" /></span>}
+              <label className="font-body text-xs font-bold px-3 py-2 rounded-lg border cursor-pointer flex items-center gap-1.5" style={{ borderColor: F.line, color: F.blue }}>
+                <Upload size={13} /> {f.logo_url ? "Trocar logo" : "Enviar logo (PNG/SVG/JPG)"}
+                <input type="file" accept="image/*" hidden onChange={async (e) => {
+                  const arq = e.target.files?.[0]; if (!arq) return;
+                  if (!supabaseConfigurado) { setF({ ...f, logo_url: URL.createObjectURL(arq) }); return; }
+                  const caminho = `logo/${Date.now()}-${arq.name.replace(/[^\w.-]/g, "_")}`;
+                  const { error } = await supabase.storage.from("fomento-materiais").upload(caminho, arq, { contentType: arq.type });
+                  if (error) { avisar(error.message, "erro"); return; }
+                  setF({ ...f, logo_url: supabase.storage.from("fomento-materiais").getPublicUrl(caminho).data.publicUrl });
+                  avisar("Logo enviada — clique em Salvar configurações.");
+                }} />
+              </label>
+              {f.logo_url && <button type="button" onClick={() => setF({ ...f, logo_url: "" })} className="font-body text-xs" style={{ color: F.danger }}>Remover</button>}
+            </div>
+          </Campo>
           <Campo label="Texto de apresentação" className="sm:col-span-2"><textarea rows={2} value={f.texto_intro || ""} onChange={(e) => setF({ ...f, texto_intro: e.target.value })} className={inputCls} style={inputSty} /></Campo>
           <Campo label="Link oficial da Fomento Paraná"><input value={f.link_oficial || ""} onChange={(e) => setF({ ...f, link_oficial: e.target.value })} className={inputCls} style={inputSty} /></Campo>
           <Campo label="Seção pública"><label className="flex items-center gap-2 h-10 font-body text-sm"><input type="checkbox" checked={f.ativo !== false} onChange={(e) => setF({ ...f, ativo: e.target.checked })} /> Visível no site</label></Campo>
