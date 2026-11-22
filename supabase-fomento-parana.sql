@@ -383,3 +383,37 @@ begin
   end if;
   return new;
 end $$;
+
+-- =============================================================================
+-- 14) PAINEL DE CRÉDITO PÚBLICO — só números agregados (nenhum dado pessoal)
+-- =============================================================================
+alter table public.fomento_config add column if not exists mostrar_resumo boolean not null default true;
+
+-- Ciclo anual da Fomento: novembro a outubro. O primeiro ciclo reúne tudo
+-- até 31/10/2026 (2025 – out/2026); depois: nov/2026 – out/2027, etc.
+create or replace function public.fomento_ciclo_fim(d date)
+returns int language sql immutable as $$
+  select greatest(2026, extract(year from d)::int + case when extract(month from d) >= 11 then 1 else 0 end);
+$$;
+
+drop function if exists public.fomento_resumo_publico();
+create or replace function public.fomento_resumo_publico()
+returns json language sql stable security definer set search_path = public as $$
+  select case when coalesce((select mostrar_resumo from public.fomento_config where id = 1), true) then
+    coalesce((select json_agg(c order by c.ciclo desc) from (
+      select public.fomento_ciclo_fim(data_proposta) as ciclo,
+        count(*) filter (where status <> 'excluido') as total_propostas,
+        count(*) filter (where status = 'concedido') as concedidos,
+        count(*) filter (where status = 'negado') as recusados,
+        coalesce(sum(valor_solicitado) filter (where status <> 'excluido'), 0) as valor_solicitado,
+        coalesce(sum(coalesce(valor_concedido, valor_solicitado)) filter (where status = 'concedido'), 0) as valor_concedido,
+        case when count(*) filter (where status in ('concedido','negado')) = 0 then 0
+             else round(100.0 * count(*) filter (where status = 'concedido')
+                        / count(*) filter (where status in ('concedido','negado'))) end as taxa_aprovacao,
+        max(atualizado_em) as atualizado_em
+      from public.fomento_propostas
+      group by 1
+    ) c), '[]'::json)
+  else null end;
+$$;
+grant execute on function public.fomento_resumo_publico() to anon, authenticated;
