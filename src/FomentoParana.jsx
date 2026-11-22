@@ -781,7 +781,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
     );
   }
 
-  const nomeLinha = (id) => (linhas || []).find((l) => l.id === id)?.nome || "—";
+  const nomeLinha = (id, alternativo) => (linhas || []).find((l) => l.id === id)?.nome || alternativo || "—";
   const nomeAgente = (id) => (agentes || []).find((a) => a.id === id)?.nome || "—";
   const novosInteresses = (interesses || []).filter((i) => i.status === "novo").length;
   const lembretesPendentes = (lembretes || []).filter((l) => !l.concluido).length;
@@ -1054,13 +1054,15 @@ function ModalProposta({ proposta, onFechar, ctx, acoes }) {
       ) : (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div><p className="font-display font-extrabold text-lg" style={{ color: F.ink }}>{p.nome}</p><p className="font-body text-xs" style={{ color: F.muted }}>{ctx.nomeLinha(p.linha_id)} · {dataBR(p.data_proposta)}</p></div>
+            <div><p className="font-display font-extrabold text-lg" style={{ color: F.ink }}>{p.nome}</p><p className="font-body text-xs" style={{ color: F.muted }}>{ctx.nomeLinha(p.linha_id, p.linha_fomentonet)} · {dataBR(p.data_proposta)}</p></div>
             <BadgeStatus status={p.status} />
           </div>
           <div className="grid sm:grid-cols-3 gap-2 font-body text-sm">
             {[["CPF", <DocProtegido valor={p.cpf} rotulo="CPF" propostaId={p.id} />], ["CNPJ", <DocProtegido valor={p.cnpj} rotulo="CNPJ" propostaId={p.id} />], ["WhatsApp", <DocProtegido valor={p.whatsapp} rotulo="WhatsApp" propostaId={p.id} />],
               ["Valor solicitado", moeda(p.valor_solicitado)], ["Valor concedido", moeda(p.valor_concedido)], ["Prazo", p.prazo_meses ? `${p.prazo_meses} meses` : "—"],
-              ["Agente", ctx.nomeAgente(p.agente_id)], ["Pontos no ranking", pontosDaProposta(p)], ["Atualizada", dataHoraBR(p.atualizado_em || p.criado_em)]].map(([k, v]) => (
+              ["Agente", ctx.nomeAgente(p.agente_id)], ["Pontos no ranking", pontosDaProposta(p)], ["Atualizada", dataHoraBR(p.atualizado_em || p.criado_em)],
+              ...(p.etapa_fomentonet ? [["Etapa no FomentoNet", `${p.etapa_fomentonet}${p.etapa_desde ? ` desde ${dataBR(p.etapa_desde)}` : ""}`], ["Contrato FomentoNet", p.codigo_contrato || "—"], ["Município", p.municipio || "—"]] : []),
+              ...(p.motivo_recusa ? [["Motivo da recusa", p.motivo_recusa]] : [])].map(([k, v]) => (
               <div key={k} className="rounded-xl p-2.5" style={{ background: F.blueTint2 }}><p className="text-[10px] font-bold uppercase" style={{ color: F.muted }}>{k}</p><div style={{ color: F.ink }}>{v}</div></div>
             ))}
           </div>
@@ -1115,9 +1117,9 @@ function TabelaPropostas({ lista, ctx, onAbrir }) {
               <td className="px-3 py-2 whitespace-nowrap"><b style={{ color: F.ink }}>{p.numero || "—"}</b><br /><span style={{ color: F.soft }}>{dataBR(p.data_proposta)}</span></td>
               <td className="px-3 py-2" style={{ color: F.ink }}>{p.nome}<br /><span style={{ color: F.soft }}>{mascararFone(p.whatsapp)}</span></td>
               <td className="px-3 py-2 whitespace-nowrap" style={{ color: F.muted }}>{mascararDoc(p.cpf)}{p.cnpj ? <><br />{mascararDoc(p.cnpj)}</> : null}</td>
-              <td className="px-3 py-2" style={{ color: F.ink }}>{ctx.nomeLinha(p.linha_id)}</td>
+              <td className="px-3 py-2" style={{ color: F.ink }}>{ctx.nomeLinha(p.linha_id, p.linha_fomentonet)}</td>
               <td className="px-3 py-2 whitespace-nowrap" style={{ color: F.ink }}>{moeda(p.valor_solicitado)}</td>
-              <td className="px-3 py-2"><BadgeStatus status={p.status} /></td>
+              <td className="px-3 py-2"><BadgeStatus status={p.status} />{p.etapa_fomentonet && <><br /><span className="text-[10px]" style={{ color: F.soft }}>FomentoNet: {p.etapa_fomentonet}</span></>}</td>
               <td className="px-3 py-2"><ChevronRight size={14} color={F.soft} /></td>
             </tr>
           ))}
@@ -1135,6 +1137,203 @@ function filtrarPropostas(lista, busca, linhaId) {
     (d && (soDigitos(p.cpf).includes(d) || soDigitos(p.cnpj).includes(d) || soDigitos(p.whatsapp).includes(d)))));
 }
 
+// ---------------------------------------------------------------- Importação do FomentoNet (CSV "Operação Microcrédito")
+// O Agente exporta a planilha no FomentoNet e envia aqui. Cada linha vira (ou
+// atualiza) uma proposta, usando o "Código da Operação" como número — então
+// importar de novo não duplica, só atualiza a etapa/valores.
+function lerCSV(texto, sep = ";") {
+  const linhas = []; let campo = ""; let linha = []; let aspas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (aspas) {
+      if (c === '"') { if (texto[i + 1] === '"') { campo += '"'; i++; } else aspas = false; }
+      else campo += c;
+    } else if (c === '"') aspas = true;
+    else if (c === sep) { linha.push(campo); campo = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && texto[i + 1] === "\n") i++;
+      linha.push(campo); campo = "";
+      if (linha.some((x) => x.trim() !== "")) linhas.push(linha);
+      linha = [];
+    } else campo += c;
+  }
+  if (campo || linha.length) { linha.push(campo); if (linha.some((x) => x.trim() !== "")) linhas.push(linha); }
+  return linhas;
+}
+const dataISO = (br) => { const m = String(br || "").match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+const semAcento = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
+
+function statusDaEtapa(etapa) {
+  const e = semAcento(etapa);
+  if (!e) return "novo";
+  if (e.includes("EXCLU")) return "excluido";
+  if (e.includes("RECUS") || e.includes("NEGAD") || e.includes("INDEFER")) return "negado";
+  if (e.includes("CONCEDID") || e.includes("LIBERAD") || e.includes("DISPONIBILIZ") || e.includes("PAGO")) return "concedido";
+  if (e.includes("CADASTRAMENTO")) return "novo";
+  if (e.includes("REGULARIZ") || e.includes("DOCUMENT") || e.includes("PENDEN")) return "documentacao";
+  return "em_analise";
+}
+function slugDaLinhaFomentoNet(nome) {
+  const n = semAcento(nome);
+  if (n.includes("PESCA") || n.includes("NAUTIC")) return "pesca-nautica";
+  if (n.includes("TAXI") && (n.includes("MULHER") || n.includes(" M "))) return "taxista-mulher";
+  if (n.includes("TAXI")) return "taxista";
+  if (n.includes("EMERGENC")) return "micro-emergencial";
+  if (n.includes("RECUPERA")) return "recupera-micro";
+  if (n.includes("RURAL") && (n.includes("MULHER") || /\bM\b/.test(n))) return "micro-mulher-rural";
+  if (n.includes("RURAL")) return "micro-rural";
+  if (n.includes("MULHER")) return "micro-mulher";
+  if (n.includes("FACIL")) return "micro-facil";
+  return null;
+}
+
+function converterLinhasFomentoNet(tabela, linhasCredito) {
+  const [cab, ...dados] = tabela;
+  const idx = (nome) => cab.findIndex((c) => semAcento(c) === semAcento(nome));
+  const col = {
+    operacao: idx("Código da Operação"), contrato: idx("Código do Contrato"), linha: idx("Linha de Crédito"), valor: idx("Valor Solicitado"),
+    nome: idx("Nome do Cliente"), doc: idx("CPF/CNPJ"), municipio: idx("Município"), cadastro: idx("Data de Cadastro"),
+    desde: idx("Na Etapa Desde"), etapa: idx("Etapa"), motivo: idx("Motivo Recusa"), amortizacao: idx("Prazo amortização"),
+    disponib: idx("Data de Disponibilização"),
+  };
+  if (col.operacao < 0 || col.nome < 0 || col.etapa < 0) throw new Error("Este arquivo não parece ser a planilha \"Operação Microcrédito\" do FomentoNet (faltam as colunas Código da Operação, Nome do Cliente ou Etapa).");
+  const v = (l, k) => (col[k] >= 0 ? String(l[col[k]] ?? "").trim() : "");
+  const porSlug = Object.fromEntries((linhasCredito || []).map((l) => [l.slug, l.id]));
+  const ignoradas = [];
+  const registros = [];
+  for (const l of dados) {
+    const op = v(l, "operacao");
+    if (!op) { ignoradas.push("linha sem Código da Operação"); continue; }
+    const doc = soDigitos(v(l, "doc"));
+    const status = statusDaEtapa(v(l, "etapa"));
+    const valor = parseValor(v(l, "valor"));
+    const slug = slugDaLinhaFomentoNet(v(l, "linha"));
+    registros.push({
+      numero: op,
+      data_proposta: dataISO(v(l, "cadastro")) || hojeLocal(),
+      nome: v(l, "nome").replace(/^\d{2}\.\d{3}\.\d{3}\s+/, "") || "(sem nome)",
+      cpf: doc.length === 11 ? doc : null,
+      cnpj: doc.length === 14 ? doc : null,
+      linha_id: slug && porSlug[slug] && !String(porSlug[slug]).startsWith("demo-") ? porSlug[slug] : null,
+      valor_solicitado: valor,
+      ...(status === "concedido" && valor ? { valor_concedido: valor } : {}),
+      prazo_meses: parseInt(v(l, "amortizacao"), 10) || null,
+      status,
+      etapa_fomentonet: v(l, "etapa") || null,
+      etapa_desde: dataISO(v(l, "desde")),
+      codigo_contrato: v(l, "contrato") || null,
+      linha_fomentonet: v(l, "linha") || null,
+      municipio: v(l, "municipio") || null,
+      motivo_recusa: v(l, "motivo") || null,
+      importado_em: new Date().toISOString(),
+      _linhaNome: v(l, "linha"),
+    });
+  }
+  return { registros, ignoradas };
+}
+
+function ImportarFomentoNet({ ctx }) {
+  const [previa, setPrevia] = useState(null);
+  const [erro, setErro] = useState("");
+  const [importando, setImportando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  const lerArquivo = async (arquivo) => {
+    setErro(""); setResultado(null); setPrevia(null);
+    if (!arquivo) return;
+    try {
+      const buf = await arquivo.arrayBuffer();
+      let texto = new TextDecoder("utf-8").decode(buf);
+      if (texto.includes("�")) texto = new TextDecoder("iso-8859-1").decode(buf);
+      const tabela = lerCSV(texto.replace(/^﻿/, ""));
+      const { registros, ignoradas } = converterLinhasFomentoNet(tabela, ctx.linhas);
+      const existentes = new Set((ctx.propostas || []).map((p) => p.numero));
+      setPrevia({ nomeArquivo: arquivo.name, registros, ignoradas, novos: registros.filter((r) => !existentes.has(r.numero)).length });
+    } catch (err) { setErro(err.message || "Não consegui ler o arquivo."); }
+  };
+
+  const importar = async () => {
+    if (!previa?.registros.length) return;
+    setImportando(true); setErro("");
+    const linhasEnvio = previa.registros.map(({ _linhaNome, ...r }) => r);
+    try {
+      if (!supabaseConfigurado) {
+        ctx.setPropostas((atual) => {
+          const mapa = new Map((atual || []).map((p) => [p.numero, p]));
+          linhasEnvio.forEach((r) => mapa.set(r.numero, { ...(mapa.get(r.numero) || { id: `demo-${r.numero}`, criado_em: new Date().toISOString() }), ...r }));
+          return [...mapa.values()].sort((a, b) => (b.data_proposta || "").localeCompare(a.data_proposta || ""));
+        });
+      } else {
+        const salvos = [];
+        for (let i = 0; i < linhasEnvio.length; i += 200) {
+          const { data, error } = await supabase.from("fomento_propostas").upsert(linhasEnvio.slice(i, i + 200), { onConflict: "numero" }).select();
+          if (error) throw error;
+          salvos.push(...(data || []));
+        }
+        ctx.setPropostas((atual) => {
+          const mapa = new Map((atual || []).map((p) => [p.id, p]));
+          salvos.forEach((p) => mapa.set(p.id, p));
+          return [...mapa.values()].sort((a, b) => (b.data_proposta || "").localeCompare(a.data_proposta || ""));
+        });
+        registrarAcesso("importou_fomentonet", `${linhasEnvio.length} linhas`);
+      }
+      setResultado({ total: linhasEnvio.length, novos: previa.novos });
+      setPrevia(null);
+      ctx.avisar(`${linhasEnvio.length} operação(ões) importada(s) do FomentoNet.`);
+    } catch (err) {
+      setErro(err.message || "Erro ao importar.");
+    } finally { setImportando(false); }
+  };
+
+  const contagem = previa ? Object.entries(STATUS_PROPOSTA).map(([k, s]) => [s.curto, previa.registros.filter((r) => r.status === k).length, s.cor]).filter(([, n]) => n) : [];
+  const semLinha = previa ? previa.registros.filter((r) => !r.linha_id).length : 0;
+
+  return (
+    <div className="rounded-2xl border p-5" style={{ borderColor: F.line, background: F.greenTint }}>
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0" style={{ background: F.green }}><Upload size={18} /></span>
+        <div className="flex-1 min-w-[200px]">
+          <p className="font-display font-extrabold text-sm" style={{ color: F.ink }}>Importar do FomentoNet (cadastro automático)</p>
+          <p className="font-body text-xs" style={{ color: F.muted }}>Exporte a planilha "Operação Microcrédito" no FomentoNet e envie aqui. Novas operações são cadastradas e as que já existem têm a etapa atualizada — sem duplicar.</p>
+        </div>
+        <label className="font-body text-sm font-bold px-4 py-2.5 rounded-xl text-white cursor-pointer flex items-center gap-2" style={{ background: F.green }}>
+          <Upload size={15} /> Escolher arquivo CSV
+          <input type="file" accept=".csv,text/csv" hidden onChange={(e) => { lerArquivo(e.target.files?.[0]); e.target.value = ""; }} />
+        </label>
+      </div>
+      {erro && <div className="mt-3"><Aviso tipo="erro">{erro}</Aviso></div>}
+      {resultado && <div className="mt-3"><Aviso tipo="ok">Importação concluída: {resultado.total} operação(ões) — {resultado.novos} nova(s), {resultado.total - resultado.novos} atualizada(s).</Aviso></div>}
+      {previa && (
+        <div className="mt-4 rounded-xl bg-white border p-4" style={{ borderColor: F.line }}>
+          <p className="font-display font-bold text-sm" style={{ color: F.ink }}>{previa.nomeArquivo}: {previa.registros.length} operação(ões) · {previa.novos} nova(s) · {previa.registros.length - previa.novos} já cadastrada(s) (serão atualizadas)</p>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {contagem.map(([r, n, cor]) => <span key={r} className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${cor}1A`, color: cor }}>{r}: {n}</span>)}
+          </div>
+          {semLinha > 0 && <p className="font-body text-[11px] mt-2" style={{ color: "#8A5A12" }}>{semLinha} operação(ões) com linha de crédito não reconhecida — serão importadas sem linha.</p>}
+          {previa.ignoradas.length > 0 && <p className="font-body text-[11px] mt-1" style={{ color: F.soft }}>{previa.ignoradas.length} linha(s) ignorada(s).</p>}
+          <div className="max-h-56 overflow-y-auto mt-3 border rounded-lg" style={{ borderColor: F.line }}>
+            <table className="w-full font-body text-[11px]">
+              <thead className="sticky top-0" style={{ background: F.blueTint }}><tr>{["Operação", "Cliente", "CPF/CNPJ", "Linha", "Valor", "Etapa"].map((h) => <th key={h} className="text-left px-2 py-1.5" style={{ color: F.blue }}>{h}</th>)}</tr></thead>
+              <tbody>
+                {previa.registros.slice(0, 100).map((r) => (
+                  <tr key={r.numero} className="border-t" style={{ borderColor: F.line }}>
+                    <td className="px-2 py-1">{r.numero}</td><td className="px-2 py-1">{r.nome}</td><td className="px-2 py-1">{mascararDoc(r.cpf || r.cnpj)}</td>
+                    <td className="px-2 py-1">{r._linhaNome}</td><td className="px-2 py-1 whitespace-nowrap">{moeda(r.valor_solicitado)}</td><td className="px-2 py-1"><BadgeStatus status={r.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex gap-2 justify-end mt-3">
+            <button onClick={() => setPrevia(null)} className="font-body text-sm font-bold px-4 py-2 rounded-xl border" style={{ borderColor: F.line, color: "#425A70" }}>Cancelar</button>
+            <button onClick={importar} disabled={importando} className="glow-btn font-body text-sm font-bold px-5 py-2 rounded-xl text-white disabled:opacity-60" style={{ background: F.green }}>{importando ? "Importando..." : `Importar ${previa.registros.length} operação(ões)`}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AbaPropostas(ctx) {
   const acoes = useAcoesProposta(ctx);
   const [chaveForm, setChaveForm] = useState(0);
@@ -1148,11 +1347,12 @@ function AbaPropostas(ctx) {
   const exportar = () => {
     registrarAcesso("exportou_propostas");
     exportarCSV("fomento-propostas.csv", ["Número", "Data", "Nome", "CPF", "CNPJ", "WhatsApp", "Linha", "Solicitado", "Concedido", "Prazo", "Situação", "Agente"],
-      lista.map((p) => [p.numero, dataBR(p.data_proposta), p.nome, formatarDoc(p.cpf), formatarDoc(p.cnpj), p.whatsapp, ctx.nomeLinha(p.linha_id), p.valor_solicitado, p.valor_concedido, p.prazo_meses, STATUS_PROPOSTA[p.status]?.curto, ctx.nomeAgente(p.agente_id)]));
+      lista.map((p) => [p.numero, dataBR(p.data_proposta), p.nome, formatarDoc(p.cpf), formatarDoc(p.cnpj), p.whatsapp, ctx.nomeLinha(p.linha_id, p.linha_fomentonet), p.valor_solicitado, p.valor_concedido, p.prazo_meses, STATUS_PROPOSTA[p.status]?.curto, ctx.nomeAgente(p.agente_id)]));
   };
 
   return (
     <div className="flex flex-col gap-6">
+      <ImportarFomentoNet ctx={ctx} />
       <div>
         <Titulo eyebrow="Nova proposta" title="Cadastrar proposta" sub="Dados pessoais ficam visíveis só para a equipe do Fomento (LGPD)." />
         <div className="rounded-2xl border p-5" style={{ borderColor: F.line }}>
@@ -1208,7 +1408,7 @@ function AbaContratos(ctx) {
                       <button onClick={() => setAberta(p)} className="text-left w-full">
                         <p className="font-body text-[10px] font-bold" style={{ color: F.soft }}>{p.numero} · {dataBR(p.data_proposta)}</p>
                         <p className="font-display font-bold text-sm truncate" style={{ color: F.ink }}>{p.nome}</p>
-                        <p className="font-body text-[11px] truncate" style={{ color: F.muted }}>{ctx.nomeLinha(p.linha_id)}</p>
+                        <p className="font-body text-[11px] truncate" style={{ color: F.muted }}>{ctx.nomeLinha(p.linha_id, p.linha_fomentonet)}</p>
                         <p className="font-body text-xs font-bold mt-1" style={{ color: F.ink }}>{moeda(p.status === "concedido" ? p.valor_concedido ?? p.valor_solicitado : p.valor_solicitado)}</p>
                       </button>
                       {prox && (
