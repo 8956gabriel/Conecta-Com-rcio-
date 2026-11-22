@@ -183,11 +183,14 @@ function useFomentoPublico() {
 
 // Quem pode ver o painel do Fomento: admin do site ou agente liberado.
 export function useFomentoAcesso(sessao, perfil) {
-  const [pode, setPode] = useState(false);
+  // null = ainda verificando (evita mostrar "sem acesso" enquanto carrega)
+  const [pode, setPode] = useState(null);
   useEffect(() => {
     if (!supabaseConfigurado) { setPode(true); return; }
+    if (sessao === undefined) { setPode(null); return; }
     if (!sessao) { setPode(false); return; }
     if (perfil?.tipo === "admin") { setPode(true); return; }
+    setPode(null);
     supabase.rpc("fomento_pode_acessar").then(({ data, error }) => setPode(!error && data === true));
   }, [sessao?.user?.id, perfil?.tipo]);
   return pode;
@@ -770,6 +773,14 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
     supabase.from("fomento_agentes").select("*").order("nome").then(({ data, error }) => setAgentes(error ? [] : data || []));
   }, [podeAcessar]);
 
+  if (podeAcessar === null) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-24 text-center">
+        <span className="w-10 h-10 rounded-full border-4 border-t-transparent animate-spin inline-block" style={{ borderColor: F.blueTint, borderTopColor: F.blue }} />
+        <p className="font-body text-sm mt-3" style={{ color: F.muted }}>Verificando seu acesso...</p>
+      </div>
+    );
+  }
   if (!podeAcessar) {
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center">
