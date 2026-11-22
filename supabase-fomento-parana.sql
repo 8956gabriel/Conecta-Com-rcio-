@@ -482,3 +482,30 @@ returns json language sql stable security definer set search_path = public as $$
   else null end;
 $$;
 grant execute on function public.fomento_resumo_publico() to anon, authenticated;
+
+-- =============================================================================
+-- 16) CONDIÇÕES DAS LINHAS (informadas pelo Agente de Crédito)
+--     Microcrédito: R$ 1.000 a R$ 20.000, até 36 parcelas, carência até 3 meses.
+--     Fomento Giro Fácil: R$ 1.000 a R$ 500.000.
+-- =============================================================================
+update public.fomento_linhas
+   set valor_min = 1000, valor_max = 20000, prazo_max_meses = 36, carencia_max_meses = 3,
+       valores  = coalesce(nullif(valores, ''),  'De R$ 1.000 a R$ 20.000'),
+       prazos   = coalesce(nullif(prazos, ''),   'Até 36 parcelas'),
+       carencia = coalesce(nullif(carencia, ''), 'Até 3 meses'),
+       atualizado_em = now()
+ where slug in ('micro-facil','micro-mulher','micro-mulher-rural','micro-rural','micro-emergencial','recupera-micro');
+
+insert into public.fomento_linhas (slug, nome, descricao, finalidade, publico_alvo, valores, valor_min, valor_max, ordem, cor)
+values ('giro-facil', 'Fomento Giro Fácil', 'Capital de giro com processo simplificado para micro, pequenas e médias empresas.',
+        'Capital de giro para o dia a dia da empresa (estoque, folha, despesas).', 'Empresas com CNPJ.',
+        'De R$ 1.000 a R$ 500.000', 1000, 500000, 10, '#1E8E5A')
+on conflict (slug) do update
+   set valor_min = 1000, valor_max = 500000,
+       valores = coalesce(nullif(public.fomento_linhas.valores, ''), 'De R$ 1.000 a R$ 500.000'),
+       atualizado_em = now();
+
+insert into public.fomento_linhas (slug, nome, descricao, finalidade, publico_alvo, ordem, cor)
+values ('fungetur', 'Fungetur', 'Fundo Geral do Turismo — crédito para empresas do setor de turismo.',
+        'Capital de giro e investimentos em empreendimentos turísticos.', 'Empresas do turismo com cadastro no Cadastur.', 11, '#0A5AA8')
+on conflict (slug) do nothing;
