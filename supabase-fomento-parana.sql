@@ -509,3 +509,10 @@ insert into public.fomento_linhas (slug, nome, descricao, finalidade, publico_al
 values ('fungetur', 'Fungetur', 'Fundo Geral do Turismo — crédito para empresas do setor de turismo.',
         'Capital de giro e investimentos em empreendimentos turísticos.', 'Empresas do turismo com cadastro no Cadastur.', 11, '#0A5AA8')
 on conflict (slug) do nothing;
+
+-- =============================================================================
+-- 17) MAIS TIPOS DE MATERIAL (modelos de declaração, manuais, planilhas)
+-- =============================================================================
+alter table public.fomento_materiais drop constraint if exists fomento_materiais_tipo_check;
+alter table public.fomento_materiais add constraint fomento_materiais_tipo_check
+  check (tipo in ('cartilha','taxas','documentacao','informativo','modelo','manual','planilha'));
