@@ -112,6 +112,9 @@ export function cicloFim(data) {
   if (isNaN(d)) return 2026;
   return Math.max(2026, d.getFullYear() + (d.getMonth() >= 10 ? 1 : 0));
 }
+// Concedidas/recusadas contam no ciclo da DECISÃO (ex.: cadastrada em outubro e
+// concedida em novembro → ciclo novo). As demais, pela data de cadastro.
+export const dataCicloProposta = (p) => (["concedido", "negado"].includes(p.status) ? p.data_decisao || p.etapa_desde || p.data_proposta || p.criado_em : p.data_proposta || p.criado_em);
 export const rotuloCiclo = (fim) => (Number(fim) <= 2026 ? "2025 – out/2026" : `nov/${fim - 1} – out/${fim}`);
 const soDigitos = (s) => String(s || "").replace(/\D/g, "");
 function parseValor(texto) {
@@ -348,7 +351,7 @@ function PainelCreditoPublico({ ciclos }) {
         ))}
       </div>
       <p className="font-body text-[10px] mt-2" style={{ color: F.soft }}>
-        Ciclo anual de novembro a outubro, pela data de cadastro da proposta. Taxa de aprovação = concedidas ÷ (concedidas + recusadas). Propostas excluídas não entram na conta.{resumo.atualizado_em ? ` Atualizado em ${dataBR(resumo.atualizado_em)}.` : ""}
+        Ciclo anual de novembro a outubro. Concedidas e recusadas contam no ciclo em que foram decididas; as demais, pela data de cadastro. Taxa de aprovação = concedidas ÷ (concedidas + recusadas). Propostas excluídas não entram na conta.{resumo.atualizado_em ? ` Atualizado em ${dataBR(resumo.atualizado_em)}.` : ""}
       </p>
     </div>
   );
@@ -938,8 +941,8 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
 function AbaPainel({ propostas, interesses, lembretes, linhas, nomeLinha, setAba }) {
   const atual = cicloFim();
   const [ciclo, setCiclo] = useState(String(atual));
-  const ciclosDisponiveis = [...new Set([atual, ...(propostas || []).map((p) => cicloFim(p.data_proposta || p.criado_em))])].sort((a, b) => b - a);
-  const lista = (propostas || []).filter((p) => ciclo === "todos" || cicloFim(p.data_proposta || p.criado_em) === Number(ciclo));
+  const ciclosDisponiveis = [...new Set([atual, ...(propostas || []).map((p) => cicloFim(dataCicloProposta(p)))])].sort((a, b) => b - a);
+  const lista = (propostas || []).filter((p) => ciclo === "todos" || cicloFim(dataCicloProposta(p)) === Number(ciclo));
   const somar = (arr, campo) => arr.reduce((s, p) => s + (Number(p[campo]) || 0), 0);
   const concedidos = lista.filter((p) => p.status === "concedido");
   const porStatus = Object.entries(STATUS_PROPOSTA).map(([k, s]) => ({ nome: s.curto, qtd: lista.filter((p) => p.status === k).length, cor: s.cor }));
@@ -1153,6 +1156,7 @@ function ModalProposta({ proposta, onFechar, ctx, acoes }) {
               ["Valor solicitado", moeda(p.valor_solicitado)], ["Valor concedido", moeda(p.valor_concedido)], ["Prazo", p.prazo_meses ? `${p.prazo_meses} meses` : "—"],
               ["Agente", ctx.nomeAgente(p.agente_id)], ["Pontos no ranking", pontosDaProposta(p)], ["Atualizada", dataHoraBR(p.atualizado_em || p.criado_em)],
               ...(p.etapa_fomentonet ? [["Etapa no FomentoNet", `${p.etapa_fomentonet}${p.etapa_desde ? ` desde ${dataBR(p.etapa_desde)}` : ""}`], ["Contrato FomentoNet", p.codigo_contrato || "—"], ["Município", p.municipio || "—"]] : []),
+              ...(p.data_decisao ? [[p.status === "concedido" ? "Concedida em" : "Recusada em", `${dataBR(p.data_decisao)} · ciclo ${rotuloCiclo(cicloFim(p.data_decisao))}`]] : []),
               ...(p.motivo_recusa ? [["Motivo da recusa", p.motivo_recusa]] : [])].map(([k, v]) => (
               <div key={k} className="rounded-xl p-2.5" style={{ background: F.blueTint2 }}><p className="text-[10px] font-bold uppercase" style={{ color: F.muted }}>{k}</p><div style={{ color: F.ink }}>{v}</div></div>
             ))}
@@ -1312,6 +1316,7 @@ function converterLinhasFomentoNet(tabela, linhasCredito) {
       status,
       etapa_fomentonet: v(l, "etapa") || null,
       etapa_desde: dataISO(v(l, "desde")),
+      ...((status === "concedido" || status === "negado") && dataISO(v(l, "desde")) ? { data_decisao: dataISO(v(l, "desde")) } : {}),
       codigo_contrato: v(l, "contrato") || null,
       linha_fomentonet: v(l, "linha") || null,
       municipio: v(l, "municipio") || null,
