@@ -184,7 +184,7 @@ function useFomentoPublico() {
       return;
     }
     const [cfg, lin, mat, rk] = await Promise.all([
-      supabase.from("fomento_config").select("*").eq("id", 1).maybeSingle(),
+      supabase.from("fomento_modulo_config").select("*").eq("id", 1).maybeSingle(),
       supabase.from("fomento_linhas").select("*").order("ordem"),
       supabase.from("fomento_materiais").select("*").order("atualizado_em", { ascending: false }),
       supabase.from("fomento_ranking_oficial").select("*").order("data_referencia", { ascending: false }).order("criado_em", { ascending: false }).limit(24),
@@ -846,7 +846,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
     else supabase.rpc("fomento_pode_gerir").then(({ data }) => setPodeGerir(data === true));
     supabase.from("fomento_propostas").select("*").order("criado_em", { ascending: false }).then(({ data, error }) => setPropostas(error ? [] : data || []));
     supabase.from("fomento_interesses").select("*").order("criado_em", { ascending: false }).then(({ data, error }) => setInteresses(error ? [] : data || []));
-    supabase.from("fomento_lembretes").select("*").order("data_hora").then(({ data, error }) => setLembretes(error ? [] : data || []));
+    supabase.from("fomento_agenda").select("*").order("data_hora").then(({ data, error }) => setLembretes(error ? [] : data || []));
     supabase.from("fomento_agentes").select("*").order("nome").then(({ data, error }) => setAgentes(error ? [] : data || []));
   }, [podeAcessar]);
 
@@ -1913,7 +1913,7 @@ function AbaMateriais({ materiais, setMateriais, linhas, avisar, podeGerir, nome
 // ---------------------------------------------------------------- Lembretes
 async function criarLembrete(ctx, dados) {
   if (!supabaseConfigurado) { ctx.setLembretes((l) => [...(l || []), { ...dados, id: `demo-${Date.now()}`, concluido: false }].sort((a, b) => new Date(a.data_hora) - new Date(b.data_hora))); ctx.avisar("Lembrete criado."); return; }
-  const { data, error } = await supabase.from("fomento_lembretes").insert(dados).select().single();
+  const { data, error } = await supabase.from("fomento_agenda").insert(dados).select().single();
   if (error) { ctx.avisar(error.message, "erro"); return; }
   ctx.setLembretes((l) => [...(l || []), data].sort((a, b) => new Date(a.data_hora) - new Date(b.data_hora)));
   ctx.avisar("Lembrete criado.");
@@ -1927,11 +1927,11 @@ function AbaLembretes(ctx) {
   const lista = (lembretes || []).filter((l) => verConcluidos || !l.concluido);
 
   const alternar = async (l) => {
-    if (supabaseConfigurado) { const { error } = await supabase.from("fomento_lembretes").update({ concluido: !l.concluido }).eq("id", l.id); if (error) { avisar(error.message, "erro"); return; } }
+    if (supabaseConfigurado) { const { error } = await supabase.from("fomento_agenda").update({ concluido: !l.concluido }).eq("id", l.id); if (error) { avisar(error.message, "erro"); return; } }
     setLembretes((x) => x.map((y) => (y.id === l.id ? { ...y, concluido: !l.concluido } : y)));
   };
   const apagar = async (l) => {
-    if (supabaseConfigurado) { const { error } = await supabase.from("fomento_lembretes").delete().eq("id", l.id); if (error) { avisar(error.message, "erro"); return; } }
+    if (supabaseConfigurado) { const { error } = await supabase.from("fomento_agenda").delete().eq("id", l.id); if (error) { avisar(error.message, "erro"); return; } }
     setLembretes((x) => x.filter((y) => y.id !== l.id));
   };
   const baixarIcs = (l) => {
@@ -1988,7 +1988,7 @@ function AbaConfig({ config, setConfig, agentes, setAgentes, avisar, podeGerir }
 
   const salvarConfig = async () => {
     const dados = { ativo: f.ativo, mostrar_resumo: f.mostrar_resumo !== false, whatsapp_oficial: f.whatsapp_oficial, agente_nome: f.agente_nome, titulo: f.titulo, texto_intro: f.texto_intro, link_oficial: f.link_oficial, aviso_simulacao: f.aviso_simulacao, atualizado_em: new Date().toISOString() };
-    if (supabaseConfigurado) { const { error } = await supabase.from("fomento_config").update(dados).eq("id", 1); if (error) { avisar(error.message, "erro"); return; } }
+    if (supabaseConfigurado) { const { error } = await supabase.from("fomento_modulo_config").update(dados).eq("id", 1); if (error) { avisar(error.message, "erro"); return; } }
     setConfig({ ...config, ...dados });
     avisar("Configurações salvas.");
   };
