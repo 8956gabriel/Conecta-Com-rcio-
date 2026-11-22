@@ -351,3 +351,5 @@ drop policy if exists "fomento: leitura publica ranking" on public.fomento_ranki
 drop policy if exists "fomento: equipe gerencia ranking" on public.fomento_ranking_oficial;
 create policy "fomento: leitura publica ranking" on public.fomento_ranking_oficial for select using (publicar or public.fomento_pode_acessar());
 create policy "fomento: equipe gerencia ranking" on public.fomento_ranking_oficial for all using (public.fomento_pode_acessar()) with check (public.fomento_pode_acessar());
+alter table public.fomento_ranking_oficial add column if not exists total_geral int;
+alter table public.fomento_ranking_oficial add column if not exists total_faixa int;
