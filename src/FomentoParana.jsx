@@ -99,6 +99,7 @@ const CONFIG_PADRAO = {
   local_atendimento: "Sala do Empreendedor de Ivatuba",
   whatsapp_sala: "",
   logo_url: "",
+  banner_url: "",
   titulo: "Fomento Paraná — Crédito para Empreendedores",
   texto_intro: "Conheça as linhas de crédito da Fomento Paraná, agência oficial de crédito do Governo do Paraná, com atendimento do Agente de Crédito em Ivatuba.",
   link_oficial: "https://www.fomento.pr.gov.br/Linhas-de-Credito",
@@ -649,7 +650,8 @@ export function FomentoPublico({ siteConfig }) {
         <div className="rounded-3xl overflow-hidden relative text-white p-6 md:p-10" style={{ background: `linear-gradient(125deg, ${F.blueDeep}, ${F.blue})` }}>
           <div aria-hidden className="absolute -right-16 -top-16 w-72 h-72 rounded-full" style={{ background: "rgba(37,168,91,0.22)" }} />
           <div aria-hidden className="absolute right-24 -bottom-20 w-48 h-48 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }} />
-          <div className="relative max-w-2xl">
+          <div className={`relative ${config?.banner_url ? "grid md:grid-cols-[1.25fr_1fr] gap-6 items-center" : ""}`}>
+          <div className="max-w-2xl">
             {config?.logo_url && (
               <span className="inline-flex items-center bg-white rounded-2xl px-4 py-2.5 mb-4 shadow-lg">
                 <img src={config.logo_url} alt="Fomento Paraná" className="h-10 md:h-12 w-auto object-contain" />
@@ -666,6 +668,11 @@ export function FomentoPublico({ siteConfig }) {
               <button onClick={() => rolar("fp-simulador")} className="font-body text-sm font-bold rounded-xl px-4 py-2.5 flex items-center gap-2" style={{ background: "rgba(255,255,255,0.14)" }}><Calculator size={15} /> Simule seu crédito</button>
               <button onClick={() => rolar("fp-docs")} className="font-body text-sm font-bold rounded-xl px-4 py-2.5 flex items-center gap-2" style={{ background: "rgba(255,255,255,0.14)" }}><FileText size={15} /> Documentos</button>
             </div>
+          </div>
+          {config?.banner_url && (
+            <img src={config.banner_url} alt={`${config?.agente_nome || "Agente de Crédito"} — Agente de Crédito da Fomento Paraná em Ivatuba`}
+              className="w-full max-w-sm mx-auto rounded-2xl shadow-2xl border border-white/20" loading="lazy" />
+          )}
           </div>
         </div>
       </section>
@@ -2027,7 +2034,7 @@ function AbaConfig({ config, setConfig, agentes, setAgentes, avisar, podeGerir }
   if (!podeGerir) return <Aviso>Somente o gestor do módulo pode alterar as configurações.</Aviso>;
 
   const salvarConfig = async () => {
-    const dados = { ativo: f.ativo, mostrar_resumo: f.mostrar_resumo !== false, whatsapp_oficial: f.whatsapp_oficial, agente_nome: f.agente_nome, local_atendimento: f.local_atendimento, whatsapp_sala: f.whatsapp_sala, logo_url: f.logo_url || null, titulo: f.titulo, texto_intro: f.texto_intro, link_oficial: f.link_oficial, aviso_simulacao: f.aviso_simulacao, atualizado_em: new Date().toISOString() };
+    const dados = { ativo: f.ativo, mostrar_resumo: f.mostrar_resumo !== false, whatsapp_oficial: f.whatsapp_oficial, agente_nome: f.agente_nome, local_atendimento: f.local_atendimento, whatsapp_sala: f.whatsapp_sala, logo_url: f.logo_url || null, banner_url: f.banner_url || null, titulo: f.titulo, texto_intro: f.texto_intro, link_oficial: f.link_oficial, aviso_simulacao: f.aviso_simulacao, atualizado_em: new Date().toISOString() };
     if (supabaseConfigurado) { const { error } = await supabase.from("fomento_modulo_config").update(dados).eq("id", 1); if (error) { avisar(error.message, "erro"); return; } }
     setConfig({ ...config, ...dados });
     avisar("Configurações salvas.");
@@ -2081,6 +2088,24 @@ function AbaConfig({ config, setConfig, agentes, setAgentes, avisar, podeGerir }
                 }} />
               </label>
               {f.logo_url && <button type="button" onClick={() => setF({ ...f, logo_url: "" })} className="font-body text-xs" style={{ color: F.danger }}>Remover</button>}
+            </div>
+          </Campo>
+          <Campo label="Banner do Agente de Crédito (aparece ao lado do título)" className="sm:col-span-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              {f.banner_url && <span className="bg-white border rounded-xl px-3 py-2" style={{ borderColor: F.line }}><img src={f.banner_url} alt="Banner" className="h-20 w-auto object-contain" /></span>}
+              <label className="font-body text-xs font-bold px-3 py-2 rounded-lg border cursor-pointer flex items-center gap-1.5" style={{ borderColor: F.line, color: F.blue }}>
+                <Upload size={13} /> {f.banner_url ? "Trocar banner" : "Enviar banner (JPG/PNG)"}
+                <input type="file" accept="image/*" hidden onChange={async (e) => {
+                  const arq = e.target.files?.[0]; if (!arq) return;
+                  if (!supabaseConfigurado) { setF({ ...f, banner_url: URL.createObjectURL(arq) }); return; }
+                  const caminho = `banner/${Date.now()}-${arq.name.replace(/[^\w.-]/g, "_")}`;
+                  const { error } = await supabase.storage.from("fomento-materiais").upload(caminho, arq, { contentType: arq.type });
+                  if (error) { avisar(error.message, "erro"); return; }
+                  setF({ ...f, banner_url: supabase.storage.from("fomento-materiais").getPublicUrl(caminho).data.publicUrl });
+                  avisar("Banner enviado — clique em Salvar configurações.");
+                }} />
+              </label>
+              {f.banner_url && <button type="button" onClick={() => setF({ ...f, banner_url: "" })} className="font-body text-xs" style={{ color: F.danger }}>Remover</button>}
             </div>
           </Campo>
           <Campo label="Texto de apresentação" className="sm:col-span-2"><textarea rows={2} value={f.texto_intro || ""} onChange={(e) => setF({ ...f, texto_intro: e.target.value })} className={inputCls} style={inputSty} /></Campo>
