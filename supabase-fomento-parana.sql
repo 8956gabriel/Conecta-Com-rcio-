@@ -417,3 +417,68 @@ returns json language sql stable security definer set search_path = public as $$
   else null end;
 $$;
 grant execute on function public.fomento_resumo_publico() to anon, authenticated;
+
+-- =============================================================================
+-- 15) DATA DA DECISÃO — concedidas/recusadas contam no ciclo em que foram
+--     decididas (ex.: cadastrada em outubro, concedida em novembro → ciclo novo)
+-- =============================================================================
+alter table public.fomento_propostas add column if not exists data_decisao date;
+
+create or replace function public.fomento_propostas_antes()
+returns trigger language plpgsql as $$
+begin
+  if tg_op = 'INSERT' and (new.numero is null or new.numero = '') then
+    new.numero := 'FP-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('public.fomento_proposta_seq')::text, 5, '0');
+  end if;
+  if new.status in ('concedido','negado') then
+    if new.data_decisao is null and (tg_op = 'INSERT' or old.status is distinct from new.status) then
+      new.data_decisao := coalesce(new.etapa_desde, current_date);
+    end if;
+  else
+    new.data_decisao := null;
+  end if;
+  new.atualizado_em := now();
+  return new;
+end $$;
+
+create or replace function public.fomento_propostas_depois()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    insert into public.fomento_historico (proposta_id, acao, para_status, detalhe)
+    values (new.id, 'criada', new.status, 'Proposta ' || new.numero || case when new.importado_em is not null then ' importada do FomentoNet' else ' cadastrada' end);
+  elsif new.status is distinct from old.status then
+    insert into public.fomento_historico (proposta_id, acao, de_status, para_status, detalhe)
+    values (new.id, 'status', old.status, new.status, case when new.importado_em is distinct from old.importado_em then 'Atualizado pela importação do FomentoNet' end);
+  elsif (to_jsonb(new) - 'atualizado_em' - 'importado_em' - 'data_decisao') is distinct from (to_jsonb(old) - 'atualizado_em' - 'importado_em' - 'data_decisao') then
+    insert into public.fomento_historico (proposta_id, acao, detalhe)
+    values (new.id, 'edicao', case when new.importado_em is distinct from old.importado_em then 'Dados atualizados pela importação do FomentoNet' else 'Dados da proposta alterados' end);
+  end if;
+  return new;
+end $$;
+
+-- preenche as que já existem (importadas): data em que entraram na etapa
+update public.fomento_propostas
+   set data_decisao = coalesce(etapa_desde, data_proposta)
+ where status in ('concedido','negado') and data_decisao is null;
+
+create or replace function public.fomento_resumo_publico()
+returns json language sql stable security definer set search_path = public as $$
+  select case when coalesce((select mostrar_resumo from public.fomento_config where id = 1), true) then
+    coalesce((select json_agg(c order by c.ciclo desc) from (
+      select public.fomento_ciclo_fim(case when status in ('concedido','negado') then coalesce(data_decisao, etapa_desde, data_proposta) else data_proposta end) as ciclo,
+        count(*) filter (where status <> 'excluido') as total_propostas,
+        count(*) filter (where status = 'concedido') as concedidos,
+        count(*) filter (where status = 'negado') as recusados,
+        coalesce(sum(valor_solicitado) filter (where status <> 'excluido'), 0) as valor_solicitado,
+        coalesce(sum(coalesce(valor_concedido, valor_solicitado)) filter (where status = 'concedido'), 0) as valor_concedido,
+        case when count(*) filter (where status in ('concedido','negado')) = 0 then 0
+             else round(100.0 * count(*) filter (where status = 'concedido')
+                        / count(*) filter (where status in ('concedido','negado'))) end as taxa_aprovacao,
+        max(atualizado_em) as atualizado_em
+      from public.fomento_propostas
+      group by 1
+    ) c), '[]'::json)
+  else null end;
+$$;
+grant execute on function public.fomento_resumo_publico() to anon, authenticated;
