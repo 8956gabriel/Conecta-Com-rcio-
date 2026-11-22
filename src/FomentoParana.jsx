@@ -377,7 +377,8 @@ function Simulador({ linhas, config, modoAdmin = false, linhaInicial, onInteress
   const carenciaMax = linha?.carencia_max_meses ?? 6;
   const v = parseValor(valor) || 0;
   const foraDaFaixa = linha && ((linha.valor_min && v < Number(linha.valor_min)) || (linha.valor_max && v > Number(linha.valor_max)));
-  const r = taxa != null ? simular({ valor: v, taxaMensal: taxa, meses, carencia: Math.min(carencia, carenciaMax) }) : null;
+  const mesesEf = Math.min(meses, prazoMax);
+  const r = taxa != null ? simular({ valor: v, taxaMensal: taxa, meses: mesesEf, carencia: Math.min(carencia, carenciaMax) }) : null;
 
   return (
     <div className="grid lg:grid-cols-[1.1fr_1fr] gap-5">
@@ -390,10 +391,10 @@ function Simulador({ linhas, config, modoAdmin = false, linhaInicial, onInteress
         <Campo label="Valor desejado (R$)">
           <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" className={inputCls} style={inputSty} />
         </Campo>
-        <Campo label={`Prazo: ${meses} meses`}>
+        <Campo label={`Prazo: ${mesesEf} meses${linha?.prazo_max_meses ? ` (máx. ${linha.prazo_max_meses})` : ""}`}>
           <input type="range" min={1} max={prazoMax} value={Math.min(meses, prazoMax)} onChange={(e) => setMeses(Number(e.target.value))} className="w-full accent-green-600 mt-3" />
         </Campo>
-        <Campo label={`Carência: ${Math.min(carencia, carenciaMax)} meses`}>
+        <Campo label={`Carência: ${Math.min(carencia, carenciaMax)} meses${linha?.carencia_max_meses != null ? ` (máx. ${linha.carencia_max_meses})` : ""}`}>
           <input type="range" min={0} max={carenciaMax} value={Math.min(carencia, carenciaMax)} onChange={(e) => setCarencia(Number(e.target.value))} className="w-full accent-green-600 mt-3" />
         </Campo>
         <Campo label={taxaRef != null ? `Taxa (% a.m.) — referência ${taxaRef}%` : "Taxa (% ao mês)"}>
@@ -414,7 +415,7 @@ function Simulador({ linhas, config, modoAdmin = false, linhaInicial, onInteress
         {r ? (
           <>
             <p className="font-display font-extrabold text-4xl mt-1 relative">{moeda(r.parcela)}</p>
-            <p className="font-body text-xs text-white/70 relative">{meses}x {carencia > 0 ? `após ${Math.min(carencia, carenciaMax)} meses de carência` : ""}</p>
+            <p className="font-body text-xs text-white/70 relative">{mesesEf}x {carencia > 0 ? `após ${Math.min(carencia, carenciaMax)} meses de carência` : ""}</p>
             <div className="grid grid-cols-2 gap-2 mt-4 relative">
               {[["Valor solicitado", moeda(v)], ["Total estimado", moeda(r.total)], ["Juros estimados", moeda(r.juros)], ["Taxa usada", `${String(taxa).replace(".", ",")}% a.m.`]].map(([k, val]) => (
                 <div key={k} className="rounded-xl p-2.5" style={{ background: "rgba(255,255,255,0.1)" }}>
@@ -431,7 +432,7 @@ function Simulador({ linhas, config, modoAdmin = false, linhaInicial, onInteress
         )}
         <p className="font-body text-[10px] text-white/60 mt-auto pt-4 relative">{config?.aviso_simulacao || CONFIG_PADRAO.aviso_simulacao}</p>
         {onInteresse && linha && (
-          <button onClick={() => onInteresse({ linha, valor: v, meses })}
+          <button onClick={() => onInteresse({ linha, valor: v, meses: mesesEf })}
             className="glow-btn relative mt-3 font-body text-sm font-bold rounded-xl px-4 py-2.5 flex items-center justify-center gap-2" style={{ background: F.greenBright }}>
             <MessageCircle size={15} /> Enviar esta simulação ao Agente
           </button>
@@ -1274,6 +1275,8 @@ function slugDaLinhaFomentoNet(nome) {
   if (n.includes("TAXI") && (n.includes("MULHER") || n.includes(" M "))) return "taxista-mulher";
   if (n.includes("TAXI")) return "taxista";
   if (n.includes("EMERGENC")) return "micro-emergencial";
+  if (n.includes("FUNGETUR")) return "fungetur";
+  if (n.includes("GIRO")) return "giro-facil";
   if (n.includes("RECUPERA")) return "recupera-micro";
   if (n.includes("RURAL") && (n.includes("MULHER") || /\bM\b/.test(n))) return "micro-mulher-rural";
   if (n.includes("RURAL")) return "micro-rural";
