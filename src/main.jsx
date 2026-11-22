@@ -11,8 +11,11 @@ import "./index.css";
 registerSW({ immediate: true });
 
 // Link curto: conectacomercio.app.br/fomento abre direto a página do Fomento Paraná.
-if (/^\/fomento\/?$/i.test(window.location.pathname)) {
-  window.history.replaceState(null, "", "/#/fomento");
+// Links separados: /fomento (público), /fomento/agente (agente de crédito), /fomento/admin (gestão).
+{
+  const p = window.location.pathname.toLowerCase().replace(/\/+$/, "");
+  const destino = { "/fomento": "/#/fomento", "/fomento/publico": "/#/fomento", "/fomento/agente": "/#/fomento-agente", "/fomento/admin": "/#/fomento-admin" }[p];
+  if (destino) window.history.replaceState(null, "", destino);
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(

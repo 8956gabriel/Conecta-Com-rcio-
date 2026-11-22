@@ -11,6 +11,10 @@
     {
       "source": "/fomento",
       "destination": "/"
+    },
+    {
+      "source": "/fomento/(.*)",
+      "destination": "/"
     }
   ]
 }

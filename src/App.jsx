@@ -14632,13 +14632,14 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", prestador: "#/prestador", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados", fomento: "#/fomento", "fomento-admin": "#/fomento-admin" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", prestador: "#/prestador", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados", fomento: "#/fomento", "fomento-admin": "#/fomento-admin", "fomento-agente": "#/fomento-agente" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
   if (!h || h === "#" || h === "#/") return "site";
   if (h.startsWith("#/admin")) return "admin";
   if (h.startsWith("#/fomento-admin")) return "fomento-admin";
+  if (h.startsWith("#/fomento-agente")) return "fomento-agente";
   if (h.startsWith("#/fomento")) return "fomento";
   if (h.startsWith("#/estatisticas") || h.startsWith("#/numeros")) return "estatisticas";
   if (h.startsWith("#/turismo")) return "turismo";
@@ -15753,7 +15754,8 @@ export default function ConectaComercio() {
     { id: "prestador", label: "Painel Prestador", icon: Wrench, restrito: "prestador" },
     // Painel do Agente de Crédito — o botão só aparece para admin ou agente liberado,
     // mas o link #/fomento-admin funciona sempre (pede login se precisar).
-    { id: "fomento-admin", label: "Fomento Paraná · Agente", icon: HandCoins, restrito: "fomento", oculto: !podeFomento },
+    { id: "fomento-agente", label: "Fomento · Agente", icon: HandCoins, restrito: "fomento", oculto: !podeFomento },
+    { id: "fomento-admin", label: "Fomento · Admin", icon: ShieldCheck, restrito: "fomento", oculto: !podeFomento },
   ];
 
   // Link direto de acesso: le o hash da URL (#/admin, #/empresa, #/entrar,
@@ -15870,7 +15872,8 @@ export default function ConectaComercio() {
       {modo === "ouvidoria" && <PaginaOuvidoria />}
       {modo === "classificados" && <PaginaClassificados />}
       {modo === "fomento" && <FomentoPublico siteConfig={siteConfig} />}
-      {modo === "fomento-admin" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <FomentoAdmin sessao={sessao} perfil={perfil} />)}
+      {modo === "fomento-admin" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <FomentoAdmin key="admin" area="admin" sessao={sessao} perfil={perfil} />)}
+      {modo === "fomento-agente" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <FomentoAdmin key="agente" area="agente" sessao={sessao} perfil={perfil} />)}
       {modo === "termos" && <PaginaLegal titulo="Termos de uso" texto={siteConfig?.termos_uso} />}
       {modo === "privacidade" && <PaginaLegal titulo="Política de privacidade" texto={siteConfig?.politica_privacidade} />}
       {modo === "conta" && (sessao && perfil ? <MinhaConta perfil={perfil} sessao={sessao} /> : <ContaAcesso abaInicial={abaConta} mensagem={mensagemAcesso} onSucesso={aposLogin} />)}

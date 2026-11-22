@@ -875,11 +875,17 @@ function KPI({ titulo, valor, sub, cor = F.blue, icon: Icon }) {
   );
 }
 
-export function FomentoAdmin({ sessao, perfil, embutido = false }) {
+export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" }) {
   const podeAcessar = useFomentoAcesso(sessao, perfil);
   const [podeGerir, setPodeGerir] = useState(!supabaseConfigurado);
-  const [aba, setAbaEstado] = useState(() => { try { return sessionStorage.getItem("fomento-aba") || "central"; } catch { return "central"; } });
-  const setAba = (a) => { setAbaEstado(a); try { sessionStorage.setItem("fomento-aba", a); } catch { /* */ } };
+  const [gerirVerificado, setGerirVerificado] = useState(!supabaseConfigurado);
+  const ABAS_AREA = {
+    agente: ["central", "propostas", "contratos", "interesses", "simulacao", "lembretes"],
+    admin: ["painel", "propostas", "contratos", "interesses", "ranking", "linhas", "materiais", "lembretes", "config"],
+  };
+  const inicial = area === "admin" ? "painel" : "central";
+  const [aba, setAbaEstado] = useState(() => { try { const a = sessionStorage.getItem(`fomento-aba-${area}`); return a && (!ABAS_AREA[area] || ABAS_AREA[area].includes(a)) ? a : inicial; } catch { return inicial; } });
+  const setAba = (a) => { setAbaEstado(a); try { sessionStorage.setItem(`fomento-aba-${area}`, a); } catch { /* */ } };
   const { config, setConfig, linhas, setLinhas, materiais, setMateriais, rankingOficial, setRankingOficial } = useFomentoPublico();
   const [propostas, setPropostas] = useState(null);
   const [interesses, setInteresses] = useState(null);
@@ -892,8 +898,8 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
     if (!podeAcessar) return;
     if (!supabaseConfigurado) { setPropostas([]); setInteresses([]); setLembretes([]); setAgentes([{ id: "demo-ag", nome: "Ademir", papel: "gestor", ativo: true }]); return; }
     registrarAcesso("abriu_painel");
-    if (perfil?.tipo === "admin") setPodeGerir(true);
-    else supabase.rpc("fomento_pode_gerir").then(({ data }) => setPodeGerir(data === true));
+    if (perfil?.tipo === "admin") { setPodeGerir(true); setGerirVerificado(true); }
+    else supabase.rpc("fomento_pode_gerir").then(({ data }) => { setPodeGerir(data === true); setGerirVerificado(true); });
     supabase.from("fomento_propostas").select("*").order("criado_em", { ascending: false }).then(({ data, error }) => setPropostas(error ? [] : data || []));
     supabase.from("fomento_interesses").select("*").order("criado_em", { ascending: false }).then(({ data, error }) => setInteresses(error ? [] : data || []));
     supabase.from("fomento_agenda").select("*").order("data_hora").then(({ data, error }) => setLembretes(error ? [] : data || []));
@@ -919,12 +925,23 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
     );
   }
 
+  if (area === "admin" && gerirVerificado && !podeGerir) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center">
+        <span className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: "#FBEAE5" }}><ShieldCheck size={24} color={F.danger} /></span>
+        <p className="font-display font-bold text-lg" style={{ color: F.ink }}>Área de administração do Fomento</p>
+        <p className="font-body text-sm mt-2" style={{ color: F.muted }}>Sua conta tem acesso de agente. Use a área do agente de crédito.</p>
+        <a href="/fomento/agente" className="inline-block glow-btn font-body text-sm font-bold mt-6 px-5 py-2.5 rounded-xl text-white" style={{ background: F.blue }}>Abrir área do agente</a>
+      </div>
+    );
+  }
+
   const nomeLinha = (id, alternativo) => (linhas || []).find((l) => l.id === id)?.nome || alternativo || "—";
   const nomeAgente = (id) => (agentes || []).find((a) => a.id === id)?.nome || "—";
   const novosInteresses = (interesses || []).filter((i) => i.status === "novo").length;
   const lembretesPendentes = (lembretes || []).filter((l) => !l.concluido).length;
 
-  const itens = [
+  const todosItens = [
     { id: "central", label: "Central de Prospecção", icon: RadarCentral, destaque: true },
     { id: "painel", label: "Painel de crédito", icon: LayoutDashboard },
     { id: "propostas", label: "Cadastrar propostas", icon: PlusCircle },
@@ -937,6 +954,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
     { id: "lembretes", label: "Lembretes", icon: Bell, badge: lembretesPendentes },
     { id: "config", label: "Configurações", icon: Settings },
   ];
+  const itens = ABAS_AREA[area] ? todosItens.filter((i) => ABAS_AREA[area].includes(i.id)) : todosItens;
 
   const ctx = { rankingOficial, setRankingOficial, config, setConfig, linhas, setLinhas, materiais, setMateriais, propostas, setPropostas, interesses, setInteresses, lembretes, setLembretes, agentes, setAgentes, avisar, nomeLinha, nomeAgente, podeGerir, setAba };
 
@@ -948,7 +966,8 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
       <div className="rounded-2xl p-5 mb-6 flex items-center justify-between gap-4 flex-wrap overflow-hidden relative" style={{ background: `linear-gradient(120deg, ${F.blueDeep}, ${F.blue})` }}>
         <div aria-hidden className="absolute -right-8 -top-10 w-40 h-40 rounded-full" style={{ background: "rgba(37,168,91,0.25)" }} />
         <div className="relative">
-          <p className="font-body text-[11px] font-bold uppercase tracking-wider text-white/70 flex items-center gap-1.5"><Landmark size={12} /> Fomento Paraná · Agente de Crédito</p>
+          <p className="font-body text-[11px] font-bold uppercase tracking-wider text-white/70 flex items-center gap-1.5"><Landmark size={12} /> Fomento Paraná · {area === "admin" ? "Administração" : "Agente de Crédito"}
+            {area !== "todos" && <a href={area === "admin" ? "/fomento/agente" : "/fomento/admin"} className="ml-2 normal-case tracking-normal underline text-white/80 hover:text-white">ir para {area === "admin" ? "área do agente" : "administração"} ›</a>}</p>
           <h1 className="font-display text-xl md:text-2xl font-extrabold text-white mt-0.5">{itens.find((i) => i.id === aba)?.label || "Painel"}</h1>
         </div>
         <div className="relative flex items-center gap-2">
