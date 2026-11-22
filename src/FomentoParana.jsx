@@ -299,6 +299,39 @@ function CardRankingIvatuba({ registro, anterior, compacto = false }) {
 }
 
 // ---------------------------------------------------------------------------
+// Painel de crédito público — só totais (nenhum dado pessoal), via função
+// fomento_resumo_publico() do banco.
+// ---------------------------------------------------------------------------
+function PainelCreditoPublico({ resumo }) {
+  if (!resumo) return null;
+  const itens = [
+    ["Propostas", Number(resumo.total_propostas).toLocaleString("pt-BR"), ClipboardList, F.blue],
+    ["Concedidas", Number(resumo.concedidos).toLocaleString("pt-BR"), CheckCircle2, F.green],
+    ["Recusadas", Number(resumo.recusados).toLocaleString("pt-BR"), X, F.danger],
+    ["Valor solicitado", moeda(resumo.valor_solicitado), HandCoins, "#7E5BEF"],
+    ["Valor concedido", moeda(resumo.valor_concedido), Landmark, F.green],
+    ["Taxa de aprovação", `${resumo.taxa_aprovacao}%`, Trophy, "#E8A23D"],
+  ];
+  return (
+    <div>
+      <Titulo eyebrow="Painel de crédito · Ivatuba" title="Crédito que já chegou aos empreendedores" sub="Números do atendimento do Agente de Crédito da Fomento Paraná em Ivatuba." />
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+        {itens.map(([rotulo, valor, Icon, cor]) => (
+          <div key={rotulo} className="rounded-2xl border p-4 bg-white" style={{ borderColor: F.line }}>
+            <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${cor}1A`, color: cor }}><Icon size={15} /></span>
+            <p className="font-display font-extrabold text-xl md:text-2xl mt-2 leading-tight" style={{ color: F.ink }}>{valor}</p>
+            <p className="font-body text-[11px] mt-0.5" style={{ color: F.muted }}>{rotulo}</p>
+          </div>
+        ))}
+      </div>
+      <p className="font-body text-[10px] mt-2" style={{ color: F.soft }}>
+        Taxa de aprovação = concedidas ÷ (concedidas + recusadas). Propostas excluídas não entram na conta.{resumo.atualizado_em ? ` Atualizado em ${dataBR(resumo.atualizado_em)}.` : ""}
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Simulador (usado na área pública e no painel)
 // ---------------------------------------------------------------------------
 function Simulador({ linhas, config, modoAdmin = false, linhaInicial, onInteresse }) {
@@ -533,6 +566,11 @@ function DetalheLinha({ linha, materiais, whatsAgente, nomeAgente, onPreCadastro
 export function FomentoPublico({ siteConfig }) {
   const { config, linhas, materiais, rankingOficial } = useFomentoPublico();
   const rankingPublicado = (rankingOficial || []).filter((r) => r.publicar);
+  const [resumoPublico, setResumoPublico] = useState(null);
+  useEffect(() => {
+    if (!supabaseConfigurado) return;
+    supabase.rpc("fomento_resumo_publico").then(({ data, error }) => { if (!error && data) setResumoPublico(data); });
+  }, []);
   const [aberta, setAberta] = useState(null);
   const [linhaSimulador, setLinhaSimulador] = useState(null);
   const [preCadastro, setPreCadastro] = useState(null);
@@ -609,6 +647,13 @@ export function FomentoPublico({ siteConfig }) {
       {rankingPublicado[0] && (
         <section className="max-w-6xl mx-auto px-4 md:px-6 mt-5">
           <CardRankingIvatuba registro={rankingPublicado[0]} anterior={rankingPublicado[1]} />
+        </section>
+      )}
+
+      {/* PAINEL DE CRÉDITO PÚBLICO */}
+      {resumoPublico && Number(resumoPublico.total_propostas) > 0 && (
+        <section className="max-w-6xl mx-auto px-4 md:px-6 mt-10">
+          <PainelCreditoPublico resumo={resumoPublico} />
         </section>
       )}
 
@@ -1888,7 +1933,7 @@ function AbaConfig({ config, setConfig, agentes, setAgentes, avisar, podeGerir }
   if (!podeGerir) return <Aviso>Somente o gestor do módulo pode alterar as configurações.</Aviso>;
 
   const salvarConfig = async () => {
-    const dados = { ativo: f.ativo, whatsapp_oficial: f.whatsapp_oficial, agente_nome: f.agente_nome, titulo: f.titulo, texto_intro: f.texto_intro, link_oficial: f.link_oficial, aviso_simulacao: f.aviso_simulacao, atualizado_em: new Date().toISOString() };
+    const dados = { ativo: f.ativo, mostrar_resumo: f.mostrar_resumo !== false, whatsapp_oficial: f.whatsapp_oficial, agente_nome: f.agente_nome, titulo: f.titulo, texto_intro: f.texto_intro, link_oficial: f.link_oficial, aviso_simulacao: f.aviso_simulacao, atualizado_em: new Date().toISOString() };
     if (supabaseConfigurado) { const { error } = await supabase.from("fomento_config").update(dados).eq("id", 1); if (error) { avisar(error.message, "erro"); return; } }
     setConfig({ ...config, ...dados });
     avisar("Configurações salvas.");
@@ -1927,6 +1972,7 @@ function AbaConfig({ config, setConfig, agentes, setAgentes, avisar, podeGerir }
           <Campo label="Texto de apresentação" className="sm:col-span-2"><textarea rows={2} value={f.texto_intro || ""} onChange={(e) => setF({ ...f, texto_intro: e.target.value })} className={inputCls} style={inputSty} /></Campo>
           <Campo label="Link oficial da Fomento Paraná"><input value={f.link_oficial || ""} onChange={(e) => setF({ ...f, link_oficial: e.target.value })} className={inputCls} style={inputSty} /></Campo>
           <Campo label="Seção pública"><label className="flex items-center gap-2 h-10 font-body text-sm"><input type="checkbox" checked={f.ativo !== false} onChange={(e) => setF({ ...f, ativo: e.target.checked })} /> Visível no site</label></Campo>
+          <Campo label="Painel de crédito público"><label className="flex items-center gap-2 h-10 font-body text-sm"><input type="checkbox" checked={f.mostrar_resumo !== false} onChange={(e) => setF({ ...f, mostrar_resumo: e.target.checked })} /> Mostrar totais (propostas, concedidas, recusadas, valores e taxa)</label></Campo>
           <Campo label="Aviso do simulador" className="sm:col-span-2"><textarea rows={2} value={f.aviso_simulacao || ""} onChange={(e) => setF({ ...f, aviso_simulacao: e.target.value })} className={inputCls} style={inputSty} /></Campo>
           <button onClick={salvarConfig} className="sm:col-span-2 glow-btn font-body text-sm font-bold text-white rounded-xl py-2.5" style={{ background: F.blue }}>Salvar configurações</button>
         </div>
