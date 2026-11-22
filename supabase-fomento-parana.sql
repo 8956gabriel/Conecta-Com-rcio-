@@ -353,3 +353,33 @@ create policy "fomento: leitura publica ranking" on public.fomento_ranking_ofici
 create policy "fomento: equipe gerencia ranking" on public.fomento_ranking_oficial for all using (public.fomento_pode_acessar()) with check (public.fomento_pode_acessar());
 alter table public.fomento_ranking_oficial add column if not exists total_geral int;
 alter table public.fomento_ranking_oficial add column if not exists total_faixa int;
+
+-- =============================================================================
+-- 13) IMPORTAÇÃO DO FOMENTONET (planilha "Operação Microcrédito")
+--     O número da proposta = Código da Operação (único), então reimportar
+--     atualiza em vez de duplicar.
+-- =============================================================================
+alter table public.fomento_propostas add column if not exists etapa_fomentonet text;
+alter table public.fomento_propostas add column if not exists etapa_desde date;
+alter table public.fomento_propostas add column if not exists codigo_contrato text;
+alter table public.fomento_propostas add column if not exists linha_fomentonet text;
+alter table public.fomento_propostas add column if not exists municipio text;
+alter table public.fomento_propostas add column if not exists motivo_recusa text;
+alter table public.fomento_propostas add column if not exists importado_em timestamptz;
+
+-- Reimportar sem mudança nenhuma não polui o histórico.
+create or replace function public.fomento_propostas_depois()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    insert into public.fomento_historico (proposta_id, acao, para_status, detalhe)
+    values (new.id, 'criada', new.status, 'Proposta ' || new.numero || case when new.importado_em is not null then ' importada do FomentoNet' else ' cadastrada' end);
+  elsif new.status is distinct from old.status then
+    insert into public.fomento_historico (proposta_id, acao, de_status, para_status, detalhe)
+    values (new.id, 'status', old.status, new.status, case when new.importado_em is distinct from old.importado_em then 'Atualizado pela importação do FomentoNet' end);
+  elsif (to_jsonb(new) - 'atualizado_em' - 'importado_em') is distinct from (to_jsonb(old) - 'atualizado_em' - 'importado_em') then
+    insert into public.fomento_historico (proposta_id, acao, detalhe)
+    values (new.id, 'edicao', case when new.importado_em is distinct from old.importado_em then 'Dados atualizados pela importação do FomentoNet' else 'Dados da proposta alterados' end);
+  end if;
+  return new;
+end $$;
