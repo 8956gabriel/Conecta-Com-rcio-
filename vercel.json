@@ -1,6 +1,16 @@
 {
   "rewrites": [
-    { "source": "/ivatuba", "destination": "/" },
-    { "source": "/ivatuba/(.*)", "destination": "/" }
+    {
+      "source": "/ivatuba",
+      "destination": "/"
+    },
+    {
+      "source": "/ivatuba/(.*)",
+      "destination": "/"
+    },
+    {
+      "source": "/fomento",
+      "destination": "/"
+    }
   ]
 }

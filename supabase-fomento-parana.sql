@@ -62,7 +62,7 @@ grant execute on function public.fomento_pode_gerir() to anon, authenticated;
 -- -----------------------------------------------------------------------------
 -- 2) CONFIGURAÇÃO DO MÓDULO (uma linha só)
 -- -----------------------------------------------------------------------------
-create table if not exists public.fomento_config (
+create table if not exists public.fomento_modulo_config (
   id int primary key default 1 check (id = 1),
   ativo boolean not null default true,              -- mostra a seção pública
   whatsapp_oficial text,                            -- WhatsApp do Agente de Crédito
@@ -73,7 +73,7 @@ create table if not exists public.fomento_config (
   aviso_simulacao text default 'Simulação apenas estimativa. Taxas, prazos e valores finais dependem da análise de crédito da Fomento Paraná.',
   atualizado_em timestamptz not null default now()
 );
-insert into public.fomento_config (id) values (1) on conflict (id) do nothing;
+insert into public.fomento_modulo_config (id) values (1) on conflict (id) do nothing;
 
 -- -----------------------------------------------------------------------------
 -- 3) LINHAS DE CRÉDITO (as 9 modalidades — tudo editável no painel)
@@ -193,7 +193,7 @@ create trigger fomento_propostas_depois after insert or update on public.fomento
 -- -----------------------------------------------------------------------------
 -- 5) LEMBRETES DE ATENDIMENTO
 -- -----------------------------------------------------------------------------
-create table if not exists public.fomento_lembretes (
+create table if not exists public.fomento_agenda (
   id uuid primary key default gen_random_uuid(),
   titulo text not null,
   data_hora timestamptz not null,
@@ -253,11 +253,11 @@ create table if not exists public.fomento_acessos (
 -- 9) SEGURANÇA (RLS)
 -- -----------------------------------------------------------------------------
 alter table public.fomento_agentes    enable row level security;
-alter table public.fomento_config     enable row level security;
+alter table public.fomento_modulo_config     enable row level security;
 alter table public.fomento_linhas     enable row level security;
 alter table public.fomento_propostas  enable row level security;
 alter table public.fomento_historico  enable row level security;
-alter table public.fomento_lembretes  enable row level security;
+alter table public.fomento_agenda  enable row level security;
 alter table public.fomento_materiais  enable row level security;
 alter table public.fomento_interesses enable row level security;
 alter table public.fomento_acessos    enable row level security;
@@ -275,13 +275,13 @@ begin
 end $$;
 
 -- Público (site): só lê o que é para divulgação
-create policy "fomento: leitura publica config"    on public.fomento_config    for select using (true);
+create policy "fomento: leitura publica config"    on public.fomento_modulo_config    for select using (true);
 create policy "fomento: leitura publica linhas"    on public.fomento_linhas    for select using (ativo or public.fomento_pode_acessar());
 create policy "fomento: leitura publica materiais" on public.fomento_materiais for select using (publicado or public.fomento_pode_acessar());
 create policy "fomento: site envia interesse"      on public.fomento_interesses for insert with check (status = 'novo' and proposta_id is null);
 
 -- Gestão (admin geral ou agente gestor)
-create policy "fomento: gestor edita config"     on public.fomento_config    for update using (public.fomento_pode_gerir());
+create policy "fomento: gestor edita config"     on public.fomento_modulo_config    for update using (public.fomento_pode_gerir());
 create policy "fomento: gestor edita linhas"     on public.fomento_linhas    for all using (public.fomento_pode_gerir()) with check (public.fomento_pode_gerir());
 create policy "fomento: gestor edita materiais"  on public.fomento_materiais for all using (public.fomento_pode_gerir()) with check (public.fomento_pode_gerir());
 create policy "fomento: gestor edita agentes"    on public.fomento_agentes   for all using (public.fomento_pode_gerir()) with check (public.fomento_pode_gerir());
@@ -289,7 +289,7 @@ create policy "fomento: equipe ve agentes"       on public.fomento_agentes   for
 
 -- Dados pessoais (CPF, CNPJ, WhatsApp): só a equipe do Fomento
 create policy "fomento: equipe gerencia propostas"   on public.fomento_propostas  for all using (public.fomento_pode_acessar()) with check (public.fomento_pode_acessar());
-create policy "fomento: equipe gerencia lembretes"   on public.fomento_lembretes  for all using (public.fomento_pode_acessar()) with check (public.fomento_pode_acessar());
+create policy "fomento: equipe gerencia lembretes"   on public.fomento_agenda  for all using (public.fomento_pode_acessar()) with check (public.fomento_pode_acessar());
 create policy "fomento: equipe ve interesses"        on public.fomento_interesses for select using (public.fomento_pode_acessar());
 create policy "fomento: equipe atualiza interesses"  on public.fomento_interesses for update using (public.fomento_pode_acessar());
 create policy "fomento: gestor apaga interesses"     on public.fomento_interesses for delete using (public.fomento_pode_gerir());
@@ -387,7 +387,7 @@ end $$;
 -- =============================================================================
 -- 14) PAINEL DE CRÉDITO PÚBLICO — só números agregados (nenhum dado pessoal)
 -- =============================================================================
-alter table public.fomento_config add column if not exists mostrar_resumo boolean not null default true;
+alter table public.fomento_modulo_config add column if not exists mostrar_resumo boolean not null default true;
 
 -- Ciclo anual da Fomento: novembro a outubro. O primeiro ciclo reúne tudo
 -- até 31/10/2026 (2025 – out/2026); depois: nov/2026 – out/2027, etc.
@@ -399,7 +399,7 @@ $$;
 drop function if exists public.fomento_resumo_publico();
 create or replace function public.fomento_resumo_publico()
 returns json language sql stable security definer set search_path = public as $$
-  select case when coalesce((select mostrar_resumo from public.fomento_config where id = 1), true) then
+  select case when coalesce((select mostrar_resumo from public.fomento_modulo_config where id = 1), true) then
     coalesce((select json_agg(c order by c.ciclo desc) from (
       select public.fomento_ciclo_fim(data_proposta) as ciclo,
         count(*) filter (where status <> 'excluido') as total_propostas,
@@ -464,7 +464,7 @@ update public.fomento_propostas
 
 create or replace function public.fomento_resumo_publico()
 returns json language sql stable security definer set search_path = public as $$
-  select case when coalesce((select mostrar_resumo from public.fomento_config where id = 1), true) then
+  select case when coalesce((select mostrar_resumo from public.fomento_modulo_config where id = 1), true) then
     coalesce((select json_agg(c order by c.ciclo desc) from (
       select public.fomento_ciclo_fim(case when status in ('concedido','negado') then coalesce(data_decisao, etapa_desde, data_proposta) else data_proposta end) as ciclo,
         count(*) filter (where status <> 'excluido') as total_propostas,
@@ -516,3 +516,25 @@ on conflict (slug) do nothing;
 alter table public.fomento_materiais drop constraint if exists fomento_materiais_tipo_check;
 alter table public.fomento_materiais add constraint fomento_materiais_tipo_check
   check (tipo in ('cartilha','taxas','documentacao','informativo','modelo','manual','planilha'));
+
+-- =============================================================================
+-- 18) SEPARAÇÃO DO APP "FOMENTO IVATUBA" (projeto separado no mesmo Supabase)
+--     As tabelas public.fomento_config e public.fomento_lembretes pertencem ao
+--     outro app. Este módulo usa fomento_modulo_config e fomento_agenda, e aqui
+--     removemos o que este script tinha acrescentado nas tabelas do outro app.
+-- =============================================================================
+drop policy if exists "fomento: leitura publica config" on public.fomento_config;
+drop policy if exists "fomento: gestor edita config"   on public.fomento_config;
+drop policy if exists "fomento: equipe gerencia lembretes" on public.fomento_lembretes;
+alter table public.fomento_config drop column if exists mostrar_resumo;
+
+-- =============================================================================
+-- 19) CONTATOS E LOGO NA ÁREA PÚBLICA
+-- =============================================================================
+alter table public.fomento_modulo_config add column if not exists local_atendimento text default 'Sala do Empreendedor de Ivatuba';
+alter table public.fomento_modulo_config add column if not exists whatsapp_sala text;
+alter table public.fomento_modulo_config add column if not exists logo_url text;
+update public.fomento_modulo_config
+   set agente_nome = 'Gabriel Oliveira', whatsapp_oficial = '44988685814',
+       local_atendimento = 'Sala do Empreendedor de Ivatuba', whatsapp_sala = '44988414673'
+ where id = 1;
