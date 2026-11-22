@@ -103,6 +103,7 @@ const CONFIG_PADRAO = {
 export const moeda = (v) => (v == null || v === "" || isNaN(Number(v)) ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 const dataBR = (d) => (d ? new Date(d.length === 10 ? `${d}T12:00:00` : d).toLocaleDateString("pt-BR") : "—");
 const dataHoraBR = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
+const hojeLocal = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const soDigitos = (s) => String(s || "").replace(/\D/g, "");
 function parseValor(texto) {
   if (texto == null || texto === "") return null;
@@ -159,22 +160,25 @@ function useFomentoPublico() {
   const [config, setConfig] = useState(null);
   const [linhas, setLinhas] = useState(null);
   const [materiais, setMateriais] = useState(null);
+  const [rankingOficial, setRankingOficial] = useState(null);
   const recarregar = async () => {
     if (!supabaseConfigurado) {
-      setConfig((c) => c ?? CONFIG_PADRAO); setLinhas((l) => l ?? LINHAS_DEMO); setMateriais((m) => m ?? []);
+      setConfig((c) => c ?? CONFIG_PADRAO); setLinhas((l) => l ?? LINHAS_DEMO); setMateriais((m) => m ?? []); setRankingOficial((r) => r ?? []);
       return;
     }
-    const [cfg, lin, mat] = await Promise.all([
+    const [cfg, lin, mat, rk] = await Promise.all([
       supabase.from("fomento_config").select("*").eq("id", 1).maybeSingle(),
       supabase.from("fomento_linhas").select("*").order("ordem"),
       supabase.from("fomento_materiais").select("*").order("atualizado_em", { ascending: false }),
+      supabase.from("fomento_ranking_oficial").select("*").order("data_referencia", { ascending: false }).order("criado_em", { ascending: false }).limit(24),
     ]);
     setConfig({ ...CONFIG_PADRAO, ...(cfg.data || {}) });
     setLinhas(lin.error ? [] : lin.data || []);
     setMateriais(mat.error ? [] : mat.data || []);
+    setRankingOficial(rk.error ? [] : rk.data || []);
   };
   useEffect(() => { recarregar(); }, []);
-  return { config, setConfig, linhas, setLinhas, materiais, setMateriais, recarregar };
+  return { config, setConfig, linhas, setLinhas, materiais, setMateriais, rankingOficial, setRankingOficial, recarregar };
 }
 
 // Quem pode ver o painel do Fomento: admin do site ou agente liberado.
@@ -245,6 +249,48 @@ function Modal({ aberto, onFechar, titulo, children, largura = "max-w-2xl" }) {
         </div>
         <div className="p-5">{children}</div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ivatuba no Ranking Geral oficial da Fomento Paraná (lançado manualmente)
+// ---------------------------------------------------------------------------
+const FAIXAS_RANKING = ["Até 5 mil hab", "Até 10 mil hab", "Até 20 mil hab", "Até 50 mil hab", "Até 100 mil hab", "Até 200 mil hab", "Acima de 200 mil hab"];
+
+function CardRankingIvatuba({ registro, anterior, compacto = false }) {
+  if (!registro) return null;
+  const variacao = anterior?.posicao_geral && registro.posicao_geral ? anterior.posicao_geral - registro.posicao_geral : null;
+  const itens = [
+    registro.posicao_geral ? [`${registro.posicao_geral}º`, "no Paraná (geral)"] : null,
+    registro.posicao_faixa ? [`${registro.posicao_faixa}º`, registro.faixa ? `na faixa ${registro.faixa}` : "na faixa"] : null,
+    registro.pontuacao != null ? [Number(registro.pontuacao).toLocaleString("pt-BR"), "pontos"] : null,
+  ].filter(Boolean);
+  return (
+    <div className="rounded-2xl p-5 text-white relative overflow-hidden" style={{ background: `linear-gradient(120deg, ${F.blueDeep}, ${F.blue})` }}>
+      <div aria-hidden className="absolute -right-10 -top-12 w-44 h-44 rounded-full" style={{ background: "rgba(37,168,91,0.25)" }} />
+      <div className="relative flex items-start gap-3 flex-wrap">
+        <span className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(37,168,91,0.4)" }}><Trophy size={20} /></span>
+        <div className="flex-1 min-w-[180px]">
+          <p className="font-body text-[11px] font-bold uppercase tracking-wider text-white/70">Ranking Geral dos Agentes de Crédito · Fomento Paraná</p>
+          <p className={`font-display font-extrabold ${compacto ? "text-base" : "text-lg md:text-xl"} mt-0.5`}>Ivatuba no ranking estadual</p>
+          {variacao ? (
+            <p className="font-body text-xs mt-0.5" style={{ color: variacao > 0 ? "#8FF2C4" : "#F2C4B8" }}>
+              {variacao > 0 ? `▲ subiu ${variacao} posição(ões)` : `▼ caiu ${Math.abs(variacao)} posição(ões)`} desde {dataBR(anterior.data_referencia)}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <div className="relative grid grid-cols-3 gap-2 mt-4">
+        {itens.map(([n, r]) => (
+          <div key={r} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.12)" }}>
+            <p className="font-display font-extrabold text-2xl leading-none">{n}</p>
+            <p className="font-body text-[11px] text-white/70 mt-1">{r}</p>
+          </div>
+        ))}
+      </div>
+      {registro.observacao && <p className="relative font-body text-xs text-white/80 mt-3">{registro.observacao}</p>}
+      <p className="relative font-body text-[10px] text-white/60 mt-3">Atualizado em {dataBR(registro.data_referencia)} · fonte: FomentoNet (Fomento Paraná)</p>
     </div>
   );
 }
@@ -482,7 +528,8 @@ function DetalheLinha({ linha, materiais, whatsAgente, nomeAgente, onPreCadastro
 // ÁREA PÚBLICA — FOMENTO PARANÁ – CRÉDITO PARA EMPREENDEDORES   (#/fomento)
 // ---------------------------------------------------------------------------
 export function FomentoPublico({ siteConfig }) {
-  const { config, linhas, materiais } = useFomentoPublico();
+  const { config, linhas, materiais, rankingOficial } = useFomentoPublico();
+  const rankingPublicado = (rankingOficial || []).filter((r) => r.publicar);
   const [aberta, setAberta] = useState(null);
   const [linhaSimulador, setLinhaSimulador] = useState(null);
   const [preCadastro, setPreCadastro] = useState(null);
@@ -554,6 +601,13 @@ export function FomentoPublico({ siteConfig }) {
           )}
         </div>
       </section>
+
+      {/* IVATUBA NO RANKING OFICIAL */}
+      {rankingPublicado[0] && (
+        <section className="max-w-6xl mx-auto px-4 md:px-6 mt-5">
+          <CardRankingIvatuba registro={rankingPublicado[0]} anterior={rankingPublicado[1]} />
+        </section>
+      )}
 
       {/* LINHAS */}
       <section id="fp-linhas" className="max-w-6xl mx-auto px-4 md:px-6 mt-12 scroll-mt-24">
@@ -658,7 +712,7 @@ function ScrollPreCadastro({ alvo, rolar }) {
 // ÁREA ADMINISTRATIVA — PAINEL DO AGENTE DE CRÉDITO (Ademir)
 // ===========================================================================
 const PROPOSTA_VAZIA = {
-  numero: "", data_proposta: new Date().toISOString().slice(0, 10), nome: "", cpf: "", cnpj: "", whatsapp: "",
+  numero: "", data_proposta: hojeLocal(), nome: "", cpf: "", cnpj: "", whatsapp: "",
   linha_id: "", valor_solicitado: "", valor_concedido: "", prazo_meses: "", status: "novo", agente_id: "", observacoes: "",
 };
 
@@ -696,7 +750,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
   const podeAcessar = useFomentoAcesso(sessao, perfil);
   const [podeGerir, setPodeGerir] = useState(!supabaseConfigurado);
   const [aba, setAba] = useState("painel");
-  const { config, setConfig, linhas, setLinhas, materiais, setMateriais } = useFomentoPublico();
+  const { config, setConfig, linhas, setLinhas, materiais, setMateriais, rankingOficial, setRankingOficial } = useFomentoPublico();
   const [propostas, setPropostas] = useState(null);
   const [interesses, setInteresses] = useState(null);
   const [lembretes, setLembretes] = useState(null);
@@ -745,7 +799,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false }) {
     { id: "config", label: "Configurações", icon: Settings },
   ];
 
-  const ctx = { config, setConfig, linhas, setLinhas, materiais, setMateriais, propostas, setPropostas, interesses, setInteresses, lembretes, setLembretes, agentes, setAgentes, avisar, nomeLinha, nomeAgente, podeGerir, setAba };
+  const ctx = { rankingOficial, setRankingOficial, config, setConfig, linhas, setLinhas, materiais, setMateriais, propostas, setPropostas, interesses, setInteresses, lembretes, setLembretes, agentes, setAgentes, avisar, nomeLinha, nomeAgente, podeGerir, setAba };
 
   return (
     <div className={embutido ? "" : "max-w-6xl mx-auto px-4 md:px-6 py-8"}>
@@ -1236,7 +1290,83 @@ function AbaInteresses(ctx) {
 }
 
 // ---------------------------------------------------------------- Ranking
-function AbaRanking({ propostas, agentes }) {
+function RankingOficialIvatuba({ rankingOficial, setRankingOficial, avisar }) {
+  const vazio = { data_referencia: hojeLocal(), posicao_geral: "", pontuacao: "", faixa: "Até 5 mil hab", posicao_faixa: "", observacao: "", publicar: true };
+  const [f, setF] = useState(vazio);
+  const [salvando, setSalvando] = useState(false);
+  const lista = rankingOficial || [];
+  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
+
+  const salvar = async (e) => {
+    e.preventDefault();
+    const dados = {
+      data_referencia: f.data_referencia, posicao_geral: f.posicao_geral ? Number(f.posicao_geral) : null, pontuacao: parseValor(f.pontuacao),
+      faixa: f.faixa || null, posicao_faixa: f.posicao_faixa ? Number(f.posicao_faixa) : null, observacao: f.observacao.trim() || null, publicar: f.publicar,
+    };
+    if (!dados.posicao_geral && !dados.posicao_faixa && dados.pontuacao == null) { avisar("Informe ao menos a posição ou a pontuação.", "erro"); return; }
+    setSalvando(true);
+    try {
+      let reg = { ...dados, id: `demo-${Date.now()}`, criado_em: new Date().toISOString() };
+      if (supabaseConfigurado) {
+        const { data, error } = await supabase.from("fomento_ranking_oficial").insert(dados).select().single();
+        if (error) throw error;
+        reg = data;
+      }
+      setRankingOficial((l) => [reg, ...(l || [])].sort((a, b) => (b.data_referencia || "").localeCompare(a.data_referencia || "")));
+      setF(vazio);
+      avisar(dados.publicar ? "Ranking atualizado — já aparece no site." : "Ranking salvo (não publicado).");
+    } catch (err) { avisar(err.message || "Erro ao salvar.", "erro"); }
+    finally { setSalvando(false); }
+  };
+  const alternarPublicar = async (r) => {
+    if (supabaseConfigurado) { const { error } = await supabase.from("fomento_ranking_oficial").update({ publicar: !r.publicar }).eq("id", r.id); if (error) { avisar(error.message, "erro"); return; } }
+    setRankingOficial((l) => l.map((x) => (x.id === r.id ? { ...x, publicar: !r.publicar } : x)));
+  };
+  const apagar = async (r) => {
+    if (!window.confirm("Excluir este lançamento do ranking?")) return;
+    if (supabaseConfigurado) { const { error } = await supabase.from("fomento_ranking_oficial").delete().eq("id", r.id); if (error) { avisar(error.message, "erro"); return; } }
+    setRankingOficial((l) => l.filter((x) => x.id !== r.id));
+  };
+
+  return (
+    <div className="mb-8">
+      <Titulo eyebrow="Ranking oficial · FomentoNet" title="Ivatuba no Ranking Geral" sub="Abra o FomentoNet, confira a posição de Ivatuba e lance aqui. O último lançamento publicado aparece na página pública do Fomento." />
+      <div className="grid lg:grid-cols-2 gap-4">
+        <form onSubmit={salvar} className="rounded-2xl border p-4 grid grid-cols-2 gap-3 h-fit" style={{ borderColor: F.line }}>
+          <Campo label="Data da consulta"><input type="date" value={f.data_referencia} onChange={set("data_referencia")} className={inputCls} style={inputSty} /></Campo>
+          <Campo label="Posição geral (PR)"><input value={f.posicao_geral} onChange={set("posicao_geral")} inputMode="numeric" placeholder="Ex.: 12" className={inputCls} style={inputSty} /></Campo>
+          <Campo label="Faixa"><select value={f.faixa} onChange={set("faixa")} className={inputCls} style={inputSty}>{FAIXAS_RANKING.map((x) => <option key={x}>{x}</option>)}</select></Campo>
+          <Campo label="Posição na faixa"><input value={f.posicao_faixa} onChange={set("posicao_faixa")} inputMode="numeric" placeholder="Ex.: 2" className={inputCls} style={inputSty} /></Campo>
+          <Campo label="Pontuação" className="col-span-2"><input value={f.pontuacao} onChange={set("pontuacao")} inputMode="decimal" placeholder="Ex.: 3500" className={inputCls} style={inputSty} /></Campo>
+          <Campo label="Observação (opcional)" className="col-span-2"><input value={f.observacao} onChange={set("observacao")} placeholder="Ex.: Pódio da faixa no mês de novembro" className={inputCls} style={inputSty} /></Campo>
+          <label className="col-span-2 font-body text-sm flex items-center gap-2" style={{ color: F.ink }}><input type="checkbox" checked={f.publicar} onChange={set("publicar")} className="accent-green-600" /> Mostrar na página pública do Fomento</label>
+          <div className="col-span-2 flex gap-2 flex-wrap">
+            <button type="submit" disabled={salvando} className="glow-btn flex-1 font-body text-sm font-bold text-white rounded-xl py-2.5 disabled:opacity-60" style={{ background: F.green }}>{salvando ? "Salvando..." : "Atualizar ranking de Ivatuba"}</button>
+            <a href={FOMENTONET_RANKING_URL} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold rounded-xl px-3 py-2.5 border flex items-center gap-1.5" style={{ borderColor: F.line, color: F.blue }}><ExternalLink size={13} /> Abrir FomentoNet</a>
+          </div>
+        </form>
+        <div className="flex flex-col gap-3">
+          {lista[0] ? <CardRankingIvatuba registro={lista[0]} anterior={lista[1]} compacto /> : <div className="rounded-2xl border p-4 font-body text-sm" style={{ borderColor: F.line, color: F.soft }}>Nenhum lançamento ainda.</div>}
+          {lista.length > 0 && (
+            <div className="rounded-2xl border divide-y" style={{ borderColor: F.line }}>
+              <p className="font-body text-[11px] font-bold uppercase px-3 py-2" style={{ color: F.muted }}>Histórico</p>
+              {lista.map((r) => (
+                <div key={r.id} className="flex items-center gap-2 px-3 py-2 font-body text-xs" style={{ borderColor: F.line, color: F.ink }}>
+                  <span className="w-20 shrink-0" style={{ color: F.muted }}>{dataBR(r.data_referencia)}</span>
+                  <span className="flex-1">{r.posicao_geral ? `${r.posicao_geral}º geral` : ""}{r.posicao_faixa ? ` · ${r.posicao_faixa}º na faixa` : ""}{r.pontuacao != null ? ` · ${Number(r.pontuacao).toLocaleString("pt-BR")} pts` : ""}</span>
+                  <button onClick={() => alternarPublicar(r)} className="font-bold" style={{ color: r.publicar ? F.green : F.soft }}>{r.publicar ? "No site" : "Oculto"}</button>
+                  <button onClick={() => apagar(r)} title="Excluir"><Trash2 size={12} color={F.danger} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AbaRanking({ propostas, agentes, rankingOficial, setRankingOficial, avisar }) {
   const [periodo, setPeriodo] = useState("mes");
   const inicio = (() => { const d = new Date(); if (periodo === "mes") return new Date(d.getFullYear(), d.getMonth(), 1); if (periodo === "ano") return new Date(d.getFullYear(), 0, 1); return new Date(0); })();
   const lista = (propostas || []).filter((p) => new Date(p.data_proposta || p.criado_em) >= inicio);
@@ -1249,15 +1379,7 @@ function AbaRanking({ propostas, agentes }) {
 
   return (
     <div>
-      <a href={FOMENTONET_RANKING_URL} target="_blank" rel="noopener noreferrer"
-        className="rounded-2xl p-4 mb-5 flex items-center gap-3 text-white hover:opacity-95 transition-opacity" style={{ background: `linear-gradient(120deg, ${F.blueDeep}, ${F.blue})` }}>
-        <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(37,168,91,0.35)" }}><Trophy size={18} /></span>
-        <span className="flex-1 min-w-0">
-          <span className="block font-display font-extrabold text-sm">Ranking Geral oficial — FomentoNet</span>
-          <span className="block font-body text-[11px] text-white/75">Abre o sistema oficial da Fomento Paraná em nova aba (login no próprio FomentoNet).</span>
-        </span>
-        <ExternalLink size={16} className="shrink-0" />
-      </a>
+      <RankingOficialIvatuba rankingOficial={rankingOficial} setRankingOficial={setRankingOficial} avisar={avisar} />
       <Titulo eyebrow="Ranking interno" title="Desempenho dos agentes nesta plataforma"
         direita={<select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className={`${inputCls} w-auto`} style={inputSty}><option value="mes">Este mês</option><option value="ano">Este ano</option><option value="tudo">Desde o início</option></select>} />
       <div className="flex flex-col gap-2">
