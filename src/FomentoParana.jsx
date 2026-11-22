@@ -149,7 +149,12 @@ function formatarDoc(doc) {
   if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
   return doc || "—";
 }
-const LINK_CURTO_FOMENTO = "https://conectacomercio.app.br/fomento";
+// Site próprio do Fomento (mesma base): build com VITE_SITE=fomento
+export const SITE_FOMENTO = import.meta.env.VITE_SITE === "fomento";
+export const LINKS_FOMENTO = SITE_FOMENTO
+  ? { publico: "/", agente: "/agente", admin: "/admin", entrar: "/entrar" }
+  : { publico: "/fomento", agente: "/fomento/agente", admin: "/fomento/admin", entrar: "#/entrar" };
+const LINK_CURTO_FOMENTO = SITE_FOMENTO && typeof window !== "undefined" ? window.location.origin : "https://conectacomercio.app.br/fomento";
 function formatarFone(f) {
   const d = soDigitos(f).replace(/^55(?=\d{10,11}$)/, "");
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
@@ -718,7 +723,7 @@ export function FomentoPublico({ siteConfig }) {
         </div>
         <div className="md:col-span-2 flex items-center gap-2 flex-wrap font-body text-xs" style={{ color: F.muted }}>
           <span>Link direto desta página:</span>
-          <a href={LINK_CURTO_FOMENTO} className="font-bold underline" style={{ color: F.blue }}>conectacomercio.app.br/fomento</a>
+          <a href={LINK_CURTO_FOMENTO} className="font-bold underline" style={{ color: F.blue }}>{LINK_CURTO_FOMENTO.replace(/^https?:\/\//, "")}</a>
           <button onClick={async () => { try { if (navigator.share) await navigator.share({ title: "Fomento Paraná — Crédito para empreendedores", url: LINK_CURTO_FOMENTO }); else { await navigator.clipboard.writeText(LINK_CURTO_FOMENTO); setLinkCopiado(true); setTimeout(() => setLinkCopiado(false), 2000); } } catch { /* cancelado */ } }}
             className="font-bold px-2.5 py-1 rounded-lg border" style={{ borderColor: F.line, color: F.blue }}>{linkCopiado ? "Copiado!" : "Compartilhar"}</button>
         </div>
@@ -920,7 +925,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" 
         <span className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: "#FBEAE5" }}><ShieldCheck size={24} color={F.danger} /></span>
         <p className="font-display font-bold text-lg" style={{ color: F.ink }}>Acesso exclusivo da equipe do Fomento Paraná</p>
         <p className="font-body text-sm mt-2" style={{ color: F.muted }}>{sessao ? "Sua conta ainda não foi liberada para o painel do Agente de Crédito. Peça ao administrador do Conecta Comércio." : "Entre com sua conta do Conecta Comércio para acessar."}</p>
-        {!sessao && <a href="#/entrar" className="inline-block glow-btn font-body text-sm font-bold mt-6 px-5 py-2.5 rounded-xl text-white" style={{ background: F.blue }}>Entrar</a>}
+        {!sessao && <a href={LINKS_FOMENTO.entrar} className="inline-block glow-btn font-body text-sm font-bold mt-6 px-5 py-2.5 rounded-xl text-white" style={{ background: F.blue }}>Entrar</a>}
       </div>
     );
   }
@@ -931,7 +936,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" 
         <span className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: "#FBEAE5" }}><ShieldCheck size={24} color={F.danger} /></span>
         <p className="font-display font-bold text-lg" style={{ color: F.ink }}>Área de administração do Fomento</p>
         <p className="font-body text-sm mt-2" style={{ color: F.muted }}>Sua conta tem acesso de agente. Use a área do agente de crédito.</p>
-        <a href="/fomento/agente" className="inline-block glow-btn font-body text-sm font-bold mt-6 px-5 py-2.5 rounded-xl text-white" style={{ background: F.blue }}>Abrir área do agente</a>
+        <a href={LINKS_FOMENTO.agente} className="inline-block glow-btn font-body text-sm font-bold mt-6 px-5 py-2.5 rounded-xl text-white" style={{ background: F.blue }}>Abrir área do agente</a>
       </div>
     );
   }
@@ -967,7 +972,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" 
         <div aria-hidden className="absolute -right-8 -top-10 w-40 h-40 rounded-full" style={{ background: "rgba(37,168,91,0.25)" }} />
         <div className="relative">
           <p className="font-body text-[11px] font-bold uppercase tracking-wider text-white/70 flex items-center gap-1.5"><Landmark size={12} /> Fomento Paraná · {area === "admin" ? "Administração" : "Agente de Crédito"}
-            {area !== "todos" && <a href={area === "admin" ? "/fomento/agente" : "/fomento/admin"} className="ml-2 normal-case tracking-normal underline text-white/80 hover:text-white">ir para {area === "admin" ? "área do agente" : "administração"} ›</a>}</p>
+            {area !== "todos" && <a href={area === "admin" ? LINKS_FOMENTO.agente : LINKS_FOMENTO.admin} className="ml-2 normal-case tracking-normal underline text-white/80 hover:text-white">ir para {area === "admin" ? "área do agente" : "administração"} ›</a>}</p>
           <h1 className="font-display text-xl md:text-2xl font-extrabold text-white mt-0.5">{itens.find((i) => i.id === aba)?.label || "Painel"}</h1>
         </div>
         <div className="relative flex items-center gap-2">

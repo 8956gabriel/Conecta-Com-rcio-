@@ -15,6 +15,18 @@
     {
       "source": "/fomento/(.*)",
       "destination": "/"
+    },
+    {
+      "source": "/agente",
+      "destination": "/"
+    },
+    {
+      "source": "/admin",
+      "destination": "/"
+    },
+    {
+      "source": "/entrar",
+      "destination": "/"
     }
   ]
 }
