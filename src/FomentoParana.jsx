@@ -1802,6 +1802,7 @@ export const ACOES_PONTUACAO = [
   { id: "retorno_proposta", rotulo: "Retorno de proposta", detalhe: "proposta devolvida", pontos: -20, cor: "#B4462F" },
   { id: "renegociacao", rotulo: "Renegociação", detalhe: "renegociação feita", pontos: 400, cor: "#2563EB" },
   { id: "renegociacao_prejuizo", rotulo: "Renegociação em prejuízo", detalhe: "contrato em prejuízo", pontos: 800, cor: "#7A3E9D" },
+  { id: "excluido", rotulo: "Excluído", detalhe: "proposta excluída", pontos: -200, cor: "#5C6B7A" },
 ];
 const acaoPorId = (id) => ACOES_PONTUACAO.find((a) => a.id === id);
 const totalLanc = (l) => (Number(l.pontos) || 0) * (Number(l.quantidade) || 1);
@@ -1897,7 +1898,7 @@ function AbaPontuacao({ avisar, sessao }) {
           <Campo label="Quantidade"><input type="number" min={1} max={100} value={quantidade} onChange={(e) => setQuantidade(e.target.value)} className={inputCls} style={inputSty} /></Campo>
           <Campo label="Observação (opcional — ex.: nome do cliente)"><input value={observacao} onChange={(e) => setObservacao(e.target.value)} maxLength={140} className={inputCls} style={inputSty} /></Campo>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {ACOES_PONTUACAO.map((a) => (
             <button key={a.id} onClick={() => lancar(a)} disabled={!!salvando || erroTabela}
               className="rounded-xl p-3.5 text-left text-white transition active:scale-[0.97] disabled:opacity-60 flex flex-col gap-1 min-h-[92px]"

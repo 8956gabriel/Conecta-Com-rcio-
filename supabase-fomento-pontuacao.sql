@@ -12,10 +12,7 @@
 -- =============================================================================
 create table if not exists public.fomento_pontuacao (
   id uuid primary key default gen_random_uuid(),
-  acao text not null check (acao in (
-    'cadastro_proposta', 'aprovado', 'abrir_sistema', 'simulacao',
-    'ler_comunicados', 'retorno_proposta', 'renegociacao', 'renegociacao_prejuizo'
-  )),
+  acao text not null,
   pontos int not null,
   quantidade int not null default 1 check (quantidade between 1 and 100),
   data date not null default current_date,
@@ -23,6 +20,12 @@ create table if not exists public.fomento_pontuacao (
   criado_por uuid not null default auth.uid() references auth.users(id) on delete cascade,
   criado_em timestamptz not null default now()
 );
+-- Atividades aceitas (refeito a cada execução, para incluir novas atividades)
+alter table public.fomento_pontuacao drop constraint if exists fomento_pontuacao_acao_check;
+alter table public.fomento_pontuacao add constraint fomento_pontuacao_acao_check check (acao in (
+  'cadastro_proposta', 'aprovado', 'abrir_sistema', 'simulacao', 'ler_comunicados',
+  'retorno_proposta', 'renegociacao', 'renegociacao_prejuizo', 'excluido'
+));
 create index if not exists fomento_pontuacao_usuario_data on public.fomento_pontuacao (criado_por, data desc);
 
 alter table public.fomento_pontuacao enable row level security;
