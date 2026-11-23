@@ -5,8 +5,11 @@ import { C, Titulo, Btn, Card, Aviso, Chip, Vazio, Modal, Campos, Campo, inp, in
 import { CAT_SERVICOS, SUGESTOES_SERVICOS, GRUPOS, MESES, SEMANA_PADRAO, INDICADORES } from "./dados.js";
 import { MES_NOME, SEMANA, br, hoje, mesInfo } from "./motor.js";
 import { Relatorios, pdfSorteio } from "./telas5.jsx";
+import { AnepsAdm } from "./aneps.jsx";
+import { ModelosFormAdm } from "./formulario-pdf.jsx";
+import { SorteiosMensais } from "./sorteios-mensais.jsx";
 
-const ABAS = [["equipe", "Equipe e acessos", Users], ["config", "Correspondente e logo", Settings], ["servicos", "Serviços", Package], ["publicos", "Públicos", Layers], ["metas", "Metas", Target], ["calendario", "Calendário", CalendarDays], ["rotina", "Rotina semanal", CalendarRange], ["pontuacao", "Pontuação", Coins], ["desafios", "Desafios e sorteios", Gift], ["conhecimento", "Conteúdo do assistente", Bot], ["dicas", "Dicas", Lightbulb], ["treinamentos", "Treinamentos", GraduationCap], ["relatorios", "Relatórios", FileBarChart], ["log", "Registro de alterações", History]];
+const ABAS = [["equipe", "Equipe e acessos", Users], ["config", "Correspondente e logo", Settings], ["servicos", "Serviços", Package], ["publicos", "Públicos", Layers], ["metas", "Metas", Target], ["calendario", "Calendário", CalendarDays], ["rotina", "Rotina semanal", CalendarRange], ["pontuacao", "Pontuação", Coins], ["desafios", "Desafios e sorteios", Gift], ["conhecimento", "Conteúdo do assistente", Bot], ["dicas", "Dicas", Lightbulb], ["treinamentos", "Treinamentos", GraduationCap], ["aneps", "Treinamento ANEPS", GraduationCap], ["formularios", "Modelos de formulário", FileDown], ["sorteiosmensais", "Sorteios mensais", Gift], ["relatorios", "Relatórios", FileBarChart], ["log", "Registro de alterações", History]];
 const limpa = (v, num = []) => { const d = {}; for (const [k, x] of Object.entries(v)) if (!["id", "criado_em", "atualizado_em"].includes(k) && !k.startsWith("_")) d[k] = x === "" ? null : num.includes(k) && x != null ? Number(x) : x; return d; };
 
 export default function Admin({ K }) {
@@ -30,6 +33,9 @@ export default function Admin({ K }) {
         {aba === "conhecimento" && <ListaSimples K={K} tab="conhecimento" titulo="Conteúdo do assistente" sub="Base de conhecimento que o assistente usa nas respostas. Coloque somente informações oficiais e atualizadas (horários, procedimentos internos, serviços autorizados, canais oficiais)." campos={[{ k: "titulo", l: "Título", req: true, full: true }, { k: "conteudo", l: "Conteúdo", t: "textarea", rows: 8, full: true, req: true }, { k: "ativo", l: "Situação", t: "checkbox", texto: "Ativo" }]} novo={{ ativo: true }} rotulo={(x) => x.titulo} />}
         {aba === "dicas" && <ListaSimples K={K} tab="dicas" titulo="Dicas do dia" sub="Dicas próprias que entram no rodízio junto com as do sistema." campos={[{ k: "categoria", l: "Categoria", t: "select", semVazio: true, op: ["Atendimento", "Comunicação", "Vendas responsáveis", "Prospecção", "Relacionamento", "Segurança bancária", "Organização", "Produtividade"].map((x) => [x, x]) }, { k: "texto", l: "Dica", t: "textarea", full: true, req: true }, { k: "ativo", l: "Situação", t: "checkbox", texto: "Ativa" }]} novo={{ categoria: "Atendimento", ativo: true }} rotulo={(x) => `${x.categoria}: ${x.texto}`} />}
         {aba === "treinamentos" && <TreinamentosAdm K={K} />}
+        {aba === "aneps" && <AnepsAdm K={K} />}
+        {aba === "formularios" && <ModelosFormAdm K={K} />}
+        {aba === "sorteiosmensais" && <SorteiosMensais K={K} modoAdmin />}
         {aba === "relatorios" && <Relatorios K={K} />}
         {aba === "log" && <Log K={K} />}
       </div>

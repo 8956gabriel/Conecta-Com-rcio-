@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Home, PlusCircle, Users, Radar, Target, MapPin, CalendarDays, CalendarRange, Megaphone, Package, MessageSquareText, Bot, Trophy,
   Gift, GraduationCap, Lightbulb, BrainCircuit, FileBarChart, ShieldCheck, LogOut, Menu, X, ClipboardList, ListChecks, Eye, EyeOff, Landmark,
+  Award, FileText, PartyPopper,
 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "../supabaseClient";
 import { C, useDados, Aviso, Btn, msgErro } from "./base.jsx";
@@ -16,10 +17,16 @@ import { Calendario, PlanoSemanal, Plano30, Campanhas } from "./telas3.jsx";
 import { Produtos, Mensagens, Assistente, Dicas, Treinamento } from "./telas4.jsx";
 import { MetasRanking, Desafios, Analise, Relatorios } from "./telas5.jsx";
 import Admin from "./Admin.jsx";
+import { TreinamentoANEPS } from "./aneps.jsx";
+import { GeradorFormularios } from "./formulario-pdf.jsx";
+import { SorteiosMensais } from "./sorteios-mensais.jsx";
 
 export const MENU = [
   { g: "Dia a dia", itens: [
     { id: "inicio", l: "Início", i: Home }, { id: "atendimentos", l: "Atendimentos", i: ClipboardList }, { id: "clientes", l: "Clientes (CRM)", i: Users }, { id: "agenda", l: "Agenda e tarefas", i: ListChecks },
+  ] },
+  { g: "Ferramentas", itens: [
+    { id: "aneps", l: "Treinamento ANEPS", i: Award, e: "🎓" }, { id: "formularios", l: "Gerador de Formulários", i: FileText, e: "📄" }, { id: "sorteios", l: "Sorteios Mensais", i: PartyPopper, e: "🎁" },
   ] },
   { g: "Prospecção", itens: [
     { id: "radar", l: "Radar de clientes", i: Radar }, { id: "prospeccao", l: "Prospecção", i: Target }, { id: "ivatuba", l: "Radar de Ivatuba", i: MapPin },
@@ -109,6 +116,9 @@ function App({ sessao, acesso, rota, ir }) {
       {aba === "desafios" && <Desafios {...P} />}
       {aba === "analise" && <Analise {...P} />}
       {aba === "relatorios" && <Relatorios {...P} />}
+      {aba === "aneps" && <TreinamentoANEPS {...P} />}
+      {aba === "formularios" && <GeradorFormularios {...P} />}
+      {aba === "sorteios" && <SorteiosMensais {...P} />}
       {modal?.tipo === "atendimento" && <ModalAtendimento K={K} atendimento={modal.dados?.id ? modal.dados : null} inicial={modal.dados?.id ? null : modal.dados} onFechar={() => setModal(null)} />}
       {modal?.tipo === "cliente" && <ModalCliente K={K} cliente={modal.dados?.id ? modal.dados : null} inicial={modal.dados?.id ? null : modal.dados} onFechar={(r) => { const dep = modal.dados?.depois; setModal(null); if (r && dep) dep(r); }} />}
       {modal?.tipo === "tarefa" && <ModalTarefa K={K} tarefa={modal.dados?.id ? modal.dados : null} inicial={modal.dados?.id ? null : modal.dados} onFechar={() => setModal(null)} />}
@@ -136,7 +146,7 @@ function Moldura({ K, children, admin, titulo, ir, toast, aba, setAba, menuMobil
           <p className="font-body text-[10px] font-bold uppercase tracking-widest px-3 mb-1" style={{ color: "rgba(255,255,255,0.45)" }}>{g.g}</p>
           {g.itens.map((it) => { const on = aba === it.id; const I = it.i; return (
             <button key={it.id} onClick={() => { setAba(it.id); onClick?.(); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-body text-sm font-semibold text-left transition"
-              style={{ background: on ? C.yellow : "transparent", color: on ? C.navy : "rgba(255,255,255,0.86)" }}><I size={16} /> {it.l}</button>); })}
+              style={{ background: on ? C.yellow : "transparent", color: on ? C.navy : "rgba(255,255,255,0.86)" }}>{it.e ? <span className="w-4 text-center text-[15px] leading-none">{it.e}</span> : <I size={16} />} {it.l}</button>); })}
         </div>
       ))}
     </nav>
