@@ -1806,7 +1806,10 @@ export const ACOES_PONTUACAO = [
 ];
 // Saldo inicial: lançado uma vez, com o valor digitado (não é botão da grade).
 const SALDO_INICIAL = { id: "saldo_inicial", rotulo: "Saldo inicial", detalhe: "pontuação de partida", pontos: 0, cor: "#052A4D" };
-const acaoPorId = (id) => (id === SALDO_INICIAL.id ? SALDO_INICIAL : ACOES_PONTUACAO.find((a) => a.id === id));
+// Lançamento manual: qualquer quantidade de pontos (positiva ou negativa), digitada.
+const PONTOS_MANUAIS = { id: "manual", rotulo: "Lançamento manual", detalhe: "pontos digitados", pontos: 0, cor: "#334155" };
+const EXTRAS_PONTUACAO = [SALDO_INICIAL, PONTOS_MANUAIS];
+const acaoPorId = (id) => EXTRAS_PONTUACAO.find((a) => a.id === id) || ACOES_PONTUACAO.find((a) => a.id === id);
 const totalLanc = (l) => (Number(l.pontos) || 0) * (Number(l.quantidade) || 1);
 const fmtPts = (n) => `${n > 0 ? "+" : ""}${Number(n).toLocaleString("pt-BR")}`;
 
@@ -1819,7 +1822,7 @@ function AbaPontuacao({ avisar, sessao }) {
   const [salvando, setSalvando] = useState(null);
   const [periodo, setPeriodo] = useState("ciclo");
   const [ultimo, setUltimo] = useState(null);
-  const [saldoInicial, setSaldoInicial] = useState("3100");
+  const [pontosManuais, setPontosManuais] = useState("");
 
   useEffect(() => {
     if (!supabaseConfigurado) { setLancamentos([]); return; }
@@ -1829,7 +1832,7 @@ function AbaPontuacao({ avisar, sessao }) {
 
   const lancar = async (acao, pontosFixos) => {
     const qtd = pontosFixos != null ? 1 : Math.min(100, Math.max(1, Number(quantidade) || 1));
-    const reg = { acao: acao.id, pontos: pontosFixos ?? acao.pontos, quantidade: qtd, data, observacao: pontosFixos != null ? "Pontuação de partida" : observacao.trim() || null };
+    const reg = { acao: acao.id, pontos: pontosFixos ?? acao.pontos, quantidade: qtd, data, observacao: observacao.trim() || (acao.id === SALDO_INICIAL.id ? "Pontuação de partida" : null) };
     setSalvando(acao.id);
     let novo = { ...reg, id: `demo-${Date.now()}`, criado_em: new Date().toISOString() };
     if (supabaseConfigurado) {
@@ -1879,9 +1882,11 @@ function AbaPontuacao({ avisar, sessao }) {
     const ls = doPeriodo.filter((l) => l.acao === a.id);
     return { ...a, vezes: ls.reduce((s, l) => s + (Number(l.quantidade) || 1), 0), total: soma(ls) };
   });
-  const ini = doPeriodo.filter((l) => l.acao === SALDO_INICIAL.id);
-  if (ini.length) porAcao.unshift({ ...SALDO_INICIAL, vezes: ini.length, total: soma(ini) });
-  const temSaldoInicial = todos.some((l) => l.acao === SALDO_INICIAL.id);
+  EXTRAS_PONTUACAO.slice().reverse().forEach((x) => {
+    const ls = doPeriodo.filter((l) => l.acao === x.id);
+    if (ls.length) porAcao.unshift({ ...x, vezes: ls.length, total: soma(ls) });
+  });
+  const temLancamento = todos.length > 0;
   const totalPeriodo = soma(doPeriodo);
 
   return (
@@ -1898,17 +1903,15 @@ function AbaPontuacao({ avisar, sessao }) {
         ))}
       </div>
 
-      {lancamentos && !temSaldoInicial && !erroTabela && (
-        <div className="rounded-2xl border-2 border-dashed p-4 mb-5 flex items-end gap-3 flex-wrap" style={{ borderColor: F.blue, background: F.blueTint2 }}>
-          <div className="flex-1 min-w-[200px]">
-            <p className="font-display font-bold text-sm" style={{ color: F.ink }}>Começar com saldo inicial</p>
-            <p className="font-body text-xs" style={{ color: F.muted }}>Lança uma vez a pontuação que você já tem, na data escolhida abaixo. Os botões somam a partir dela.</p>
-          </div>
-          <Campo label="Pontos"><input inputMode="numeric" value={saldoInicial} onChange={(e) => setSaldoInicial(e.target.value.replace(/[^\d-]/g, ""))} className={`${inputCls} w-28`} style={inputSty} /></Campo>
-          <button onClick={() => { const n = parseInt(saldoInicial, 10); if (!n) { avisar("Informe os pontos do saldo inicial.", "erro"); return; } lancar(SALDO_INICIAL, n); }} disabled={!!salvando}
-            className="glow-btn font-body text-sm font-bold px-5 py-2.5 rounded-xl text-white disabled:opacity-60" style={{ background: F.blue }}>{salvando === SALDO_INICIAL.id ? "Lançando..." : "Lançar saldo inicial"}</button>
+      <div className="rounded-2xl border-2 border-dashed p-4 mb-5 flex items-end gap-3 flex-wrap" style={{ borderColor: F.blue, background: F.blueTint2 }}>
+        <div className="flex-1 min-w-[200px]">
+          <p className="font-display font-bold text-sm" style={{ color: F.ink }}>Lançar pontos manualmente</p>
+          <p className="font-body text-xs" style={{ color: F.muted }}>{temLancamento ? "Digite os pontos (use − para descontar). Usa a data e a observação do quadro abaixo." : "Comece lançando a pontuação que você já tem (ex.: 3100). Os botões somam a partir dela."}</p>
         </div>
-      )}
+        <Campo label="Pontos"><input inputMode="numeric" placeholder={temLancamento ? "ex.: 150" : "ex.: 3100"} value={pontosManuais} onChange={(e) => setPontosManuais(e.target.value.replace(/[^\d-]/g, ""))} className={`${inputCls} w-28`} style={inputSty} /></Campo>
+        <button onClick={async () => { const n = parseInt(pontosManuais, 10); if (!n) { avisar("Digite os pontos.", "erro"); return; } await lancar(temLancamento ? PONTOS_MANUAIS : SALDO_INICIAL, n); setPontosManuais(""); }} disabled={!!salvando || erroTabela}
+          className="glow-btn font-body text-sm font-bold px-5 py-2.5 rounded-xl text-white disabled:opacity-60" style={{ background: F.blue }}>{EXTRAS_PONTUACAO.some((x) => x.id === salvando) ? "Lançando..." : temLancamento ? "Lançar pontos" : "Lançar saldo inicial"}</button>
+      </div>
 
       <div className="rounded-2xl border p-4 mb-5" style={{ borderColor: F.line }}>
         <div className="grid sm:grid-cols-[150px_110px_1fr] gap-3 mb-4">
@@ -1945,8 +1948,8 @@ function AbaPontuacao({ avisar, sessao }) {
         {porAcao.map((a) => (
           <div key={a.id} className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0" style={{ borderColor: F.line }}>
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: a.cor }} />
-            <p className="flex-1 font-body text-sm" style={{ color: F.ink }}>{a.rotulo} {a.id !== SALDO_INICIAL.id && <span className="text-[11px]" style={{ color: F.soft }}>({fmtPts(a.pontos)} cada)</span>}</p>
-            <p className="font-body text-xs w-16 text-right" style={{ color: F.muted }}>{a.id === SALDO_INICIAL.id ? "" : `${a.vezes}×`}</p>
+            <p className="flex-1 font-body text-sm" style={{ color: F.ink }}>{a.rotulo} {!EXTRAS_PONTUACAO.some((x) => x.id === a.id) && <span className="text-[11px]" style={{ color: F.soft }}>({fmtPts(a.pontos)} cada)</span>}</p>
+            <p className="font-body text-xs w-16 text-right" style={{ color: F.muted }}>{EXTRAS_PONTUACAO.some((x) => x.id === a.id) ? "" : `${a.vezes}×`}</p>
             <p className="font-display font-bold text-sm w-20 text-right" style={{ color: a.total < 0 ? F.danger : a.total ? F.green : F.soft }}>{a.total.toLocaleString("pt-BR")}</p>
           </div>
         ))}

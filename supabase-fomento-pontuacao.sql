@@ -24,7 +24,7 @@ create table if not exists public.fomento_pontuacao (
 alter table public.fomento_pontuacao drop constraint if exists fomento_pontuacao_acao_check;
 alter table public.fomento_pontuacao add constraint fomento_pontuacao_acao_check check (acao in (
   'cadastro_proposta', 'aprovado', 'abrir_sistema', 'simulacao', 'ler_comunicados',
-  'retorno_proposta', 'renegociacao', 'renegociacao_prejuizo', 'excluido', 'saldo_inicial'
+  'retorno_proposta', 'renegociacao', 'renegociacao_prejuizo', 'excluido', 'saldo_inicial', 'manual'
 ));
 create index if not exists fomento_pontuacao_usuario_data on public.fomento_pontuacao (criado_por, data desc);
 
