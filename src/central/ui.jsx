@@ -149,11 +149,11 @@ export function Texto({ children, className = "" }) {
 }
 
 // Chamada à IA do servidor (com o token do usuário logado)
-export async function chamarIA({ modo, pedido, messages, contexto }) {
+export async function chamarIA({ modo, pedido, messages, contexto, endpoint = "/api/fomento-ia" }) {
   if (!supabaseConfigurado) throw new Error("Modo demonstração: conecte o Supabase.");
   const { data } = await supabase.auth.getSession();
   const token = data?.session?.access_token;
-  const r = await fetch("/api/fomento-ia", {
+  const r = await fetch(endpoint, {
     method: "POST",
     headers: { "content-type": "application/json", Authorization: `Bearer ${token || ""}` },
     body: JSON.stringify({ modo, pedido, messages, contexto }),

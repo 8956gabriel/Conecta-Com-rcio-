@@ -281,19 +281,19 @@ export async function exportarExcel(nomeArquivo, abas) {
   }
   XLSX.writeFile(wb, `${nomeArquivo}.xlsx`);
 }
-export async function exportarPDF(nomeArquivo, titulo, secoes, rodape = "") {
+export async function exportarPDF(nomeArquivo, titulo, secoes, rodape = "", subtitulo = "Fomento Paraná · Agente de Crédito Ivatuba", corRGB = [10, 90, 168]) {
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF({ orientation: "landscape" });
-  doc.setFillColor(10, 90, 168); doc.rect(0, 0, 297, 22, "F");
+  doc.setFillColor(...corRGB); doc.rect(0, 0, 297, 22, "F");
   doc.setTextColor(255); doc.setFontSize(15); doc.text(titulo, 12, 14);
-  doc.setFontSize(9); doc.text(`Fomento Paraná · Agente de Crédito Ivatuba · gerado em ${new Date().toLocaleString("pt-BR")}`, 12, 19.5);
+  doc.setFontSize(9); doc.text(`${subtitulo} · gerado em ${new Date().toLocaleString("pt-BR")}`, 12, 19.5);
   let y = 30;
   doc.setTextColor(14, 34, 51);
   for (const s of secoes) {
     if (y > 180) { doc.addPage(); y = 16; }
     doc.setFontSize(12); doc.text(s.titulo, 12, y); y += 3;
-    autoTable(doc, { startY: y, head: [s.cabecalho], body: s.linhas, styles: { fontSize: 8.5 }, headStyles: { fillColor: [10, 90, 168] }, alternateRowStyles: { fillColor: [245, 249, 253] }, margin: { left: 12, right: 12 } });
+    autoTable(doc, { startY: y, head: [s.cabecalho], body: s.linhas, styles: { fontSize: 8.5 }, headStyles: { fillColor: corRGB }, alternateRowStyles: { fillColor: [245, 249, 253] }, margin: { left: 12, right: 12 } });
     y = doc.lastAutoTable.finalY + 10;
   }
   if (rodape) { doc.setFontSize(8); doc.setTextColor(92, 113, 134); doc.text(rodape, 12, 203); }

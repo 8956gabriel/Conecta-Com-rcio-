@@ -11,14 +11,15 @@ registerSW({ immediate: true });
 
 // Link curto: conectacomercio.app.br/fomento abre direto a página do Fomento Paraná.
 // Links separados: /fomento (público), /fomento/agente (agente de crédito), /fomento/admin (gestão).
-if (import.meta.env.VITE_SITE !== "fomento") {
+if (!import.meta.env.VITE_SITE) {
   const p = window.location.pathname.toLowerCase().replace(/\/+$/, "");
   const destino = { "/fomento": "/#/fomento", "/fomento/publico": "/#/fomento", "/fomento/agente": "/#/fomento-agente", "/fomento/admin": "/#/fomento-admin" }[p];
   if (destino) window.history.replaceState(null, "", destino);
 }
 
-// Site próprio do Fomento Paraná (VITE_SITE=fomento) ou Conecta Comércio completo
-const carregar = import.meta.env.VITE_SITE === "fomento" ? import("./FomentoSite.jsx") : import("./App.jsx");
+// VITE_SITE=fomento → site do Fomento · VITE_SITE=maisbb → Mais BB Digital · vazio → Conecta Comércio
+const SITE = import.meta.env.VITE_SITE;
+const carregar = SITE === "fomento" ? import("./FomentoSite.jsx") : SITE === "maisbb" ? import("./maisbb/MaisBBSite.jsx") : import("./App.jsx");
 carregar.then(({ default: Raiz }) => {
   ReactDOM.createRoot(document.getElementById("root")).render(
     <React.StrictMode>
