@@ -49,15 +49,17 @@ begin
   end if;
   select lower(email), coalesce(raw_user_meta_data->>'nome', raw_user_meta_data->>'full_name', split_part(email, '@', 1))
     into v_email, v_nome from auth.users where id = auth.uid();
-  if not exists (select 1 from maisbb_membros) then
-    insert into maisbb_membros (user_id, nome, email, papel) values (auth.uid(), v_nome, v_email, 'admin');
-    return jsonb_build_object('ok', true, 'papel', 'admin', 'nome', v_nome, 'primeiro', true);
-  end if;
+  -- convite tem prioridade (define o perfil certo mesmo para quem entra primeiro)
   select * into v_conv from maisbb_convites where lower(email) = v_email;
   if found then
     insert into maisbb_membros (user_id, nome, email, papel) values (auth.uid(), coalesce(v_conv.nome, v_nome), v_email, v_conv.papel);
     delete from maisbb_convites where lower(email) = v_email;
     return jsonb_build_object('ok', true, 'papel', v_conv.papel, 'nome', coalesce(v_conv.nome, v_nome));
+  end if;
+  -- sem convite: só o primeiro de todos vira administrador, e apenas se não houver convite de administrador pendente
+  if not exists (select 1 from maisbb_membros) and not exists (select 1 from maisbb_convites where papel = 'admin') then
+    insert into maisbb_membros (user_id, nome, email, papel) values (auth.uid(), v_nome, v_email, 'admin');
+    return jsonb_build_object('ok', true, 'papel', 'admin', 'nome', v_nome, 'primeiro', true);
   end if;
   return jsonb_build_object('ok', false, 'motivo', 'sem_convite', 'email', v_email);
 end $$;
@@ -458,6 +460,12 @@ drop policy if exists "maisbb arquivos enviar" on storage.objects;
 create policy "maisbb arquivos enviar" on storage.objects for insert to authenticated with check (bucket_id = 'maisbb' and public.maisbb_pode_acessar());
 drop policy if exists "maisbb arquivos apagar" on storage.objects;
 create policy "maisbb arquivos apagar" on storage.objects for delete to authenticated using (bucket_id = 'maisbb' and public.maisbb_e_admin());
+
+-- acessos iniciais
+insert into public.maisbb_convites (email, nome, papel) values
+  ('gabrielfotossouza05@gmail.com', 'Gabriel', 'admin'),
+  ('rayane.trabalho15@gmail.com', 'Rayane', 'atendente')
+on conflict (email) do update set papel = excluded.papel;
 
 select string_agg(table_name, ', ' order by table_name) as tabelas_mais_bb
   from information_schema.tables where table_schema = 'public' and table_name like 'maisbb_%';
