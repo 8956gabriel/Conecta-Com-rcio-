@@ -16,7 +16,7 @@ import {
   Landmark, HandCoins, MessageCircle, FileText, Download, Calculator, ClipboardList,
   CheckCircle2, X, Search, Bell, Trophy, Settings, LayoutDashboard, Users, Pencil,
   Trash2, Eye, EyeOff, Upload, Calendar, ChevronRight, ShieldCheck, PlusCircle,
-  Clock, ArrowRight, ExternalLink, Columns, Inbox, History,
+  Clock, ArrowRight, ExternalLink, Columns, Inbox, History, Medal, Undo2,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
@@ -885,8 +885,8 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" 
   const [podeGerir, setPodeGerir] = useState(!supabaseConfigurado);
   const [gerirVerificado, setGerirVerificado] = useState(!supabaseConfigurado);
   const ABAS_AREA = {
-    agente: ["central", "propostas", "contratos", "interesses", "simulacao", "lembretes"],
-    admin: ["painel", "propostas", "contratos", "interesses", "ranking", "linhas", "materiais", "lembretes", "config"],
+    agente: ["central", "propostas", "contratos", "interesses", "simulacao", "pontuacao", "lembretes"],
+    admin: ["painel", "propostas", "contratos", "interesses", "pontuacao", "ranking", "linhas", "materiais", "lembretes", "config"],
   };
   const inicial = area === "admin" ? "painel" : "central";
   const [aba, setAbaEstado] = useState(() => { try { const a = sessionStorage.getItem(`fomento-aba-${area}`); return a && (!ABAS_AREA[area] || ABAS_AREA[area].includes(a)) ? a : inicial; } catch { return inicial; } });
@@ -953,6 +953,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" 
     { id: "contratos", label: "Contratos e andamento", icon: Columns },
     { id: "interesses", label: "Pré-cadastros do site", icon: Inbox, badge: novosInteresses },
     { id: "simulacao", label: "Simulação", icon: Calculator },
+    { id: "pontuacao", label: "Minha pontuação", icon: Medal },
     { id: "ranking", label: "Ranking de pontuação", icon: Trophy },
     { id: "linhas", label: "Linhas de crédito", icon: HandCoins },
     { id: "materiais", label: "Documentos e PDFs", icon: FileText },
@@ -1008,6 +1009,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" 
           {aba === "contratos" && <AbaContratos {...ctx} />}
           {aba === "interesses" && <AbaInteresses {...ctx} />}
           {aba === "simulacao" && <div><Titulo eyebrow="Simulação" title="Simulador de crédito" sub="Use durante o atendimento. Valores são estimativas." /><Simulador linhas={linhas} config={config} modoAdmin /></div>}
+          {aba === "pontuacao" && <AbaPontuacao {...ctx} sessao={sessao} />}
           {aba === "ranking" && <AbaRanking {...ctx} />}
           {aba === "linhas" && <AbaLinhas {...ctx} />}
           {aba === "materiais" && <AbaMateriais {...ctx} />}
@@ -1782,6 +1784,178 @@ function AbaRanking({ propostas, agentes, rankingOficial, setRankingOficial, avi
         <p className="font-body text-xs" style={{ color: F.muted }}>
           {Object.values(STATUS_PROPOSTA).map((s) => `${s.curto}: ${s.pontos}`).join(" · ")} · Concedido ganha +1 ponto a cada R$ 1.000 concedidos.
         </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Minha pontuação
+// Controle interno e pessoal do Agente de Crédito: cada botão lança pontos na
+// hora (tabela fomento_pontuacao — ver supabase-fomento-pontuacao.sql). Só conta
+// o que for lançado aqui, a partir de agora. Separado do ranking oficial.
+export const ACOES_PONTUACAO = [
+  { id: "cadastro_proposta", rotulo: "Cadastro de proposta", detalhe: "depois do SCR + documentação", pontos: 200, cor: "#0A5AA8" },
+  { id: "aprovado", rotulo: "Aprovado", detalhe: "proposta aprovada", pontos: 300, cor: "#1E8E5A" },
+  { id: "abrir_sistema", rotulo: "Abrir sistema", detalhe: "acesso ao FomentoNet", pontos: 10, cor: "#0EA5A5" },
+  { id: "simulacao", rotulo: "Simulação", detalhe: "simulação feita", pontos: 10, cor: "#7E5BEF" },
+  { id: "ler_comunicados", rotulo: "Ler comunicados", detalhe: "comunicados lidos", pontos: 30, cor: "#E8A23D" },
+  { id: "retorno_proposta", rotulo: "Retorno de proposta", detalhe: "proposta devolvida", pontos: -20, cor: "#B4462F" },
+  { id: "renegociacao", rotulo: "Renegociação", detalhe: "renegociação feita", pontos: 400, cor: "#2563EB" },
+  { id: "renegociacao_prejuizo", rotulo: "Renegociação em prejuízo", detalhe: "contrato em prejuízo", pontos: 800, cor: "#7A3E9D" },
+];
+const acaoPorId = (id) => ACOES_PONTUACAO.find((a) => a.id === id);
+const totalLanc = (l) => (Number(l.pontos) || 0) * (Number(l.quantidade) || 1);
+const fmtPts = (n) => `${n > 0 ? "+" : ""}${Number(n).toLocaleString("pt-BR")}`;
+
+function AbaPontuacao({ avisar, sessao }) {
+  const [lancamentos, setLancamentos] = useState(null);
+  const [erroTabela, setErroTabela] = useState(false);
+  const [data, setData] = useState(hojeLocal());
+  const [quantidade, setQuantidade] = useState(1);
+  const [observacao, setObservacao] = useState("");
+  const [salvando, setSalvando] = useState(null);
+  const [periodo, setPeriodo] = useState("ciclo");
+  const [ultimo, setUltimo] = useState(null);
+
+  useEffect(() => {
+    if (!supabaseConfigurado) { setLancamentos([]); return; }
+    supabase.from("fomento_pontuacao").select("*").order("data", { ascending: false }).order("criado_em", { ascending: false })
+      .then(({ data: d, error }) => { if (error) { setErroTabela(true); setLancamentos([]); } else setLancamentos(d || []); });
+  }, [sessao?.user?.id]);
+
+  const lancar = async (acao) => {
+    const qtd = Math.min(100, Math.max(1, Number(quantidade) || 1));
+    const reg = { acao: acao.id, pontos: acao.pontos, quantidade: qtd, data, observacao: observacao.trim() || null };
+    setSalvando(acao.id);
+    let novo = { ...reg, id: `demo-${Date.now()}`, criado_em: new Date().toISOString() };
+    if (supabaseConfigurado) {
+      const { data: d, error } = await supabase.from("fomento_pontuacao").insert(reg).select().single();
+      if (error) { setSalvando(null); avisar(error.message.includes("fomento_pontuacao") ? "Rode o arquivo supabase-fomento-pontuacao.sql no Supabase primeiro." : error.message, "erro"); return; }
+      novo = d;
+    }
+    setSalvando(null);
+    setLancamentos((l) => [novo, ...(l || [])]);
+    setUltimo(novo);
+    setQuantidade(1); setObservacao("");
+    avisar(`${acao.rotulo}: ${fmtPts(totalLanc(novo))} pontos`);
+  };
+
+  const apagar = async (l, perguntar = true) => {
+    if (perguntar && !window.confirm(`Apagar o lançamento "${acaoPorId(l.acao)?.rotulo || l.acao}" (${fmtPts(totalLanc(l))} pts)?`)) return;
+    if (supabaseConfigurado) {
+      const { error } = await supabase.from("fomento_pontuacao").delete().eq("id", l.id);
+      if (error) { avisar(error.message, "erro"); return; }
+    }
+    setLancamentos((x) => (x || []).filter((y) => y.id !== l.id));
+    if (ultimo?.id === l.id) setUltimo(null);
+    avisar("Lançamento apagado.");
+  };
+
+  const hoje = hojeLocal();
+  const mesAtual = hoje.slice(0, 7);
+  const cicloAtual = cicloFim();
+  const todos = lancamentos || [];
+  const ciclos = [...new Set([cicloAtual, ...todos.map((l) => cicloFim(l.data))])].sort((a, b) => b - a);
+  const filtro = (l) => {
+    if (periodo === "hoje") return l.data === hoje;
+    if (periodo === "mes") return String(l.data).slice(0, 7) === mesAtual;
+    if (periodo === "tudo") return true;
+    if (periodo === "ciclo") return cicloFim(l.data) === cicloAtual;
+    return cicloFim(l.data) === Number(periodo.replace("ciclo-", ""));
+  };
+  const doPeriodo = todos.filter(filtro);
+  const soma = (lista) => lista.reduce((s, l) => s + totalLanc(l), 0);
+  const kpis = [
+    ["Hoje", soma(todos.filter((l) => l.data === hoje))],
+    ["Este mês", soma(todos.filter((l) => String(l.data).slice(0, 7) === mesAtual))],
+    [`Ciclo ${rotuloCiclo(cicloAtual)}`, soma(todos.filter((l) => cicloFim(l.data) === cicloAtual))],
+    ["Total geral", soma(todos)],
+  ];
+  const porAcao = ACOES_PONTUACAO.map((a) => {
+    const ls = doPeriodo.filter((l) => l.acao === a.id);
+    return { ...a, vezes: ls.reduce((s, l) => s + (Number(l.quantidade) || 1), 0), total: soma(ls) };
+  });
+  const totalPeriodo = soma(doPeriodo);
+
+  return (
+    <div>
+      <Titulo eyebrow="Controle interno" title="Minha pontuação" sub="Toque no botão da atividade para somar os pontos. Só você vê estes lançamentos — o ranking oficial continua separado." />
+      {erroTabela && <div className="mb-4"><Aviso tipo="erro">A tabela de pontuação ainda não existe no banco. Rode o arquivo <b>supabase-fomento-pontuacao.sql</b> no SQL Editor do Supabase.</Aviso></div>}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        {kpis.map(([t, v], i) => (
+          <div key={t} className="rounded-2xl p-4" style={{ background: i === 2 ? `linear-gradient(120deg, ${F.blueDeep}, ${F.blue})` : F.blueTint2 }}>
+            <p className="font-body text-[11px] font-bold uppercase tracking-wider" style={{ color: i === 2 ? "rgba(255,255,255,0.75)" : F.muted }}>{t}</p>
+            <p className="font-display font-extrabold text-2xl mt-1" style={{ color: i === 2 ? "#fff" : v < 0 ? F.danger : F.ink }}>{lancamentos ? v.toLocaleString("pt-BR") : "…"}<span className="font-body text-[11px] ml-1 font-semibold" style={{ color: i === 2 ? "rgba(255,255,255,0.7)" : F.soft }}>pts</span></p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-2xl border p-4 mb-5" style={{ borderColor: F.line }}>
+        <div className="grid sm:grid-cols-[150px_110px_1fr] gap-3 mb-4">
+          <Campo label="Data"><input type="date" value={data} max={hoje} onChange={(e) => setData(e.target.value || hoje)} className={inputCls} style={inputSty} /></Campo>
+          <Campo label="Quantidade"><input type="number" min={1} max={100} value={quantidade} onChange={(e) => setQuantidade(e.target.value)} className={inputCls} style={inputSty} /></Campo>
+          <Campo label="Observação (opcional — ex.: nome do cliente)"><input value={observacao} onChange={(e) => setObservacao(e.target.value)} maxLength={140} className={inputCls} style={inputSty} /></Campo>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {ACOES_PONTUACAO.map((a) => (
+            <button key={a.id} onClick={() => lancar(a)} disabled={!!salvando || erroTabela}
+              className="rounded-xl p-3.5 text-left text-white transition active:scale-[0.97] disabled:opacity-60 flex flex-col gap-1 min-h-[92px]"
+              style={{ background: a.cor }}>
+              <span className="font-display font-extrabold text-xl leading-none">{salvando === a.id ? "…" : fmtPts(a.pontos * (Math.max(1, Number(quantidade) || 1)))}</span>
+              <span className="font-body text-sm font-bold leading-tight">{a.rotulo}</span>
+              <span className="font-body text-[10px] text-white/80 leading-tight">{a.detalhe}</span>
+            </button>
+          ))}
+        </div>
+        {ultimo && (
+          <div className="mt-3 flex items-center justify-between gap-2 rounded-xl px-3 py-2 font-body text-xs" style={{ background: F.greenTint, color: F.green }}>
+            <span>Lançado: <b>{acaoPorId(ultimo.acao)?.rotulo}</b> {ultimo.quantidade > 1 ? `×${ultimo.quantidade} ` : ""}({fmtPts(totalLanc(ultimo))} pts) em {dataBR(ultimo.data)}</span>
+            <button onClick={() => apagar(ultimo, false)} className="font-bold flex items-center gap-1 underline"><Undo2 size={12} /> Desfazer</button>
+          </div>
+        )}
+      </div>
+
+      <Titulo eyebrow="Resumo" title="Pontos por atividade"
+        direita={<select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className={`${inputCls} w-auto`} style={inputSty}>
+          <option value="hoje">Hoje</option><option value="mes">Este mês</option><option value="ciclo">Ciclo atual ({rotuloCiclo(cicloAtual)})</option>
+          {ciclos.filter((c) => c !== cicloAtual).map((c) => <option key={c} value={`ciclo-${c}`}>Ciclo {rotuloCiclo(c)}</option>)}
+          <option value="tudo">Desde o início</option>
+        </select>} />
+      <div className="rounded-2xl border overflow-hidden mb-6" style={{ borderColor: F.line }}>
+        {porAcao.map((a) => (
+          <div key={a.id} className="flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0" style={{ borderColor: F.line }}>
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: a.cor }} />
+            <p className="flex-1 font-body text-sm" style={{ color: F.ink }}>{a.rotulo} <span className="text-[11px]" style={{ color: F.soft }}>({fmtPts(a.pontos)} cada)</span></p>
+            <p className="font-body text-xs w-16 text-right" style={{ color: F.muted }}>{a.vezes}×</p>
+            <p className="font-display font-bold text-sm w-20 text-right" style={{ color: a.total < 0 ? F.danger : a.total ? F.green : F.soft }}>{a.total.toLocaleString("pt-BR")}</p>
+          </div>
+        ))}
+        <div className="flex items-center justify-between px-4 py-3" style={{ background: F.blueTint2 }}>
+          <p className="font-display font-bold text-sm" style={{ color: F.ink }}>Total do período</p>
+          <p className="font-display font-extrabold text-lg" style={{ color: totalPeriodo < 0 ? F.danger : F.green }}>{totalPeriodo.toLocaleString("pt-BR")} pts</p>
+        </div>
+      </div>
+
+      <Titulo eyebrow="Histórico" title="Lançamentos do período"
+        direita={doPeriodo.length > 0 && <button onClick={() => exportarCSV(`minha-pontuacao-${hoje}`, ["Data", "Atividade", "Quantidade", "Pontos", "Observação"], doPeriodo.map((l) => [dataBR(l.data), acaoPorId(l.acao)?.rotulo || l.acao, l.quantidade, totalLanc(l), l.observacao || ""]))} className="font-body text-xs font-bold px-3 py-2 rounded-lg border flex items-center gap-1.5" style={{ borderColor: F.line, color: F.blue }}><Download size={13} /> Exportar</button>} />
+      <div className="flex flex-col gap-1.5">
+        {doPeriodo.slice(0, 100).map((l) => {
+          const a = acaoPorId(l.acao);
+          return (
+            <div key={l.id} className="rounded-xl border px-3.5 py-2.5 flex items-center gap-3" style={{ borderColor: F.line }}>
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: a?.cor || F.soft }} />
+              <div className="flex-1 min-w-0">
+                <p className="font-body text-sm font-semibold" style={{ color: F.ink }}>{a?.rotulo || l.acao}{l.quantidade > 1 ? ` ×${l.quantidade}` : ""}</p>
+                <p className="font-body text-[11px] truncate" style={{ color: F.muted }}>{dataBR(l.data)}{l.observacao ? ` · ${l.observacao}` : ""}</p>
+              </div>
+              <p className="font-display font-bold text-sm" style={{ color: totalLanc(l) < 0 ? F.danger : F.green }}>{fmtPts(totalLanc(l))}</p>
+              <button onClick={() => apagar(l)} title="Apagar lançamento" className="p-1.5 rounded-lg" style={{ color: F.soft }}><Trash2 size={14} /></button>
+            </div>
+          );
+        })}
+        {lancamentos && !doPeriodo.length && <p className="font-body text-sm py-4 text-center" style={{ color: F.soft }}>Nenhum lançamento neste período ainda. Toque nos botões acima para começar a somar.</p>}
+        {doPeriodo.length > 100 && <p className="font-body text-xs text-center" style={{ color: F.muted }}>Mostrando os 100 mais recentes — use “Exportar” para ver todos.</p>}
       </div>
     </div>
   );
