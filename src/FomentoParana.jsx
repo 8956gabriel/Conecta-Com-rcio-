@@ -1223,6 +1223,7 @@ function HistoricoProposta({ proposta }) {
 function ModalProposta({ proposta, onFechar, ctx, acoes }) {
   const [editando, setEditando] = useState(false);
   const [plano, setPlano] = useState(false);
+  const [mensagem, setMensagem] = useState(false);
   if (!proposta) return null;
   const p = proposta;
   return (
@@ -1259,9 +1260,11 @@ function ModalProposta({ proposta, onFechar, ctx, acoes }) {
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setEditando(true)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white flex items-center gap-1.5" style={{ background: F.blue }}><Pencil size={13} /> Editar</button>
             {p.whatsapp && <a href={linkWhats(p.whatsapp, `Olá, ${p.nome.split(" ")[0]}! Aqui é do atendimento da Fomento Paraná em Ivatuba, sobre a sua proposta ${p.numero || ""}.`)} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white flex items-center gap-1.5" style={{ background: F.greenBright }}><MessageCircle size={13} /> WhatsApp</a>}
+            <button onClick={() => setMensagem(true)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white flex items-center gap-1.5" style={{ background: "#128C7E" }}><MessageCircle size={13} /> Mensagem pronta</button>
             <button onClick={() => setPlano(true)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white flex items-center gap-1.5" style={{ background: "#0F766E" }}><ClipboardList size={13} /> Plano de ação (+50)</button>
             <NovoLembreteRapido proposta={p} ctx={ctx} />
           </div>
+          <ModalMensagens aberto={mensagem} onFechar={() => setMensagem(false)} proposta={p} config={ctx.config} avisar={ctx.avisar} />
           <ModalPlanoAcao aberto={plano} onFechar={() => setPlano(false)} config={ctx.config} avisar={ctx.avisar}
             inicial={{ nome: p.nome || "", whatsapp: p.whatsapp || "", objetivo: p.valor_solicitado ? `${moeda(p.valor_solicitado)} de crédito na Fomento Paraná` : "" }} />
           <div className="pt-3 border-t" style={{ borderColor: F.line }}>
@@ -1522,6 +1525,7 @@ function ImportarFomentoNet({ ctx }) {
 
 function AbaPropostas(ctx) {
   const acoes = useAcoesProposta(ctx);
+  const [msgAvulsa, setMsgAvulsa] = useState(false);
   const [chaveForm, setChaveForm] = useState(0);
   const [aberta, setAberta] = useState(null);
   const [busca, setBusca] = useState("");
@@ -1547,7 +1551,10 @@ function AbaPropostas(ctx) {
         </div>
       </div>
       <div>
-        <Titulo eyebrow="Histórico das propostas" title="Todas as propostas" direita={<button onClick={exportar} className="font-body text-xs font-bold px-3 py-2 rounded-lg border flex items-center gap-1.5" style={{ borderColor: F.line, color: "#425A70" }}><Download size={13} /> Exportar CSV</button>} />
+        <Titulo eyebrow="Histórico das propostas" title="Todas as propostas" direita={<div className="flex gap-2 flex-wrap">
+          <button onClick={() => setMsgAvulsa(true)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white flex items-center gap-1.5" style={{ background: "#128C7E" }}><MessageCircle size={13} /> Mensagem pronta</button>
+          <button onClick={exportar} className="font-body text-xs font-bold px-3 py-2 rounded-lg border flex items-center gap-1.5" style={{ borderColor: F.line, color: "#425A70" }}><Download size={13} /> Exportar CSV</button></div>} />
+        <ModalMensagens aberto={msgAvulsa} onFechar={() => setMsgAvulsa(false)} proposta={null} config={ctx.config} avisar={ctx.avisar} />
         <div className="flex flex-wrap gap-2 mb-3">
           <div className="relative flex-1 min-w-[200px]"><Search size={14} className="absolute left-3 top-3" color={F.soft} /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, nº, CPF, CNPJ ou WhatsApp" className={`${inputCls} pl-8`} style={inputSty} /></div>
           <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className={`${inputCls} w-auto`} style={inputSty}><option value="">Todas as situações</option>{Object.entries(STATUS_PROPOSTA).map(([k, s]) => <option key={k} value={k}>{s.rotulo}</option>)}</select>
@@ -1828,6 +1835,92 @@ async function gravarPontuacao(reg) {
     r = await supabase.from("fomento_pontuacao").insert({ ...reg, acao: "manual", observacao: `Plano de ação${reg.observacao ? ` · ${reg.observacao.replace(/^Plano de ação · /, "")}` : ""}` }).select().single();
   }
   return r;
+}
+
+
+// ---------------------------------------------------------------- Mensagens prontas
+// Modelos de retorno ao cliente (situação da proposta e motivos). O texto é
+// preenchido com os dados da proposta e pode ser editado antes de enviar.
+const MODELOS_MENSAGEM = [
+  { grupo: "Situação", id: "aprovada", rotulo: "Proposta aprovada", texto: (d) => `Tenho uma ótima notícia: sua proposta de crédito na Fomento Paraná foi *APROVADA*! 🎉\n\n💰 Valor: ${d.valor}\n📆 Parcelas: ${d.prazo} de R$ [valor da parcela]\n⏳ Carência: [prazo]\n\nO próximo passo é a assinatura do contrato. Podemos combinar um horário aqui na Sala do Empreendedor? Me avise o melhor dia para você.\n\nParabéns pela conquista e conte comigo!` },
+  { grupo: "Situação", id: "em_analise", rotulo: "Em análise", texto: () => `Passando para te dar um retorno: sua proposta de crédito já foi enviada e está *em análise* na Fomento Paraná. ✅\n\nO prazo médio de retorno é de [X] dias úteis. Assim que eu tiver a resposta, te aviso na hora.\n\nSe precisar de algo nesse meio tempo, estou à disposição.` },
+  { grupo: "Situação", id: "liberado", rotulo: "Crédito liberado", texto: (d) => `Passando para avisar que o seu crédito foi *LIBERADO* e o valor de ${d.valor} já foi depositado na sua conta. 🙌\n\n📌 Lembrete: a 1ª parcela vence em [data]. Manter os pagamentos em dia ajuda muito em futuras solicitações.\n\nDesejo muito sucesso no seu negócio! Qualquer dúvida, estou à disposição.` },
+  { grupo: "Situação", id: "nao_aprovada", rotulo: "Proposta não aprovada", texto: () => `Recebi o retorno da sua proposta e, infelizmente, desta vez ela *não foi aprovada* pela Fomento Paraná.\n\nSei que não é a notícia que você esperava, mas isso não fecha as portas. Podemos conversar sobre o que pode ser ajustado e avaliar uma nova solicitação mais para frente, ou outras alternativas para o seu negócio.\n\nSe quiser, marcamos um horário aqui na Sala do Empreendedor. Conte comigo!` },
+  { grupo: "Situação", id: "sem_retorno", rotulo: "Cliente sem retorno", texto: () => `Estou passando para saber se você ainda tem interesse em dar continuidade à sua proposta de crédito na Fomento Paraná.\n\nFicou faltando [pendência/assinatura] para seguirmos. Se tiver alguma dúvida ou precisar de ajuda, é só me chamar que resolvemos juntos.\n\nFico no aguardo do seu retorno!` },
+  { grupo: "Motivo", id: "documentacao", rotulo: "Documentação pendente", texto: () => `Sua proposta de crédito na Fomento Paraná está parada por *pendência de documentação*. Para seguirmos, preciso de:\n\n📄 [documento 1]\n📄 [documento 2]\n\nPode me enviar por aqui (foto nítida e completa) ou trazer na Sala do Empreendedor.\n\nAssim que eu receber tudo, já dou andamento. Qualquer dúvida, é só chamar!` },
+  { grupo: "Motivo", id: "restricao", rotulo: "Restrição no CPF/CNPJ", texto: () => `Na análise da sua proposta foi identificada uma *restrição cadastral* (SPC/Serasa) no seu CPF/CNPJ, o que impede a continuidade neste momento.\n\nO caminho é procurar a empresa credora para negociar e regularizar a pendência. Depois que a restrição for baixada (costuma levar alguns dias), me avise que reavaliamos sua proposta.\n\nSe precisar de orientação, estou à disposição aqui na Sala do Empreendedor.` },
+  { grupo: "Motivo", id: "prejuizo", rotulo: "Dívida em prejuízo (Bacen)", texto: () => `Na análise da sua proposta, apareceu no sistema do Banco Central (SCR) uma *dívida registrada como prejuízo* junto a uma instituição financeira. Com esse apontamento, a Fomento Paraná não consegue aprovar o crédito agora.\n\n👉 Você pode consultar seu relatório de graça pelo *Registrato*, no site do Banco Central, e ver qual banco e qual valor estão em aberto.\n👉 Depois, procure esse banco para negociar ou quitar a dívida.\n\nCom a situação regularizada, me procure que fazemos uma nova análise. Conte comigo!` },
+  { grupo: "Motivo", id: "outros_financiamentos", rotulo: "Financiamentos em outros bancos", texto: () => `Na análise da sua proposta, foi verificado que você já possui *outros financiamentos/empréstimos em andamento* em outras instituições, e o valor das parcelas já compromete boa parte da sua renda.\n\nPor isso, neste momento o crédito não pôde ser aprovado no valor solicitado.\n\nPodemos conversar sobre:\n✅ Um valor menor, que caiba no seu orçamento\n✅ Nova solicitação depois que algum contrato for quitado\n\nMe avise se quiser marcar um horário. Estou à disposição!` },
+  { grupo: "Motivo", id: "capacidade", rotulo: "Capacidade de pagamento", texto: () => `Recebi o retorno da sua proposta. Pela análise do faturamento informado, o valor solicitado ficou *acima da capacidade de pagamento* do negócio neste momento.\n\nA boa notícia é que podemos ajustar: rever o valor, o prazo ou reforçar a comprovação de renda/faturamento (notas, extratos, vendas).\n\nVamos conversar para montar uma proposta que caiba no seu bolso? Conte comigo!` },
+  { grupo: "Motivo", id: "mei", rotulo: "Empresa/MEI irregular", texto: () => `Na análise da sua proposta, verificamos uma *pendência no cadastro da empresa*: [DAS em atraso / CNPJ inapto / tempo de atividade insuficiente].\n\nPara seguirmos, é preciso regularizar essa situação. Aqui na Sala do Empreendedor podemos te ajudar com isso!\n\nAssim que estiver tudo certo, retomamos sua proposta.` },
+  { grupo: "Motivo", id: "avalista", rotulo: "Pendência do avalista", texto: () => `Sua proposta está em andamento, mas surgiu uma *pendência com o avalista* indicado.\n\nPara seguir, temos duas opções:\n✅ Regularizar a pendência do avalista atual\n✅ Indicar outro avalista\n\nMe avise como prefere seguir que eu dou andamento!` },
+];
+const modeloSugerido = (p) => (!p ? "aprovada" : p.status === "concedido" ? "aprovada" : p.status === "recusado" ? "nao_aprovada" : "em_analise");
+
+function montarMensagem(modelo, { nome, valor, prazo, agente }) {
+  const primeiro = String(nome || "").trim().split(" ")[0] || "[Nome]";
+  const corpo = modelo.texto({ valor: valor || "R$ [valor]", prazo: prazo || "[nº]" });
+  return `Olá, ${primeiro}! Tudo bem?\n\n${corpo}\n\n${agente || "Agente de Crédito"} – Agente de Crédito\nFomento Paraná | Sala do Empreendedor de Ivatuba`;
+}
+
+function ModalMensagens({ aberto, onFechar, proposta, config, avisar }) {
+  const [nome, setNome] = useState("");
+  const [whats, setWhats] = useState("");
+  const [modeloId, setModeloId] = useState("aprovada");
+  const [texto, setTexto] = useState("");
+  const dados = (m, n) => ({
+    nome: n, agente: config?.agente_nome,
+    valor: proposta?.valor_concedido ? moeda(proposta.valor_concedido) : proposta?.valor_solicitado ? moeda(proposta.valor_solicitado) : "",
+    prazo: proposta?.prazo_meses ? `${proposta.prazo_meses}` : "",
+  });
+  useEffect(() => {
+    if (!aberto) return;
+    const id = modeloSugerido(proposta);
+    const n = proposta?.nome || "";
+    setNome(n); setWhats(proposta?.whatsapp || ""); setModeloId(id);
+    setTexto(montarMensagem(MODELOS_MENSAGEM.find((m) => m.id === id), dados(id, n)));
+  }, [aberto]);
+  const escolher = (id) => { setModeloId(id); setTexto(montarMensagem(MODELOS_MENSAGEM.find((m) => m.id === id), dados(id, nome))); };
+  const trocarNome = (v) => { setNome(v); setTexto(montarMensagem(MODELOS_MENSAGEM.find((m) => m.id === modeloId), dados(modeloId, v))); };
+  const pendentes = (texto.match(/\[[^\]]+\]/g) || []).length;
+  const enviar = () => {
+    const url = linkWhats(whats, texto);
+    if (!url) { avisar("Informe o WhatsApp do cliente (com DDD).", "erro"); return; }
+    window.open(url, "_blank", "noopener");
+  };
+  const copiar = async () => { try { await navigator.clipboard.writeText(texto); avisar("Mensagem copiada."); } catch { avisar("Não consegui copiar — selecione o texto.", "erro"); } };
+
+  return (
+    <Modal aberto={aberto} onFechar={onFechar} titulo="Mensagem para o cliente" largura="max-w-3xl">
+      <div className="grid md:grid-cols-[230px_1fr] gap-5">
+        <div className="flex flex-col gap-3">
+          {["Situação", "Motivo"].map((g) => (
+            <div key={g}>
+              <p className="font-body text-[11px] font-bold uppercase mb-1.5" style={{ color: F.muted }}>{g === "Situação" ? "Situação da proposta" : "Motivo / pendência"}</p>
+              <div className="flex flex-col gap-1">
+                {MODELOS_MENSAGEM.filter((m) => m.grupo === g).map((m) => (
+                  <button key={m.id} onClick={() => escolher(m.id)} className="font-body text-xs font-semibold text-left px-3 py-2 rounded-lg border"
+                    style={{ borderColor: modeloId === m.id ? F.blue : F.line, background: modeloId === m.id ? F.blueTint : "#fff", color: modeloId === m.id ? F.blue : F.ink }}>{m.rotulo}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Nome do cliente"><input value={nome} onChange={(e) => trocarNome(e.target.value)} className={inputCls} style={inputSty} /></Campo>
+            <Campo label="WhatsApp (com DDD)"><input value={whats} onChange={(e) => setWhats(e.target.value)} inputMode="tel" className={inputCls} style={inputSty} /></Campo>
+          </div>
+          <Campo label="Mensagem (pode editar)"><textarea rows={14} value={texto} onChange={(e) => setTexto(e.target.value)} className={`${inputCls} font-mono text-xs`} style={{ ...inputSty, background: "#F4FBF6" }} /></Campo>
+          {pendentes > 0 && <Aviso>Ainda há {pendentes} campo(s) entre [colchetes] para completar antes de enviar.</Aviso>}
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={enviar} className="glow-btn flex-1 font-body text-sm font-bold px-4 py-3 rounded-xl text-white flex items-center justify-center gap-2" style={{ background: F.greenBright }}><MessageCircle size={16} /> Enviar no WhatsApp</button>
+            <button onClick={copiar} className="font-body text-xs font-bold px-4 py-3 rounded-xl border" style={{ borderColor: F.line, color: F.blue }}>Copiar</button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
 }
 
 // ---------------------------------------------------------------- Plano de ação
