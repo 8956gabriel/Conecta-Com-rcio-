@@ -1222,6 +1222,7 @@ function HistoricoProposta({ proposta }) {
 
 function ModalProposta({ proposta, onFechar, ctx, acoes }) {
   const [editando, setEditando] = useState(false);
+  const [plano, setPlano] = useState(false);
   if (!proposta) return null;
   const p = proposta;
   return (
@@ -1258,8 +1259,11 @@ function ModalProposta({ proposta, onFechar, ctx, acoes }) {
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setEditando(true)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white flex items-center gap-1.5" style={{ background: F.blue }}><Pencil size={13} /> Editar</button>
             {p.whatsapp && <a href={linkWhats(p.whatsapp, `Olá, ${p.nome.split(" ")[0]}! Aqui é do atendimento da Fomento Paraná em Ivatuba, sobre a sua proposta ${p.numero || ""}.`)} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white flex items-center gap-1.5" style={{ background: F.greenBright }}><MessageCircle size={13} /> WhatsApp</a>}
+            <button onClick={() => setPlano(true)} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white flex items-center gap-1.5" style={{ background: "#0F766E" }}><ClipboardList size={13} /> Plano de ação (+50)</button>
             <NovoLembreteRapido proposta={p} ctx={ctx} />
           </div>
+          <ModalPlanoAcao aberto={plano} onFechar={() => setPlano(false)} config={ctx.config} avisar={ctx.avisar}
+            inicial={{ nome: p.nome || "", whatsapp: p.whatsapp || "", objetivo: p.valor_solicitado ? `${moeda(p.valor_solicitado)} de crédito na Fomento Paraná` : "" }} />
           <div className="pt-3 border-t" style={{ borderColor: F.line }}>
             <p className="font-display font-bold text-sm mb-2" style={{ color: F.ink }}>Histórico da proposta</p>
             <HistoricoProposta proposta={p} />
@@ -1803,6 +1807,7 @@ export const ACOES_PONTUACAO = [
   { id: "renegociacao", rotulo: "Renegociação", detalhe: "renegociação feita", pontos: 400, cor: "#2563EB" },
   { id: "renegociacao_prejuizo", rotulo: "Renegociação em prejuízo", detalhe: "contrato em prejuízo", pontos: 800, cor: "#7A3E9D" },
   { id: "excluido", rotulo: "Excluído", detalhe: "proposta excluída", pontos: -200, cor: "#5C6B7A" },
+  { id: "plano_acao", rotulo: "Plano de ação", detalhe: "gera a mensagem pro cliente", pontos: 50, cor: "#0F766E" },
 ];
 // Saldo inicial: lançado uma vez, com o valor digitado (não é botão da grade).
 const SALDO_INICIAL = { id: "saldo_inicial", rotulo: "Saldo inicial", detalhe: "pontuação de partida", pontos: 0, cor: "#052A4D" };
@@ -1813,7 +1818,124 @@ const acaoPorId = (id) => EXTRAS_PONTUACAO.find((a) => a.id === id) || ACOES_PON
 const totalLanc = (l) => (Number(l.pontos) || 0) * (Number(l.quantidade) || 1);
 const fmtPts = (n) => `${n > 0 ? "+" : ""}${Number(n).toLocaleString("pt-BR")}`;
 
-function AbaPontuacao({ avisar, sessao }) {
+// Grava um lançamento em fomento_pontuacao. Se o banco ainda não aceitar a
+// atividade "plano_acao" (SQL novo não rodado), grava como lançamento manual
+// com a observação "Plano de ação", para os pontos não se perderem.
+async function gravarPontuacao(reg) {
+  if (!supabaseConfigurado) return { data: { ...reg, id: `demo-${Date.now()}`, criado_em: new Date().toISOString() } };
+  let r = await supabase.from("fomento_pontuacao").insert(reg).select().single();
+  if (r.error && reg.acao === "plano_acao" && /acao_check|check constraint/i.test(r.error.message)) {
+    r = await supabase.from("fomento_pontuacao").insert({ ...reg, acao: "manual", observacao: `Plano de ação${reg.observacao ? ` · ${reg.observacao.replace(/^Plano de ação · /, "")}` : ""}` }).select().single();
+  }
+  return r;
+}
+
+// ---------------------------------------------------------------- Plano de ação
+// Monta a mensagem de Plano de Ação para o empreendedor, abre no WhatsApp e
+// soma +50 na Minha pontuação.
+const PASSOS_PLANO = [
+  "Regularizar a dívida registrada como prejuízo no Banco Central (consulte grátis no Registrato e procure o banco para negociar)",
+  "Negociar e baixar a restrição no SPC/Serasa",
+  "Colocar o DAS do MEI em dia",
+  "Regularizar a situação do CNPJ",
+  "Separar os documentos pendentes da proposta",
+  "Separar comprovantes de faturamento dos últimos 3 meses (notas, extratos, vendas)",
+  "Quitar ou reduzir outro financiamento/empréstimo em andamento",
+  "Providenciar os documentos do avalista (ou indicar outro avalista)",
+];
+
+function textoPlanoAcao({ nome, objetivo, passos, prazo, retorno, agente }) {
+  const primeiro = String(nome || "").trim().split(" ")[0] || "[Nome]";
+  const nums = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
+  const linhas = passos.map((p, i) => `${nums[i] || `${i + 1}.`} ${p}`).join("\n");
+  return [
+    `Olá, ${primeiro}! Tudo bem?`,
+    "",
+    "Como conversamos, preparei um *Plano de Ação* para você conseguir o seu crédito na Fomento Paraná. 📋",
+    ...(objetivo?.trim() ? ["", `*🎯 Objetivo:* ${objetivo.trim()}`] : []),
+    "",
+    "*📌 O que precisa ser feito:*",
+    linhas || "[passos]",
+    ...(prazo ? ["", `*📆 Prazo combinado:* até ${dataBR(prazo)}`] : []),
+    ...(retorno?.trim() ? ["", `*🤝 Nosso próximo encontro:* ${retorno.trim()}, aqui na Sala do Empreendedor, para revisarmos tudo e encaminhar a nova proposta.`] : []),
+    "",
+    "Qualquer dificuldade em algum passo, me chame que te ajudo. Estamos juntos nessa!",
+    "",
+    `${agente || "Agente de Crédito"} – Agente de Crédito`,
+    "Fomento Paraná | Sala do Empreendedor de Ivatuba",
+  ].join("\n");
+}
+
+function ModalPlanoAcao({ aberto, onFechar, inicial, config, avisar, onLancado }) {
+  const vazio = { nome: "", whatsapp: "", objetivo: "", marcados: [], extra: "", prazo: "", retorno: "" };
+  const [f, setF] = useState(vazio);
+  const [salvando, setSalvando] = useState(false);
+  useEffect(() => { if (aberto) setF({ ...vazio, ...(inicial || {}) }); }, [aberto]);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const marcar = (p) => setF({ ...f, marcados: f.marcados.includes(p) ? f.marcados.filter((x) => x !== p) : [...f.marcados, p] });
+  const passos = [...PASSOS_PLANO.filter((p) => f.marcados.includes(p)), ...f.extra.split("\n").map((x) => x.trim()).filter(Boolean)];
+  const texto = textoPlanoAcao({ ...f, passos, agente: config?.agente_nome });
+
+  const concluir = async (modo) => {
+    if (!f.nome.trim()) { avisar("Informe o nome do cliente.", "erro"); return; }
+    if (!passos.length) { avisar("Marque ou escreva ao menos um passo.", "erro"); return; }
+    if (modo === "whats") {
+      const url = linkWhats(f.whatsapp, texto);
+      if (!url) { avisar("Informe o WhatsApp do cliente (com DDD).", "erro"); return; }
+      window.open(url, "_blank", "noopener");
+    } else {
+      try { await navigator.clipboard.writeText(texto); } catch { avisar("Não consegui copiar automaticamente — selecione o texto da prévia.", "erro"); }
+    }
+    setSalvando(true);
+    const reg = { acao: "plano_acao", pontos: 50, quantidade: 1, data: hojeLocal(), observacao: `Plano de ação · ${f.nome.trim()}`.slice(0, 140) };
+    const { data, error } = await gravarPontuacao(reg);
+    setSalvando(false);
+    if (error) { avisar(`Mensagem pronta, mas os pontos não foram lançados: ${error.message}`, "erro"); return; }
+    onLancado?.(data);
+    avisar(`Plano de ação de ${f.nome.trim().split(" ")[0]}: +50 pontos${modo === "copiar" ? " · texto copiado" : ""}`);
+    onFechar();
+  };
+
+  return (
+    <Modal aberto={aberto} onFechar={onFechar} titulo="Plano de ação (+50 pontos)" largura="max-w-3xl">
+      <div className="grid md:grid-cols-2 gap-5">
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Nome do cliente"><input value={f.nome} onChange={set("nome")} className={inputCls} style={inputSty} /></Campo>
+            <Campo label="WhatsApp (com DDD)"><input value={f.whatsapp} onChange={set("whatsapp")} inputMode="tel" className={inputCls} style={inputSty} /></Campo>
+          </div>
+          <Campo label="Objetivo (opcional)"><input value={f.objetivo} onChange={set("objetivo")} placeholder="Ex.: R$ 10.000 para compra de equipamentos" className={inputCls} style={inputSty} /></Campo>
+          <div>
+            <p className="font-body text-[11px] font-bold uppercase mb-1.5" style={{ color: F.muted }}>O que precisa ser feito</p>
+            <div className="flex flex-col gap-1.5">
+              {PASSOS_PLANO.map((p) => (
+                <label key={p} className="flex items-start gap-2 font-body text-xs rounded-lg border px-2.5 py-2 cursor-pointer" style={{ borderColor: f.marcados.includes(p) ? F.blue : F.line, background: f.marcados.includes(p) ? F.blueTint2 : "#fff", color: F.ink }}>
+                  <input type="checkbox" checked={f.marcados.includes(p)} onChange={() => marcar(p)} className="mt-0.5" /> {p}
+                </label>
+              ))}
+            </div>
+          </div>
+          <Campo label="Outros passos (um por linha)"><textarea rows={2} value={f.extra} onChange={set("extra")} className={inputCls} style={inputSty} /></Campo>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Prazo combinado"><input type="date" value={f.prazo} min={hojeLocal()} onChange={set("prazo")} className={inputCls} style={inputSty} /></Campo>
+            <Campo label="Próximo encontro"><input value={f.retorno} onChange={set("retorno")} placeholder="Ex.: 05/12 às 14h" className={inputCls} style={inputSty} /></Campo>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3">
+          <p className="font-body text-[11px] font-bold uppercase" style={{ color: F.muted }}>Prévia da mensagem</p>
+          <pre className="font-body text-xs whitespace-pre-wrap rounded-xl p-3 border flex-1 select-all" style={{ borderColor: F.line, background: "#F4FBF6", color: F.ink }}>{texto}</pre>
+          <button onClick={() => concluir("whats")} disabled={salvando} className="glow-btn font-body text-sm font-bold px-4 py-3 rounded-xl text-white flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: F.greenBright }}>
+            <MessageCircle size={16} /> {salvando ? "Lançando..." : "Enviar no WhatsApp e somar +50"}
+          </button>
+          <button onClick={() => concluir("copiar")} disabled={salvando} className="font-body text-xs font-bold px-4 py-2.5 rounded-xl border disabled:opacity-60" style={{ borderColor: F.line, color: F.blue }}>Copiar texto e somar +50</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function AbaPontuacao({ avisar, sessao, config }) {
+  const [planoAberto, setPlanoAberto] = useState(false);
   const [lancamentos, setLancamentos] = useState(null);
   const [erroTabela, setErroTabela] = useState(false);
   const [data, setData] = useState(hojeLocal());
@@ -1834,12 +1956,8 @@ function AbaPontuacao({ avisar, sessao }) {
     const qtd = pontosFixos != null ? 1 : Math.min(100, Math.max(1, Number(quantidade) || 1));
     const reg = { acao: acao.id, pontos: pontosFixos ?? acao.pontos, quantidade: qtd, data, observacao: observacao.trim() || (acao.id === SALDO_INICIAL.id ? "Pontuação de partida" : null) };
     setSalvando(acao.id);
-    let novo = { ...reg, id: `demo-${Date.now()}`, criado_em: new Date().toISOString() };
-    if (supabaseConfigurado) {
-      const { data: d, error } = await supabase.from("fomento_pontuacao").insert(reg).select().single();
-      if (error) { setSalvando(null); avisar(error.message.includes("fomento_pontuacao") ? "Rode o arquivo supabase-fomento-pontuacao.sql no Supabase primeiro." : error.message, "erro"); return; }
-      novo = d;
-    }
+    const { data: novo, error } = await gravarPontuacao(reg);
+    if (error) { setSalvando(null); avisar(error.message.includes("fomento_pontuacao") ? "Rode o arquivo supabase-fomento-pontuacao.sql no Supabase primeiro." : error.message, "erro"); return; }
     setSalvando(null);
     setLancamentos((l) => [novo, ...(l || [])]);
     setUltimo(novo);
@@ -1921,7 +2039,7 @@ function AbaPontuacao({ avisar, sessao }) {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {ACOES_PONTUACAO.map((a) => (
-            <button key={a.id} onClick={() => lancar(a)} disabled={!!salvando || erroTabela}
+            <button key={a.id} onClick={() => (a.id === "plano_acao" ? setPlanoAberto(true) : lancar(a))} disabled={!!salvando || erroTabela}
               className="rounded-xl p-3.5 text-left text-white transition active:scale-[0.97] disabled:opacity-60 flex flex-col gap-1 min-h-[92px]"
               style={{ background: a.cor }}>
               <span className="font-display font-extrabold text-xl leading-none">{salvando === a.id ? "…" : fmtPts(a.pontos * (Math.max(1, Number(quantidade) || 1)))}</span>
@@ -1937,6 +2055,9 @@ function AbaPontuacao({ avisar, sessao }) {
           </div>
         )}
       </div>
+
+      <ModalPlanoAcao aberto={planoAberto} onFechar={() => setPlanoAberto(false)} config={config} avisar={avisar}
+        onLancado={(novo) => { setLancamentos((l) => [novo, ...(l || [])]); setUltimo(novo); }} />
 
       <Titulo eyebrow="Resumo" title="Pontos por atividade"
         direita={<select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className={`${inputCls} w-auto`} style={inputSty}>
