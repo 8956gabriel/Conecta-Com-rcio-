@@ -6,10 +6,12 @@
 //   /agente   → área do agente de crédito (Central de Prospecção)
 //   /admin    → administração do módulo
 //   /entrar   → login
+//   /demo     → demonstração somente leitura (pede nome e cidade; dados mascarados)
 // =============================================================================
 import React, { useEffect, useState } from "react";
-import { Landmark, LogIn, LogOut, Radar, ShieldCheck, Home, Eye, EyeOff } from "lucide-react";
-import { supabase, supabaseConfigurado } from "./supabaseClient";
+import { Landmark, LogIn, LogOut, Radar, ShieldCheck, Home, Eye, EyeOff, MonitorPlay, Lock } from "lucide-react";
+import { supabase, supabaseReal, supabaseConfigurado, usarClienteDemonstracao } from "./supabaseClient";
+import { criarClienteDemonstracao, lerPasse, salvarPasse, apagarPasse, marcarPagina } from "./fomentoDemo";
 import { FomentoPublico, FomentoAdmin } from "./FomentoParana.jsx";
 
 const AZUL = "#0A5AA8", AZUL_ESC = "#052A4D", AMARELO = "#F5B700", LINHA = "#DCE7F2", MUTED = "#5C7186", INK = "#0E2233";
@@ -17,6 +19,11 @@ const ROTAS = { "/": "publico", "/agente": "agente", "/admin": "admin", "/entrar
 const rotaAtual = () => ROTAS[window.location.pathname.replace(/\/+$/, "") || "/"] || "publico";
 
 export default function FomentoSite() {
+  const ehDemo = window.location.pathname.replace(/\/+$/, "").toLowerCase() === "/demo";
+  return ehDemo ? <FomentoDemo /> : <FomentoSiteNormal />;
+}
+
+function FomentoSiteNormal() {
   const [rota, setRota] = useState(rotaAtual);
   const [sessao, setSessao] = useState(undefined);
   const [perfil, setPerfil] = useState(null);
@@ -163,6 +170,105 @@ function Entrar({ sessao, recuperando, onRecuperado, onEntrou }) {
           <button type="submit" disabled={carregando} className="w-full font-body text-sm font-bold py-3 rounded-xl text-white disabled:opacity-60" style={{ background: AZUL }}>{carregando ? "Aguarde..." : recuperando ? "Salvar nova senha" : "Entrar"}</button>
         </form>
         {!recuperando && <button onClick={esqueci} className="mt-3 font-body text-xs font-semibold underline" style={{ color: AZUL }}>Esqueci minha senha</button>}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// DEMONSTRAÇÃO — /demo
+// =============================================================================
+const PERFIL_DEMO = { id: "demo", nome: "Visitante", tipo: "admin" };
+const ROTULO_AREA = { publico: "Início", agente: "Área do agente", admin: "Administração" };
+
+function FomentoDemo() {
+  const [passe, setPasse] = useState(() => lerPasse());
+  const [area, setArea] = useState("publico");
+  const [pronto, setPronto] = useState(false);
+
+  useEffect(() => { document.title = "Demonstração · Fomento Paraná Ivatuba"; }, []);
+  useEffect(() => {
+    if (!passe) return;
+    usarClienteDemonstracao(criarClienteDemonstracao(passe.token));
+    setPronto(true);
+    const expirou = () => { apagarPasse(); window.location.reload(); };
+    window.addEventListener("fomento-demo-expirou", expirou);
+    return () => window.removeEventListener("fomento-demo-expirou", expirou);
+  }, [passe?.token]);
+  useEffect(() => { if (pronto) marcarPagina(passe.token, ROTULO_AREA[area]); }, [pronto, area]);
+
+  if (!passe) return <PortaDemo onEntrou={(p) => { salvarPasse(p); setPasse(p); }} />;
+  if (!pronto) return <Carregando />;
+
+  const sessaoDemo = { user: { id: "demo", email: "demonstracao" } };
+  const Aba = ({ r, icon: I }) => (
+    <button onClick={() => { setArea(r); window.scrollTo(0, 0); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-body text-sm font-bold whitespace-nowrap"
+      style={{ background: area === r ? "#fff" : "transparent", color: area === r ? AZUL : "#fff" }}><I size={15} /> {ROTULO_AREA[r]}</button>
+  );
+  return (
+    <div className="min-h-screen" style={{ background: "#F7FAFD" }}>
+      <div className="text-center font-body text-xs font-bold py-1.5 px-3" style={{ background: AMARELO, color: AZUL_ESC }}>
+        <Lock size={12} className="inline -mt-0.5 mr-1" /> DEMONSTRAÇÃO · somente visualização · nomes só com a inicial, sem documentos nem contatos
+      </div>
+      <header className="sticky top-0 z-50 shadow-md" style={{ background: `linear-gradient(110deg, ${AZUL_ESC}, ${AZUL})` }}>
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 mr-auto">
+            <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: AMARELO }}><Landmark size={19} color={AZUL_ESC} /></span>
+            <span className="text-left leading-tight"><span className="block font-display font-extrabold text-white text-[15px]">Fomento Paraná</span><span className="block font-body text-[11px] font-semibold" style={{ color: AMARELO }}>Olá, {passe.nome.split(" ")[0]} · {passe.cidade}</span></span>
+          </div>
+          <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <Aba r="publico" icon={Home} />
+            <Aba r="agente" icon={Radar} />
+            <Aba r="admin" icon={ShieldCheck} />
+          </nav>
+        </div>
+      </header>
+      <main>
+        {area === "publico" && <FomentoPublico siteConfig={null} />}
+        {area === "agente" && <FomentoAdmin key="demo-agente" area="agente" sessao={sessaoDemo} perfil={PERFIL_DEMO} aoTrocarAba={(a) => marcarPagina(passe.token, `Agente: ${a}`)} />}
+        {area === "admin" && <FomentoAdmin key="demo-admin" area="admin" sessao={sessaoDemo} perfil={PERFIL_DEMO} aoTrocarAba={(a) => marcarPagina(passe.token, `Admin: ${a}`)} />}
+      </main>
+      <footer className="border-t mt-10" style={{ borderColor: LINHA }}>
+        <div className="max-w-6xl mx-auto px-4 py-6 font-body text-xs" style={{ color: MUTED }}>
+          Demonstração do sistema do Agente de Crédito da Fomento Paraná em Ivatuba-PR. Os dados pessoais dos empreendedores não são exibidos.
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function PortaDemo({ onEntrou }) {
+  const [nome, setNome] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [carregando, setCarregando] = useState(false);
+  const input = "font-body text-sm border rounded-xl px-3.5 py-3 outline-none bg-white w-full focus:ring-2 focus:ring-blue-200";
+  const entrar = async (e) => {
+    e.preventDefault();
+    if (nome.trim().length < 2 || cidade.trim().length < 2) { setMsg("Informe seu nome e sua cidade."); return; }
+    if (!supabaseConfigurado) { setMsg("Demonstração indisponível no momento."); return; }
+    setCarregando(true); setMsg(null);
+    const { data, error } = await supabaseReal.rpc("fomento_demo_registrar", { p_nome: nome.trim(), p_cidade: cidade.trim(), p_navegador: navigator.userAgent });
+    setCarregando(false);
+    if (error || !data) { setMsg(error?.message || "Não foi possível abrir a demonstração."); return; }
+    onEntrou({ token: data, nome: nome.trim(), cidade: cidade.trim() });
+  };
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 py-10" style={{ background: `linear-gradient(140deg, ${AZUL_ESC}, ${AZUL})` }}>
+      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+        <span className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3" style={{ background: AMARELO }}><MonitorPlay size={22} color={AZUL_ESC} /></span>
+        <p className="font-body text-[11px] font-bold uppercase tracking-wider" style={{ color: AZUL }}>Fomento Paraná · Ivatuba-PR</p>
+        <p className="font-display font-extrabold text-xl mt-0.5" style={{ color: INK }}>Demonstração do sistema</p>
+        <p className="font-body text-sm mt-1 mb-5" style={{ color: MUTED }}>Veja o Início, a Área do agente e a Administração. Para entrar, diga quem é você.</p>
+        <form onSubmit={entrar} className="space-y-3">
+          <input required maxLength={80} autoComplete="name" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" className={input} style={{ borderColor: LINHA }} />
+          <input required maxLength={80} value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Sua cidade" className={input} style={{ borderColor: LINHA }} />
+          {msg && <div className="rounded-xl px-3 py-2 font-body text-xs" style={{ background: "#FBEAE5", color: "#B4462F" }}>{msg}</div>}
+          <button type="submit" disabled={carregando} className="w-full font-body text-sm font-bold py-3 rounded-xl text-white disabled:opacity-60" style={{ background: AZUL }}>{carregando ? "Abrindo..." : "Ver demonstração"}</button>
+        </form>
+        <div className="mt-4 rounded-xl px-3 py-2.5 font-body text-[11px] leading-relaxed" style={{ background: "#F1F6FB", color: MUTED }}>
+          <Lock size={11} className="inline -mt-0.5 mr-1" />Somente visualização. Nomes de clientes aparecem só com a inicial; documentos, telefones e endereços ficam ocultos. Seu nome, cidade, data e horário de acesso ficam registrados.
+        </div>
       </div>
     </div>
   );

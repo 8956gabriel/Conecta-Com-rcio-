@@ -19,7 +19,7 @@ import {
   Clock, ArrowRight, ExternalLink, Columns, Inbox, History, Medal, Undo2,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { supabase, supabaseConfigurado } from "./supabaseClient";
+import { supabase, supabaseConfigurado, emDemonstracao } from "./supabaseClient";
 import { Radar as RadarCentral } from "lucide-react";
 const CentralProspeccao = lazy(() => import("./central/Central.jsx"));
 
@@ -880,16 +880,17 @@ function KPI({ titulo, valor, sub, cor = F.blue, icon: Icon }) {
   );
 }
 
-export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" }) {
+export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos", aoTrocarAba }) {
   const podeAcessar = useFomentoAcesso(sessao, perfil);
   const [podeGerir, setPodeGerir] = useState(!supabaseConfigurado);
   const [gerirVerificado, setGerirVerificado] = useState(!supabaseConfigurado);
   const ABAS_AREA = {
     agente: ["central", "propostas", "contratos", "interesses", "simulacao", "pontuacao", "lembretes"],
-    admin: ["painel", "propostas", "contratos", "interesses", "pontuacao", "ranking", "linhas", "materiais", "lembretes", "config"],
+    admin: ["painel", "propostas", "contratos", "interesses", "pontuacao", "ranking", "linhas", "materiais", "lembretes", "config", "demo"],
   };
   const inicial = area === "admin" ? "painel" : "central";
   const [aba, setAbaEstado] = useState(() => { try { const a = sessionStorage.getItem(`fomento-aba-${area}`); return a && (!ABAS_AREA[area] || ABAS_AREA[area].includes(a)) ? a : inicial; } catch { return inicial; } });
+  useEffect(() => { aoTrocarAba?.(aba); }, [aba]);
   const setAba = (a) => { setAbaEstado(a); try { sessionStorage.setItem(`fomento-aba-${area}`, a); } catch { /* */ } };
   const { config, setConfig, linhas, setLinhas, materiais, setMateriais, rankingOficial, setRankingOficial } = useFomentoPublico();
   const [propostas, setPropostas] = useState(null);
@@ -959,6 +960,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" 
     { id: "materiais", label: "Documentos e PDFs", icon: FileText },
     { id: "lembretes", label: "Lembretes", icon: Bell, badge: lembretesPendentes },
     { id: "config", label: "Configurações", icon: Settings },
+    ...(emDemonstracao ? [] : [{ id: "demo", label: "Visitas da demonstração", icon: Eye }]),
   ];
   const itens = ABAS_AREA[area] ? todosItens.filter((i) => ABAS_AREA[area].includes(i.id)) : todosItens;
 
@@ -973,7 +975,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" 
         <div aria-hidden className="absolute -right-8 -top-10 w-40 h-40 rounded-full" style={{ background: "rgba(37,168,91,0.25)" }} />
         <div className="relative">
           <p className="font-body text-[11px] font-bold uppercase tracking-wider text-white/70 flex items-center gap-1.5"><Landmark size={12} /> Fomento Paraná · {area === "admin" ? "Administração" : "Agente de Crédito"}
-            {area !== "todos" && <a href={area === "admin" ? LINKS_FOMENTO.agente : LINKS_FOMENTO.admin} className="ml-2 normal-case tracking-normal underline text-white/80 hover:text-white">ir para {area === "admin" ? "área do agente" : "administração"} ›</a>}</p>
+            {area !== "todos" && !emDemonstracao && <a href={area === "admin" ? LINKS_FOMENTO.agente : LINKS_FOMENTO.admin} className="ml-2 normal-case tracking-normal underline text-white/80 hover:text-white">ir para {area === "admin" ? "área do agente" : "administração"} ›</a>}</p>
           <h1 className="font-display text-xl md:text-2xl font-extrabold text-white mt-0.5">{itens.find((i) => i.id === aba)?.label || "Painel"}</h1>
         </div>
         <div className="relative flex items-center gap-2">
@@ -987,6 +989,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" 
       </div>
 
       {!supabaseConfigurado && <div className="mb-4"><Aviso>Modo demonstração: conecte o Supabase para salvar os dados de verdade.</Aviso></div>}
+      {emDemonstracao && <div className="mb-4"><Aviso>Demonstração somente para visualização: nomes aparecem só com a inicial e documentos, contatos e observações ficam ocultos. Nenhuma alteração é salva.</Aviso></div>}
 
       <div className={aba === "central" ? "grid gap-4" : "grid md:grid-cols-[220px_1fr] gap-6"}>
         <aside className={`rounded-2xl border p-2 h-fit flex gap-1 overflow-x-auto no-scrollbar ${aba === "central" ? "" : "md:flex-col"}`} style={{ borderColor: F.line }}>
@@ -1015,6 +1018,7 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos" 
           {aba === "materiais" && <AbaMateriais {...ctx} />}
           {aba === "lembretes" && <AbaLembretes {...ctx} />}
           {aba === "config" && <AbaConfig {...ctx} />}
+          {aba === "demo" && !emDemonstracao && <AbaVisitasDemo {...ctx} />}
         </div>
       </div>
     </div>
@@ -2586,6 +2590,69 @@ function AbaConfig({ config, setConfig, agentes, setAgentes, avisar, podeGerir }
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Visitas da demonstração
+function AbaVisitasDemo({ avisar, podeGerir }) {
+  const [lista, setLista] = useState(null);
+  const [busca, setBusca] = useState("");
+  const link = SITE_FOMENTO ? `${window.location.origin}/demo` : "https://fomento-ivatuba.vercel.app/demo";
+  const carregar = () => supabase.from("fomento_demo_visitas").select("*").order("criado_em", { ascending: false }).limit(2000)
+    .then(({ data, error }) => { if (error) { avisar(/does not exist|schema cache/i.test(error.message) ? "Rode o arquivo supabase-fomento-demo.sql no Supabase." : error.message, "erro"); setLista([]); } else setLista(data || []); });
+  useEffect(() => { carregar(); }, []);
+  const dataBR = (d) => new Date(d).toLocaleDateString("pt-BR");
+  const horaBR = (d) => new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const filtrada = (lista || []).filter((v) => !busca || `${v.nome} ${v.cidade}`.toLowerCase().includes(busca.toLowerCase()));
+  const porCidade = Object.entries(filtrada.reduce((m, v) => { const c = v.cidade.trim(); m[c] = (m[c] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]);
+  const apagar = async (v) => {
+    if (!window.confirm(`Apagar o registro de ${v.nome}?`)) return;
+    const { error } = await supabase.from("fomento_demo_visitas").delete().eq("id", v.id);
+    if (error) avisar(error.message, "erro"); else setLista((l) => l.filter((x) => x.id !== v.id));
+  };
+  return (
+    <div>
+      <Titulo eyebrow="Demonstração" title="Quem visualizou o sistema" sub="Cada pessoa que abre o link informa nome e cidade. A demonstração é só para ver: nomes de clientes aparecem com a inicial e sem documentos ou contatos." />
+      <div className="rounded-2xl border p-4 mb-4 flex flex-wrap items-center gap-3" style={{ borderColor: F.line, background: F.blueTint }}>
+        <span className="font-body text-sm font-bold" style={{ color: F.ink }}>Link da demonstração:</span>
+        <code className="font-body text-sm px-2 py-1 rounded-lg bg-white" style={{ color: F.blue }}>{link}</code>
+        <button onClick={() => { navigator.clipboard?.writeText(link); avisar("Link copiado!"); }} className="font-body text-xs font-bold px-3 py-2 rounded-xl text-white" style={{ background: F.blue }}>Copiar link</button>
+        <a href={link} target="_blank" rel="noopener" className="font-body text-xs font-bold underline" style={{ color: F.blue }}>Abrir</a>
+      </div>
+      <div className="grid sm:grid-cols-3 gap-3 mb-4">
+        <KPI titulo="Visualizações" valor={lista ? filtrada.length : "…"} icon={Eye} />
+        <KPI titulo="Cidades" valor={lista ? porCidade.length : "…"} sub={porCidade.slice(0, 3).map(([c, n]) => `${c} (${n})`).join(" · ")} icon={Landmark} />
+        <KPI titulo="Hoje" valor={lista ? filtrada.filter((v) => dataBR(v.criado_em) === dataBR(new Date())).length : "…"} icon={Calendar} />
+      </div>
+      <div className="flex flex-wrap gap-2 mb-3">
+        <div className="relative flex-1 min-w-[200px]"><Search size={15} className="absolute left-3 top-3" color={F.soft} />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou cidade" className="w-full font-body text-sm border rounded-xl pl-9 pr-3 py-2.5 outline-none" style={{ borderColor: F.line }} /></div>
+        <button onClick={carregar} className="font-body text-xs font-bold px-3 py-2 rounded-xl border" style={{ borderColor: F.line, color: F.blue }}>Atualizar</button>
+        <button onClick={() => exportarCSV("visitas-demonstracao.csv", ["Nome", "Cidade", "Data", "Horário", "Último acesso", "Telas vistas"], filtrada.map((v) => [v.nome, v.cidade, dataBR(v.criado_em), horaBR(v.criado_em), `${dataBR(v.ultimo_acesso)} ${horaBR(v.ultimo_acesso)}`, (v.paginas || []).join(" | ")]))}
+          className="font-body text-xs font-bold px-3 py-2 rounded-xl text-white inline-flex items-center gap-1.5" style={{ background: F.green }}><Download size={14} /> Exportar planilha</button>
+      </div>
+      <div className="rounded-2xl border overflow-x-auto bg-white" style={{ borderColor: F.line }}>
+        <table className="w-full font-body text-sm">
+          <thead><tr className="text-left text-xs uppercase" style={{ color: F.muted, background: "#F7FAFD" }}>
+            <th className="px-3 py-2.5">Nome</th><th className="px-3 py-2.5">Cidade</th><th className="px-3 py-2.5">Data</th><th className="px-3 py-2.5">Horário</th><th className="px-3 py-2.5">Telas vistas</th>{podeGerir && <th />}
+          </tr></thead>
+          <tbody>
+            {lista === null && <tr><td colSpan={6} className="px-3 py-8 text-center" style={{ color: F.muted }}>Carregando...</td></tr>}
+            {lista && !filtrada.length && <tr><td colSpan={6} className="px-3 py-8 text-center" style={{ color: F.muted }}>Ninguém abriu a demonstração ainda.</td></tr>}
+            {filtrada.map((v) => (
+              <tr key={v.id} className="border-t align-top" style={{ borderColor: F.line }}>
+                <td className="px-3 py-2.5 font-semibold" style={{ color: F.ink }}>{v.nome}</td>
+                <td className="px-3 py-2.5">{v.cidade}</td>
+                <td className="px-3 py-2.5 whitespace-nowrap">{dataBR(v.criado_em)}</td>
+                <td className="px-3 py-2.5 whitespace-nowrap">{horaBR(v.criado_em)}</td>
+                <td className="px-3 py-2.5 text-xs" style={{ color: F.muted }}>{(v.paginas || []).length ? `${v.paginas.length} · ${v.paginas.slice(0, 4).join(", ")}${v.paginas.length > 4 ? "…" : ""}` : "—"}</td>
+                {podeGerir && <td className="px-3 py-2.5"><button onClick={() => apagar(v)} title="Apagar registro"><Trash2 size={14} color={F.soft} /></button></td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { X, Sparkles, ShieldCheck, Copy, MessageCircle, Check } from "lucide-react";
-import { supabase, supabaseConfigurado } from "../supabaseClient";
+import { supabase, supabaseConfigurado, emDemonstracao } from "../supabaseClient";
 
 // Identidade da Central: azul institucional + branco + detalhes amarelos
 export const C = {
@@ -151,6 +151,7 @@ export function Texto({ children, className = "" }) {
 // Chamada à IA do servidor (com o token do usuário logado)
 export async function chamarIA({ modo, pedido, messages, contexto, endpoint = "/api/fomento-ia" }) {
   if (!supabaseConfigurado) throw new Error("Modo demonstração: conecte o Supabase.");
+  if (emDemonstracao) throw new Error("A IA fica desligada no link de demonstração.");
   const { data } = await supabase.auth.getSession();
   const token = data?.session?.access_token;
   const r = await fetch(endpoint, {

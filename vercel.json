@@ -27,6 +27,10 @@
     {
       "source": "/entrar",
       "destination": "/"
+    },
+    {
+      "source": "/demo",
+      "destination": "/"
     }
   ]
 }
