@@ -2611,8 +2611,17 @@ function AbaVisitasDemo({ avisar, podeGerir }) {
     const { error } = await supabase.from("fomento_demo_visitas").delete().eq("id", v.id);
     if (error) avisar(error.message, "erro"); else setLista((l) => l.filter((x) => x.id !== v.id));
   };
+  const mudarStatus = async (v, status) => {
+    const liberado_em = status === "liberado" ? new Date().toISOString() : null;
+    const { error } = await supabase.from("fomento_demo_visitas").update({ status, liberado_em }).eq("id", v.id);
+    if (error) avisar(error.message, "erro");
+    else { setLista((l) => l.map((x) => (x.id === v.id ? { ...x, status, liberado_em } : x))); avisar(status === "liberado" ? `Acesso de ${v.nome} liberado.` : `Acesso de ${v.nome} bloqueado.`); }
+  };
+  const pendentes = (lista || []).filter((v) => (v.status || "pendente") === "pendente").length;
+  const corStatus = { liberado: [F.green, "#E7F5EC", "Liberado"], bloqueado: ["#B4462F", "#FBEAE5", "Bloqueado"], pendente: ["#9A6B00", "#FFF4D6", "Aguardando"] };
   return (
     <div>
+      {pendentes > 0 && <div className="rounded-2xl border p-3 mb-4 font-body text-sm font-bold" style={{ borderColor: "#F2D48A", background: "#FFF4D6", color: "#7A5500" }}>{pendentes} pedido(s) aguardando sua liberação.</div>}
       <Titulo eyebrow="Demonstração" title="Quem visualizou o sistema" sub="Cada pessoa que abre o link informa nome e cidade. A demonstração é só para ver: nomes de clientes aparecem com a inicial e sem documentos ou contatos." />
       <div className="rounded-2xl border p-4 mb-4 flex flex-wrap items-center gap-3" style={{ borderColor: F.line, background: F.blueTint }}>
         <span className="font-body text-sm font-bold" style={{ color: F.ink }}>Link da demonstração:</span>
@@ -2635,11 +2644,11 @@ function AbaVisitasDemo({ avisar, podeGerir }) {
       <div className="rounded-2xl border overflow-x-auto bg-white" style={{ borderColor: F.line }}>
         <table className="w-full font-body text-sm">
           <thead><tr className="text-left text-xs uppercase" style={{ color: F.muted, background: "#F7FAFD" }}>
-            <th className="px-3 py-2.5">Nome</th><th className="px-3 py-2.5">Cidade</th><th className="px-3 py-2.5">Data</th><th className="px-3 py-2.5">Horário</th><th className="px-3 py-2.5">Telas vistas</th>{podeGerir && <th />}
+            <th className="px-3 py-2.5">Nome</th><th className="px-3 py-2.5">Cidade</th><th className="px-3 py-2.5">Data</th><th className="px-3 py-2.5">Horário</th><th className="px-3 py-2.5">Telas vistas</th><th className="px-3 py-2.5">Acesso</th>{podeGerir && <th />}
           </tr></thead>
           <tbody>
-            {lista === null && <tr><td colSpan={6} className="px-3 py-8 text-center" style={{ color: F.muted }}>Carregando...</td></tr>}
-            {lista && !filtrada.length && <tr><td colSpan={6} className="px-3 py-8 text-center" style={{ color: F.muted }}>Ninguém abriu a demonstração ainda.</td></tr>}
+            {lista === null && <tr><td colSpan={7} className="px-3 py-8 text-center" style={{ color: F.muted }}>Carregando...</td></tr>}
+            {lista && !filtrada.length && <tr><td colSpan={7} className="px-3 py-8 text-center" style={{ color: F.muted }}>Ninguém abriu a demonstração ainda.</td></tr>}
             {filtrada.map((v) => (
               <tr key={v.id} className="border-t align-top" style={{ borderColor: F.line }}>
                 <td className="px-3 py-2.5 font-semibold" style={{ color: F.ink }}>{v.nome}</td>
@@ -2647,6 +2656,11 @@ function AbaVisitasDemo({ avisar, podeGerir }) {
                 <td className="px-3 py-2.5 whitespace-nowrap">{dataBR(v.criado_em)}</td>
                 <td className="px-3 py-2.5 whitespace-nowrap">{horaBR(v.criado_em)}</td>
                 <td className="px-3 py-2.5 text-xs" style={{ color: F.muted }}>{(v.paginas || []).length ? `${v.paginas.length} · ${v.paginas.slice(0, 4).join(", ")}${v.paginas.length > 4 ? "…" : ""}` : "—"}</td>
+                <td className="px-3 py-2.5 whitespace-nowrap">
+                  {(() => { const [cor, fundo, rot] = corStatus[v.status || "pendente"] || corStatus.pendente; return <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ color: cor, background: fundo }}>{rot}</span>; })()}
+                  {podeGerir && (v.status || "pendente") !== "liberado" && <button onClick={() => mudarStatus(v, "liberado")} className="ml-2 text-xs font-bold px-2.5 py-1 rounded-lg text-white" style={{ background: F.green }}>Liberar</button>}
+                  {podeGerir && (v.status || "pendente") !== "bloqueado" && <button onClick={() => mudarStatus(v, "bloqueado")} className="ml-2 text-xs font-bold px-2.5 py-1 rounded-lg border" style={{ borderColor: F.line, color: "#B4462F" }}>Bloquear</button>}
+                </td>
                 {podeGerir && <td className="px-3 py-2.5"><button onClick={() => apagar(v)} title="Apagar registro"><Trash2 size={14} color={F.soft} /></button></td>}
               </tr>
             ))}

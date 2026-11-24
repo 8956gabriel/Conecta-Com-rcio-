@@ -251,6 +251,8 @@ function PortaDemo({ onEntrou }) {
     const { data, error } = await supabaseReal.rpc("fomento_demo_registrar", { p_nome: nome.trim(), p_cidade: cidade.trim(), p_navegador: navigator.userAgent });
     setCarregando(false);
     if (error || !data) { setMsg(error?.message || "Não foi possível abrir a demonstração."); return; }
+    if (data === "pendente") { setMsg({ ok: true, texto: "Pedido enviado! Aguarde o agente de crédito liberar seu acesso. Depois, volte aqui e clique de novo em Ver demonstração com o mesmo nome e cidade." }); return; }
+    if (data === "bloqueado") { setMsg("Seu acesso à demonstração não foi autorizado."); return; }
     onEntrou({ token: data, nome: nome.trim(), cidade: cidade.trim() });
   };
   return (
@@ -263,11 +265,13 @@ function PortaDemo({ onEntrou }) {
         <form onSubmit={entrar} className="space-y-3">
           <input required maxLength={80} autoComplete="name" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" className={input} style={{ borderColor: LINHA }} />
           <input required maxLength={80} value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Sua cidade" className={input} style={{ borderColor: LINHA }} />
-          {msg && <div className="rounded-xl px-3 py-2 font-body text-xs" style={{ background: "#FBEAE5", color: "#B4462F" }}>{msg}</div>}
+          {msg && (msg.ok
+            ? <div className="rounded-xl px-3 py-2 font-body text-xs" style={{ background: "#E7F5EC", color: "#1E7A44" }}>{msg.texto}</div>
+            : <div className="rounded-xl px-3 py-2 font-body text-xs" style={{ background: "#FBEAE5", color: "#B4462F" }}>{msg}</div>)}
           <button type="submit" disabled={carregando} className="w-full font-body text-sm font-bold py-3 rounded-xl text-white disabled:opacity-60" style={{ background: AZUL }}>{carregando ? "Abrindo..." : "Ver demonstração"}</button>
         </form>
         <div className="mt-4 rounded-xl px-3 py-2.5 font-body text-[11px] leading-relaxed" style={{ background: "#F1F6FB", color: MUTED }}>
-          <Lock size={11} className="inline -mt-0.5 mr-1" />Somente visualização. Nomes de clientes aparecem só com a inicial; documentos, telefones e endereços ficam ocultos. Seu nome, cidade, data e horário de acesso ficam registrados.
+          <Lock size={11} className="inline -mt-0.5 mr-1" />Somente visualização. Nomes de clientes aparecem só com a inicial; documentos, telefones e endereços ficam ocultos. Seu nome, cidade, data e horário de acesso ficam registrados. O acesso é liberado pelo agente de crédito.
         </div>
       </div>
     </div>

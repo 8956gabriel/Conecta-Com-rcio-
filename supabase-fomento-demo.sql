@@ -9,6 +9,8 @@
 --     WhatsApp, telefone, e-mail, endereço, observações ou documentos;
 --   • nada pode ser alterado (o banco não oferece escrita para a demonstração).
 --
+--   • NOVO: o pedido fica "pendente" até o agente LIBERAR na aba Demonstração.
+--
 -- Rode este arquivo inteiro no Supabase › SQL Editor (pode rodar de novo).
 -- =============================================================================
 
@@ -32,20 +34,45 @@ create policy "demo: gestor ve" on public.fomento_demo_visitas for select to aut
 drop policy if exists "demo: gestor apaga" on public.fomento_demo_visitas;
 create policy "demo: gestor apaga" on public.fomento_demo_visitas for delete to authenticated using (public.fomento_pode_gerir());
 
--- 2) Entrada na demonstração: grava nome/cidade e devolve o "passe" da visita ---
-create or replace function public.fomento_demo_registrar(p_nome text, p_cidade text, p_navegador text default null)
-returns uuid language plpgsql security definer set search_path = public as $$
-declare v uuid;
+-- 1b) Liberação pelo agente: cada pedido começa "pendente" -------------------
+alter table public.fomento_demo_visitas add column if not exists status text not null default 'pendente';
+alter table public.fomento_demo_visitas add column if not exists liberado_em timestamptz;
+alter table public.fomento_demo_visitas add column if not exists entrou_em timestamptz;
+grant update (status, liberado_em) on public.fomento_demo_visitas to authenticated;
+drop policy if exists "demo: gestor libera" on public.fomento_demo_visitas;
+create policy "demo: gestor libera" on public.fomento_demo_visitas for update to authenticated using (public.fomento_pode_gerir()) with check (public.fomento_pode_gerir());
+
+-- 2) Entrada na demonstração --------------------------------------------------
+--   devolve o "passe" (id) se a pessoa já foi LIBERADA; senão devolve
+--   'pendente' (pedido criado/aguardando) ou 'bloqueado'.
+drop function if exists public.fomento_demo_registrar(text, text, text);
+create function public.fomento_demo_registrar(p_nome text, p_cidade text, p_navegador text default null)
+returns text language plpgsql security definer set search_path = public as $$
+declare v_id uuid; v_status text;
 begin
   p_nome := left(trim(regexp_replace(coalesce(p_nome, ''), '\s+', ' ', 'g')), 80);
   p_cidade := left(trim(regexp_replace(coalesce(p_cidade, ''), '\s+', ' ', 'g')), 80);
   if char_length(p_nome) < 2 or char_length(p_cidade) < 2 then raise exception 'Informe seu nome e sua cidade.'; end if;
-  -- trava simples contra robôs
-  if (select count(*) from public.fomento_demo_visitas where criado_em > now() - interval '1 minute') > 30 then
-    raise exception 'Muitos acessos agora. Tente de novo em um minuto.';
+
+  select id, status into v_id, v_status from public.fomento_demo_visitas
+   where lower(nome) = lower(p_nome) and lower(cidade) = lower(p_cidade)
+   order by criado_em desc limit 1;
+
+  if not found then
+    -- trava simples contra robôs
+    if (select count(*) from public.fomento_demo_visitas where criado_em > now() - interval '1 minute') > 30 then
+      raise exception 'Muitos acessos agora. Tente de novo em um minuto.';
+    end if;
+    insert into public.fomento_demo_visitas (nome, cidade, navegador) values (p_nome, p_cidade, left(p_navegador, 200));
+    return 'pendente';
   end if;
-  insert into public.fomento_demo_visitas (nome, cidade, navegador) values (p_nome, p_cidade, left(p_navegador, 200)) returning id into v;
-  return v;
+
+  if v_status <> 'liberado' then return v_status; end if;
+
+  update public.fomento_demo_visitas
+     set entrou_em = now(), ultimo_acesso = now(), navegador = left(p_navegador, 200)
+   where id = v_id;
+  return v_id::text;
 end $$;
 
 -- 3) Marca a tela aberta (para o relatório) -------------------------------------
@@ -54,7 +81,7 @@ returns void language sql security definer set search_path = public as $$
   update public.fomento_demo_visitas
      set ultimo_acesso = now(),
          paginas = case when left(p_pagina, 40) = any(paginas) or cardinality(paginas) >= 40 then paginas else paginas || left(p_pagina, 40) end
-   where id = p_token and criado_em > now() - interval '24 hours';
+   where id = p_token and status = 'liberado' and entrou_em > now() - interval '24 hours';
 $$;
 
 -- 4) Máscara dos dados -----------------------------------------------------------
@@ -99,7 +126,7 @@ create or replace function public.fomento_demo_dados(p_token uuid, p_tabela text
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare v jsonb;
 begin
-  if not exists (select 1 from public.fomento_demo_visitas where id = p_token and criado_em > now() - interval '24 hours') then
+  if not exists (select 1 from public.fomento_demo_visitas where id = p_token and status = 'liberado' and entrou_em > now() - interval '24 hours') then
     raise exception 'demo_expirada';
   end if;
   if p_tabela not in ('fomento_propostas','fomento_interesses','fomento_agenda','fomento_agentes','fomento_historico','fomento_pontuacao',
@@ -118,3 +145,5 @@ revoke all on function public.fomento_demo_mascarar(jsonb, text) from public, an
 grant execute on function public.fomento_demo_registrar(text, text, text) to anon, authenticated;
 grant execute on function public.fomento_demo_pagina(uuid, text) to anon, authenticated;
 grant execute on function public.fomento_demo_dados(uuid, text) to anon, authenticated;
+
+notify pgrst, 'reload schema';
