@@ -11,7 +11,7 @@
 // =============================================================================
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  History, PlusCircle, Pencil, Trash2, Download, Copy, Globe, EyeOff, X, Camera, Sparkles, Users, CalendarDays, Target, Award, ClipboardList,
+  History, PlusCircle, Pencil, Trash2, Download, Copy, Globe, EyeOff, X, Camera, Sparkles, CalendarDays, Target, Award, ClipboardList, GraduationCap,
 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { exportarPDF } from "./central/motor.js";
@@ -29,22 +29,31 @@ const inputCls = "font-body text-sm border rounded-lg px-3 py-2.5 outline-none b
 const inputStyle = { borderColor: R.line };
 const faltaTabela = (e) => /relation|schema cache|column/i.test(e?.message || "");
 
-// Tipos de marco (lançados à mão)
+// Grupos usados no filtro e nos números da capa
+export const GRUPOS = {
+  eventos: { r: "Eventos", emoji: "📣" },
+  capacitacoes: { r: "Capacitações", emoji: "🎓" },
+  acoes: { r: "Ações", emoji: "🎯" },
+  marcos: { r: "Marcos", emoji: "🏆" },
+};
+// Tipos lançados à mão na Retrospectiva (tabela sala_marcos)
 export const TIPOS_MARCO = {
-  conquista: { r: "Conquista", emoji: "🏆", c: "#C99700" },
-  inauguracao: { r: "Inauguração", emoji: "🎉", c: "#E0457B" },
-  parceria: { r: "Parceria", emoji: "🤝", c: "#0EA5A5" },
-  capacitacao: { r: "Capacitação", emoji: "🎓", c: "#7E5BEF" },
-  evento: { r: "Evento", emoji: "📣", c: "#0A5AA8" },
-  visita: { r: "Visita", emoji: "👥", c: "#1E8E5A" },
-  outro: { r: "Outro", emoji: "⭐", c: "#5C7186" },
+  evento: { r: "Evento", emoji: "📣", c: "#0A5AA8", g: "eventos", ex: "Ex.: Feira do Empreendedor na praça" },
+  acao: { r: "Ação da Sala", emoji: "🎯", c: "#1E8E5A", g: "acoes", ex: "Ex.: Visita aos comércios do centro sobre o DAS" },
+  capacitacao: { r: "Capacitação / curso / palestra", emoji: "🎓", c: "#7E5BEF", g: "capacitacoes", ex: "Ex.: Oficina de vendas pelo WhatsApp (Sebrae)" },
+  mutirao: { r: "Mutirão", emoji: "🧰", c: "#E0457B", g: "eventos", ex: "Ex.: Mutirão da Declaração Anual do MEI" },
+  parceria: { r: "Parceria", emoji: "🤝", c: "#0EA5A5", g: "acoes", ex: "Ex.: Parceria com a Fomento Paraná" },
+  conquista: { r: "Conquista / prêmio", emoji: "🏆", c: "#C99700", g: "marcos", ex: "Ex.: Selo Sebrae Prata" },
+  inauguracao: { r: "Inauguração", emoji: "🎉", c: "#E0457B", g: "marcos", ex: "Ex.: Inauguração da nova Sala" },
+  visita: { r: "Visita recebida", emoji: "👥", c: "#5C7186", g: "marcos", ex: "Ex.: Visita da consultoria do Sebrae" },
+  outro: { r: "Outro", emoji: "⭐", c: "#5C7186", g: "marcos", ex: "" },
 };
 // Itens que vêm do Calendário
 const TIPOS_CAL = {
-  evento: { r: "Evento", emoji: "📅", c: "#0A5AA8" },
-  mutirao: { r: "Mutirão", emoji: "🧰", c: "#7E5BEF" },
-  curso: { r: "Curso", emoji: "🎓", c: "#0EA5A5" },
-  comercio: { r: "Data do comércio", emoji: "🛍️", c: "#E8A23D" },
+  evento: { r: "Evento", emoji: "📅", c: "#0A5AA8", g: "eventos" },
+  mutirao: { r: "Mutirão", emoji: "🧰", c: "#7E5BEF", g: "eventos" },
+  curso: { r: "Curso", emoji: "🎓", c: "#0EA5A5", g: "capacitacoes" },
+  comercio: { r: "Data do comércio", emoji: "🛍️", c: "#E8A23D", g: "eventos" },
 };
 
 // Modo demonstração (sem Supabase)
@@ -90,18 +99,18 @@ export function montarRetrospectiva({ ano, fichas = [], totais = [], eventos = [
   const itens = [];
   marcos.filter((m) => doAno(m.data)).forEach((m) => {
     const t = TIPOS_MARCO[m.tipo] || TIPOS_MARCO.outro;
-    itens.push({ chave: `m-${m.id}`, origem: "marco", data: m.data, emoji: t.emoji, cor: t.c, rotulo: t.r, titulo: m.titulo, descricao: m.descricao, foto: m.foto_url, publicar: m.publicar, bruto: m });
+    itens.push({ chave: `m-${m.id}`, origem: "marco", grupo: t.g, data: m.data, emoji: t.emoji, cor: t.c, rotulo: t.r, titulo: m.titulo, descricao: m.descricao, foto: m.foto_url, local: m.local, participantes: Number(m.participantes) || 0, publicar: m.publicar, bruto: m });
   });
   eventos.filter((e) => doAno(e.data) && e.data <= hoje && TIPOS_CAL[e.tipo]).forEach((e) => {
     const t = TIPOS_CAL[e.tipo];
-    itens.push({ chave: `e-${e.id}`, origem: "calendario", data: e.data, emoji: t.emoji, cor: t.c, rotulo: t.r, titulo: e.titulo, descricao: e.descricao, publicar: e.publicar });
+    itens.push({ chave: `e-${e.id}`, origem: "calendario", grupo: t.g, data: e.data, emoji: t.emoji, cor: t.c, rotulo: t.r, titulo: e.titulo, descricao: e.descricao, publicar: e.publicar });
   });
   estrategias.forEach((e) => {
     if (e.status === "concluida") {
       const d = e.data_fim || e.data_inicio;
-      if (doAno(d) && d <= hoje) itens.push({ chave: `s-${e.id}`, origem: "estrategia", data: d, emoji: "✅", cor: R.green, rotulo: "Estratégia concluída", titulo: e.titulo, descricao: e.objetivo, publicar: e.publicar });
+      if (doAno(d) && d <= hoje) itens.push({ chave: `s-${e.id}`, origem: "estrategia", grupo: "acoes", data: d, emoji: "✅", cor: R.green, rotulo: "Estratégia concluída", titulo: e.titulo, descricao: e.objetivo, publicar: e.publicar });
     } else if (e.status === "em_andamento" && doAno(e.data_inicio) && e.data_inicio <= hoje) {
-      itens.push({ chave: `s-${e.id}`, origem: "estrategia", data: e.data_inicio, emoji: "🚀", cor: "#E8A23D", rotulo: "Estratégia iniciada", titulo: e.titulo, descricao: e.objetivo, publicar: e.publicar });
+      itens.push({ chave: `s-${e.id}`, origem: "estrategia", grupo: "acoes", data: e.data_inicio, emoji: "🚀", cor: "#E8A23D", rotulo: "Estratégia iniciada", titulo: e.titulo, descricao: e.objetivo, publicar: e.publicar });
     }
   });
   itens.sort((a, b) => a.data.localeCompare(b.data) || (a.origem === "marco" ? -1 : 1));
@@ -118,10 +127,11 @@ export function montarRetrospectiva({ ano, fichas = [], totais = [], eventos = [
     melhorMes: total ? { m: melhorIdx, v: porMes[melhorIdx] } : null,
     maiorMes: Math.max(1, ...porMes),
     pessoas: pessoas.size, canais, fichas: fichasAno.length,
-    eventos: contar((i) => i.origem === "calendario" && i.rotulo !== "Curso"),
-    cursos: contar((i) => i.origem === "calendario" && i.rotulo === "Curso"),
-    estrategias: contar((i) => i.origem === "estrategia" && i.rotulo === "Estratégia concluída"),
-    marcos: contar((i) => i.origem === "marco"),
+    eventos: contar((i) => i.grupo === "eventos"),
+    cursos: contar((i) => i.grupo === "capacitacoes"),
+    estrategias: contar((i) => i.grupo === "acoes" && i.rotulo !== "Estratégia iniciada"),
+    marcos: contar((i) => i.grupo === "marcos"),
+    participantes: itens.reduce((s, i) => s + (i.participantes || 0), 0),
   };
 }
 
@@ -129,16 +139,16 @@ function textoResumo(r, selo) {
   const linhas = [`📊 *Retrospectiva ${r.ano} — Sala do Empreendedor de Ivatuba*`, ""];
   if (r.total) linhas.push(`✅ ${num(r.total)} atendimentos realizados`);
   if (r.pessoas) linhas.push(`👥 ${num(r.pessoas)} empreendedores atendidos`);
-  if (r.eventos) linhas.push(`📅 ${r.eventos} eventos e mutirões`);
-  if (r.cursos) linhas.push(`🎓 ${r.cursos} cursos`);
-  if (r.estrategias) linhas.push(`🎯 ${r.estrategias} ações/estratégias concluídas`);
+  if (r.eventos) linhas.push(`📣 ${r.eventos} eventos e mutirões`);
+  if (r.cursos) linhas.push(`🎓 ${r.cursos} capacitações, cursos e palestras`);
+  if (r.estrategias) linhas.push(`🎯 ${r.estrategias} ações realizadas`);
+  if (r.participantes) linhas.push(`🙋 ${num(r.participantes)} participantes nos eventos e capacitações`);
   if (r.melhorMes) linhas.push(`🔥 Mês mais movimentado: ${MES_NOME[r.melhorMes.m]} (${num(r.melhorMes.v)} atendimentos)`);
   if (r.topCats.length) linhas.push(`🔎 Assunto mais procurado: ${r.topCats[0][0]}`);
   if (selo) linhas.push(`${selo.emoji} Selo Sebrae: ${selo.r} (${selo.pontos.toFixed(0)} pontos com evidência)`);
-  const marcos = r.itens.filter((i) => i.origem === "marco");
-  if (marcos.length) {
-    linhas.push("", "*Momentos marcantes:*");
-    marcos.forEach((i) => linhas.push(`${i.emoji} ${diaMes(i.data)} — ${i.titulo}`));
+  if (r.itens.length) {
+    linhas.push("", "*O que fizemos:*");
+    r.itens.filter((i) => i.rotulo !== "Estratégia iniciada").forEach((i) => linhas.push(`${i.emoji} ${diaMes(i.data)} — ${i.titulo}${i.participantes ? ` (${num(i.participantes)} participantes)` : ""}`));
   }
   linhas.push("", "Obrigado a todos os empreendedores que passaram pela Sala! 💙");
   return linhas.join("\n");
@@ -158,6 +168,9 @@ function Numero({ valor, rotulo, icon: Icon }) {
 
 function Capa({ r, selo, publico }) {
   const destaques = [
+    !publico && r.pessoas > 0 && `👥 ${num(r.pessoas)} empreendedores atendidos`,
+    r.participantes > 0 && `🙋 ${num(r.participantes)} participantes nos eventos e capacitações`,
+    r.marcos > 0 && `🏆 ${r.marcos} conquista${r.marcos === 1 ? "" : "s"} e marco${r.marcos === 1 ? "" : "s"}`,
     r.melhorMes && `🔥 Mês mais movimentado: ${MES_NOME[r.melhorMes.m]} (${num(r.melhorMes.v)})`,
     r.topCats[0] && `🔎 Assunto mais procurado: ${r.topCats[0][0]}`,
     selo && `${selo.emoji} Selo Sebrae ${selo.r}`,
@@ -174,9 +187,9 @@ function Capa({ r, selo, publico }) {
         <p className="font-body text-sm md:text-base mt-1 text-white/80">Tudo o que a Sala do Empreendedor de Ivatuba fez no ano, mês a mês.</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
           <Numero valor={num(r.total)} rotulo="Atendimentos" icon={ClipboardList} />
-          {r.pessoas > 0 && !publico ? <Numero valor={num(r.pessoas)} rotulo="Empreendedores" icon={Users} /> : <Numero valor={r.marcos} rotulo="Momentos marcantes" icon={Sparkles} />}
-          <Numero valor={r.eventos + r.cursos} rotulo="Eventos e cursos" icon={CalendarDays} />
-          <Numero valor={r.estrategias} rotulo="Ações concluídas" icon={Target} />
+          <Numero valor={r.eventos} rotulo="Eventos" icon={CalendarDays} />
+          <Numero valor={r.cursos} rotulo="Capacitações" icon={GraduationCap} />
+          <Numero valor={r.estrategias} rotulo="Ações realizadas" icon={Target} />
         </div>
         {destaques.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-4">
@@ -188,14 +201,34 @@ function Capa({ r, selo, publico }) {
   );
 }
 
-function LinhaDoTempo({ r, onEditar, onApagar }) {
+function FiltroGrupos({ r, filtro, setFiltro }) {
+  const qtd = (g) => r.itens.filter((i) => i.grupo === g && i.rotulo !== "Estratégia iniciada").length;
+  const opcoes = [["", "Tudo", r.itens.length], ...Object.entries(GRUPOS).map(([k, g]) => [k, `${g.emoji} ${g.r}`, qtd(k)])];
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-5">
+      {opcoes.map(([k, rot, n]) => (
+        <button key={k || "tudo"} onClick={() => setFiltro(k)} className="font-body text-xs font-bold rounded-full px-3 py-1.5 border"
+          style={filtro === k ? { background: R.blue, color: "#fff", borderColor: R.blue } : { background: "#fff", color: "#425A70", borderColor: R.line }}>
+          {rot} <span className="opacity-70">({n})</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LinhaDoTempo({ r, filtro = "", onEditar, onApagar }) {
+  if (filtro && !r.itens.some((i) => i.grupo === filtro)) {
+    return <p className="font-body text-sm text-center py-10" style={{ color: R.muted }}>Nada lançado nesse grupo ainda.</p>;
+  }
   if (!r.meses.length) {
     return <p className="font-body text-sm text-center py-10" style={{ color: R.muted }}>Esse ano ainda não começou na linha do tempo.</p>;
   }
   return (
     <div className="relative mt-6">
       <div aria-hidden className="absolute left-[19px] top-2 bottom-2 w-0.5" style={{ background: R.line }} />
-      {r.meses.map((mes) => {
+      {r.meses.map((mesBruto) => {
+        const mes = filtro ? { ...mesBruto, itens: mesBruto.itens.filter((i) => i.grupo === filtro) } : mesBruto;
+        if (filtro && !mes.itens.length) return null;
         const vazio = !mes.itens.length && !mes.atendimentos;
         return (
           <div key={mes.m} className="relative pl-12 pb-6">
@@ -235,6 +268,11 @@ function LinhaDoTempo({ r, onEditar, onApagar }) {
                           {onEditar && i.publicar === false && <span title="Não aparece na página pública" className="inline-flex"><EyeOff size={12} color={R.soft} /></span>}
                         </div>
                         <p className="font-display font-bold text-sm mt-1" style={{ color: R.ink }}>{i.titulo}</p>
+                        {(i.local || i.participantes > 0) && (
+                          <p className="font-body text-[11px] mt-0.5 font-semibold" style={{ color: R.muted }}>
+                            {[i.local && `📍 ${i.local}`, i.participantes > 0 && `🙋 ${num(i.participantes)} participante${i.participantes === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
                         {i.descricao && <p className="font-body text-xs mt-0.5 whitespace-pre-line" style={{ color: R.muted }}>{i.descricao}</p>}
                       </div>
                       {onEditar && i.origem === "marco" && (
@@ -305,6 +343,7 @@ export function AbaRetrospectiva({ ctx }) {
   const [ano, setAno] = useState(anoAtual);
   const [recarga, setRecarga] = useState(0);
   const [form, setForm] = useState(null);
+  const [filtro, setFiltro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const fichasDemo = useMemo(() => ctx.atendimentos || [], [ctx.atendimentos]);
   const dados = useDadosRetrospectiva(ano, { fichasDemo, recarga });
@@ -319,30 +358,31 @@ export function AbaRetrospectiva({ ctx }) {
   const selo = useMemo(() => calcularSelo(dados?.selo), [dados]);
   const publica = !!ctx.config?.retrospectiva_publica;
 
-  const novoMarco = () => setForm({ data: hojeISO(), titulo: "", descricao: "", tipo: "conquista", foto_url: "", publicar: true });
+  const novoMarco = (tipo = "evento") => setForm({ data: hojeISO(), titulo: "", descricao: "", tipo, local: "", participantes: "", foto_url: "", publicar: true });
 
-  const salvarMarco = async () => {
+  const salvarMarco = async (outro = false) => {
     if (!form.titulo.trim() || !form.data) { ctx.avisar("Preencha a data e o título.", "erro"); return; }
-    const reg = { data: form.data, titulo: form.titulo.trim(), descricao: form.descricao?.trim() || null, tipo: form.tipo, foto_url: form.foto_url || null, publicar: !!form.publicar };
+    const reg = { data: form.data, titulo: form.titulo.trim(), descricao: form.descricao?.trim() || null, tipo: form.tipo, local: form.local?.trim() || null, participantes: Number(form.participantes) > 0 ? Math.round(Number(form.participantes)) : null, foto_url: form.foto_url || null, publicar: !!form.publicar };
+    const proximo = outro ? { data: form.data, titulo: "", descricao: "", tipo: form.tipo, local: "", participantes: "", foto_url: "", publicar: form.publicar } : null;
     if (!supabaseConfigurado) {
       demo.marcos = form.id ? demo.marcos.map((m) => (m.id === form.id ? { ...m, ...reg } : m)) : [...demo.marcos, { ...reg, id: `demo-${Date.now()}` }];
-      setForm(null); setRecarga((n) => n + 1); return;
+      setForm(proximo); setRecarga((n) => n + 1); return;
     }
     setSalvando(true);
     const { error } = form.id ? await supabase.from("sala_marcos").update(reg).eq("id", form.id) : await supabase.from("sala_marcos").insert(reg);
     setSalvando(false);
     if (error) { ctx.avisar(faltaTabela(error) ? "Falta rodar o arquivo supabase-sala-retrospectiva.sql no Supabase." : "Não consegui salvar: " + error.message, "erro"); return; }
-    ctx.avisar(form.id ? "Marco atualizado." : "Marco adicionado à linha do tempo.");
+    ctx.avisar(form.id ? "Atualizado." : outro ? "Lançado! Pode lançar o próximo." : "Lançado na linha do tempo.");
     if (Number(form.data.slice(0, 4)) !== ano) setAno(Number(form.data.slice(0, 4)));
-    setForm(null); setRecarga((n) => n + 1);
+    setForm(proximo); setRecarga((n) => n + 1);
   };
 
   const apagarMarco = async (m) => {
-    if (!window.confirm(`Apagar o marco "${m.titulo}"?`)) return;
+    if (!window.confirm(`Apagar "${m.titulo}" da linha do tempo?`)) return;
     if (!supabaseConfigurado) { demo.marcos = demo.marcos.filter((x) => x.id !== m.id); setRecarga((n) => n + 1); return; }
     const { error } = await supabase.from("sala_marcos").delete().eq("id", m.id);
     if (error) { ctx.avisar("Não consegui apagar: " + error.message, "erro"); return; }
-    ctx.avisar("Marco apagado."); setRecarga((n) => n + 1);
+    ctx.avisar("Apagado."); setRecarga((n) => n + 1);
   };
 
   const enviarFoto = async (e) => {
@@ -375,9 +415,10 @@ export function AbaRetrospectiva({ ctx }) {
       ["Atendimentos realizados", num(r.total)],
       ...(r.pessoas ? [["Empreendedores diferentes (fichas)", num(r.pessoas)]] : []),
       ["Eventos e mutirões", String(r.eventos)],
-      ["Cursos", String(r.cursos)],
-      ["Estratégias concluídas", String(r.estrategias)],
-      ["Momentos marcantes", String(r.marcos)],
+      ["Capacitações, cursos e palestras", String(r.cursos)],
+      ["Ações realizadas", String(r.estrategias)],
+      ...(r.participantes ? [["Participantes nos eventos e capacitações", num(r.participantes)]] : []),
+      ["Conquistas e marcos", String(r.marcos)],
       ...(r.melhorMes ? [["Mês mais movimentado", `${MES_NOME[r.melhorMes.m]} (${num(r.melhorMes.v)})`]] : []),
       ...r.topCats.slice(0, 3).map(([c, v], i) => [`${i + 1}º assunto mais procurado`, `${c} (${num(v)})`]),
       ...(selo ? [["Selo Sebrae (estimativa interna)", `${selo.r} · ${selo.pontos.toFixed(0)} pontos com evidência`]] : []),
@@ -386,7 +427,10 @@ export function AbaRetrospectiva({ ctx }) {
       { titulo: "Resumo do ano", cabecalho: ["Indicador", "Valor"], linhas: resumo },
       { titulo: "Atendimentos mês a mês", cabecalho: ["Mês", "Atendimentos", "Assunto mais procurado"], linhas: r.meses.map((m) => [MES_NOME[m.m], num(m.atendimentos), m.topCat ? `${m.topCat[0]} (${num(m.topCat[1])})` : "—"]) },
     ];
-    if (r.itens.length) secoes.push({ titulo: "Linha do tempo", cabecalho: ["Data", "Tipo", "O quê", "Detalhes"], linhas: r.itens.map((i) => [dataBR(i.data), i.rotulo, i.titulo, i.descricao || ""]) });
+    Object.entries(GRUPOS).forEach(([g, info]) => {
+      const lista = r.itens.filter((i) => i.grupo === g && i.rotulo !== "Estratégia iniciada");
+      if (lista.length) secoes.push({ titulo: info.r, cabecalho: ["Data", "Tipo", "O quê", "Local", "Participantes", "Detalhes"], linhas: lista.map((i) => [dataBR(i.data), i.rotulo, i.titulo, i.local || "", i.participantes ? num(i.participantes) : "", i.descricao || ""]) });
+    });
     exportarPDF(`retrospectiva-sala-do-empreendedor-${ano}`, `Retrospectiva ${ano} — Sala do Empreendedor`, secoes, "Atendimentos: fichas registradas + totais lançados (GISE). Eventos, estratégias e marcos lançados na plataforma.", "Sala do Empreendedor · Ivatuba-PR");
   };
 
@@ -396,13 +440,13 @@ export function AbaRetrospectiva({ ctx }) {
         <div>
           <p className="font-body text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: R.blue }}>Linha do tempo</p>
           <h2 className="font-display font-extrabold text-xl md:text-2xl mt-1" style={{ color: R.ink }}>Retrospectiva da Sala</h2>
-          <p className="font-body text-sm mt-1" style={{ color: R.muted }}>Montada sozinha com os atendimentos, o Calendário, as Estratégias e o Selo. Acrescente os momentos marcantes que não estão no sistema.</p>
+          <p className="font-body text-sm mt-1" style={{ color: R.muted }}>Os atendimentos, o Calendário, as Estratégias e o Selo entram sozinhos. Lance aqui os eventos, ações e capacitações que a Sala fez, com data, local, participantes e foto.</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <select value={ano} onChange={(e) => setAno(Number(e.target.value))} className="font-body text-xs font-bold border rounded-lg px-3 py-2 bg-white" style={inputStyle}>
             {anos.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
-          <button onClick={novoMarco} className="font-body text-xs font-bold rounded-lg px-3 py-2 inline-flex items-center gap-1.5 text-white" style={{ background: R.blue }}><PlusCircle size={14} /> Momento marcante</button>
+          <button onClick={() => novoMarco("evento")} className="font-body text-xs font-bold rounded-lg px-3 py-2 inline-flex items-center gap-1.5 text-white" style={{ background: R.blue }}><PlusCircle size={14} /> Lançar evento, ação ou capacitação</button>
           <button onClick={copiarResumo} disabled={!r} className="font-body text-xs font-bold rounded-lg px-3 py-2 inline-flex items-center gap-1.5 bg-white border disabled:opacity-50" style={{ borderColor: R.line, color: R.blue }}><Copy size={14} /> Copiar resumo</button>
           <button onClick={pdf} disabled={!r} className="font-body text-xs font-bold rounded-lg px-3 py-2 inline-flex items-center gap-1.5 bg-white border disabled:opacity-50" style={{ borderColor: R.line, color: R.blue }}><Download size={14} /> PDF</button>
         </div>
@@ -410,7 +454,7 @@ export function AbaRetrospectiva({ ctx }) {
 
       {dados?.faltaMarcos && (
         <div className="rounded-xl border p-3 mb-4 font-body text-xs" style={{ borderColor: "#F3D9A4", background: "#FFF8E6", color: "#7A5A00" }}>
-          Para lançar momentos marcantes e publicar a retrospectiva, rode uma vez o arquivo <b>supabase-sala-retrospectiva.sql</b> no SQL Editor do Supabase. O resto já funciona.
+          Para lançar eventos, ações e capacitações e publicar a retrospectiva, rode uma vez o arquivo <b>supabase-sala-retrospectiva.sql</b> no SQL Editor do Supabase. O resto já funciona.
         </div>
       )}
 
@@ -430,19 +474,27 @@ export function AbaRetrospectiva({ ctx }) {
       {form && (
         <div className="rounded-2xl border p-4 md:p-5 mb-5 bg-white shadow-sm" style={{ borderColor: R.line }}>
           <div className="flex items-center justify-between mb-3">
-            <p className="font-display font-extrabold text-base" style={{ color: R.ink }}>{form.id ? "Editar momento marcante" : "Novo momento marcante"}</p>
+            <p className="font-display font-extrabold text-base" style={{ color: R.ink }}>{form.id ? "Editar" : "Lançar na linha do tempo"}</p>
             <button onClick={() => setForm(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={16} color={R.muted} /></button>
           </div>
-          <div className="grid md:grid-cols-3 gap-3">
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {Object.entries(TIPOS_MARCO).map(([k, t]) => (
+              <button key={k} onClick={() => setForm({ ...form, tipo: k })} className="font-body text-xs font-bold rounded-full px-3 py-1.5 border"
+                style={form.tipo === k ? { background: `${t.c}1A`, color: t.c, borderColor: t.c } : { background: "#fff", color: "#425A70", borderColor: R.line }}>
+                {t.emoji} {t.r}
+              </button>
+            ))}
+          </div>
+          <div className="grid md:grid-cols-4 gap-3">
             <label className="flex flex-col gap-1"><span className="font-body text-xs font-bold" style={{ color: R.ink }}>Data</span>
               <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} className={inputCls} style={inputStyle} /></label>
-            <label className="flex flex-col gap-1"><span className="font-body text-xs font-bold" style={{ color: R.ink }}>Tipo</span>
-              <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className={inputCls} style={inputStyle}>
-                {Object.entries(TIPOS_MARCO).map(([k, t]) => <option key={k} value={k}>{t.emoji} {t.r}</option>)}
-              </select></label>
-            <label className="flex flex-col gap-1"><span className="font-body text-xs font-bold" style={{ color: R.ink }}>Título</span>
-              <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder="Ex.: Inauguração da nova sala" className={inputCls} style={inputStyle} /></label>
-            <label className="flex flex-col gap-1 md:col-span-3"><span className="font-body text-xs font-bold" style={{ color: R.ink }}>O que aconteceu (opcional)</span>
+            <label className="flex flex-col gap-1 md:col-span-3"><span className="font-body text-xs font-bold" style={{ color: R.ink }}>O que foi</span>
+              <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder={(TIPOS_MARCO[form.tipo] || TIPOS_MARCO.outro).ex || "Título"} className={inputCls} style={inputStyle} /></label>
+            <label className="flex flex-col gap-1 md:col-span-2"><span className="font-body text-xs font-bold" style={{ color: R.ink }}>Local (opcional)</span>
+              <input value={form.local || ""} onChange={(e) => setForm({ ...form, local: e.target.value })} placeholder="Ex.: Sala do Empreendedor, Câmara, praça..." className={inputCls} style={inputStyle} /></label>
+            <label className="flex flex-col gap-1 md:col-span-2"><span className="font-body text-xs font-bold" style={{ color: R.ink }}>Nº de participantes (opcional)</span>
+              <input type="number" min="0" value={form.participantes ?? ""} onChange={(e) => setForm({ ...form, participantes: e.target.value })} placeholder="Ex.: 25" className={inputCls} style={inputStyle} /></label>
+            <label className="flex flex-col gap-1 md:col-span-4"><span className="font-body text-xs font-bold" style={{ color: R.ink }}>O que aconteceu (opcional)</span>
               <textarea rows={2} value={form.descricao || ""} onChange={(e) => setForm({ ...form, descricao: e.target.value })} placeholder="Conte em poucas palavras: quem participou, resultado, número de pessoas..." className={inputCls} style={inputStyle} /></label>
           </div>
           <div className="flex items-center gap-3 flex-wrap mt-3">
@@ -461,7 +513,8 @@ export function AbaRetrospectiva({ ctx }) {
             </label>
             <div className="flex-1" />
             <button onClick={() => setForm(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border bg-white" style={{ borderColor: R.line, color: R.muted }}>Cancelar</button>
-            <button onClick={salvarMarco} disabled={salvando} className="font-body text-xs font-bold rounded-lg px-4 py-2 text-white disabled:opacity-50" style={{ background: R.blue }}>{salvando ? "Salvando..." : "Salvar"}</button>
+            {!form.id && <button onClick={() => salvarMarco(true)} disabled={salvando} className="font-body text-xs font-bold rounded-lg px-3 py-2 border bg-white disabled:opacity-50" style={{ borderColor: R.line, color: R.blue }}>Salvar e lançar outro</button>}
+            <button onClick={() => salvarMarco(false)} disabled={salvando} className="font-body text-xs font-bold rounded-lg px-4 py-2 text-white disabled:opacity-50" style={{ background: R.blue }}>{salvando ? "Salvando..." : "Salvar"}</button>
           </div>
         </div>
       )}
@@ -480,7 +533,8 @@ export function AbaRetrospectiva({ ctx }) {
               </div>
             </div>
           )}
-          <LinhaDoTempo r={r} onEditar={(m) => setForm({ ...m, descricao: m.descricao || "", foto_url: m.foto_url || "" })} onApagar={apagarMarco} />
+          <FiltroGrupos r={r} filtro={filtro} setFiltro={setFiltro} />
+          <LinhaDoTempo r={r} filtro={filtro} onEditar={(m) => { setForm({ ...m, descricao: m.descricao || "", local: m.local || "", participantes: m.participantes ?? "", foto_url: m.foto_url || "" }); window.scrollTo({ top: 0, behavior: "smooth" }); }} onApagar={apagarMarco} />
         </>
       )}
     </div>
@@ -493,6 +547,7 @@ export function AbaRetrospectiva({ ctx }) {
 export function RetrospectivaPublica({ config }) {
   const anoAtual = new Date().getFullYear();
   const [ano, setAno] = useState(anoAtual);
+  const [filtro, setFiltro] = useState("");
   const ligada = !!config?.retrospectiva_publica;
   const dados = useDadosRetrospectiva(ano, { publico: true, ativo: ligada });
   const r = useMemo(() => (dados && ligada ? montarRetrospectiva({ ano, ...dados }) : null), [dados, ano, ligada]);
@@ -506,7 +561,8 @@ export function RetrospectivaPublica({ config }) {
         </select>
       </div>
       <Capa r={r} publico />
-      <LinhaDoTempo r={r} />
+      {r.itens.length > 0 && <FiltroGrupos r={r} filtro={filtro} setFiltro={setFiltro} />}
+      <LinhaDoTempo r={r} filtro={filtro} />
     </section>
   );
 }

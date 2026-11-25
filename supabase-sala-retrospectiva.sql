@@ -3,8 +3,8 @@
 -- Rode este arquivo UMA vez no Supabase (SQL Editor) depois dos outros
 -- arquivos supabase-sala-*.sql. Pode rodar de novo sem problema.
 --
--- • sala_marcos: marcos lançados à mão (inauguração, parceria, prêmio, visita,
---   palestra...). O resto da retrospectiva (atendimentos, eventos do
+-- • sala_marcos: eventos, ações, capacitações, mutirões e outros momentos
+--   lançados à mão (com data, local, nº de participantes e foto). O resto da retrospectiva (atendimentos, eventos do
 --   calendário, estratégias, Selo) é montado sozinho a partir das outras tabelas.
 -- • sala_config.retrospectiva_publica: liga/desliga a retrospectiva na página pública.
 -- =============================================================================
@@ -14,11 +14,19 @@ create table if not exists public.sala_marcos (
   data date not null,
   titulo text not null,
   descricao text,
-  tipo text not null default 'conquista' check (tipo in ('conquista', 'inauguracao', 'parceria', 'capacitacao', 'evento', 'visita', 'outro')),
+  tipo text not null default 'evento',
+  participantes integer,
+  local text,
   foto_url text,
   publicar boolean not null default true,
   criado_em timestamptz not null default now()
 );
+-- Se a tabela já existia de uma versão anterior, garante as colunas e os tipos novos
+alter table public.sala_marcos add column if not exists participantes integer;
+alter table public.sala_marcos add column if not exists local text;
+alter table public.sala_marcos drop constraint if exists sala_marcos_tipo_check;
+alter table public.sala_marcos add constraint sala_marcos_tipo_check
+  check (tipo in ('evento', 'acao', 'capacitacao', 'mutirao', 'parceria', 'conquista', 'inauguracao', 'visita', 'outro'));
 create index if not exists sala_marcos_data_idx on public.sala_marcos (data);
 
 alter table public.sala_marcos enable row level security;
