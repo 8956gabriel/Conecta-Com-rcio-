@@ -9,7 +9,7 @@
 // Conecta Comércio. Tabela: ver supabase-sala-avisos.sql.
 // =============================================================================
 import React, { useEffect, useMemo, useState } from "react";
-import { Copy, Pencil, Trash2, X, Camera, ExternalLink, Megaphone, CopyPlus, Archive, Eye, EyeOff, Star } from "lucide-react";
+import { Copy, Pencil, Trash2, X, Camera, ExternalLink, Megaphone, CopyPlus, Archive, Eye, EyeOff, Star, Image as ImageIcon, Download, Share2 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 
 const A = {
@@ -180,6 +180,200 @@ export const MODELOS_AVISO = {
 
 const demo = { avisos: [] };
 
+// =============================================================================
+// ARTE PARA REDES (feed 1080×1350 e story 1080×1920) — desenhada em canvas
+// =============================================================================
+const FORMATOS = { feed: { r: "Feed (4:5)", w: 1080, h: 1350, topo: 80, base: 70 }, story: { r: "Story (9:16)", w: 1080, h: 1920, topo: 190, base: 210 } };
+const FONTE = "Manrope, 'Segoe UI', Arial, sans-serif";
+const foneBR = (f) => { const d = String(f || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, ""); return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : f || ""; };
+
+function carregarImg(src) {
+  return new Promise((ok) => {
+    if (!src) { ok(null); return; }
+    const img = new window.Image();
+    if (/^https?:/i.test(src) && !src.startsWith(window.location.origin)) img.crossOrigin = "anonymous";
+    img.onload = () => ok(img); img.onerror = () => ok(null);
+    img.src = src;
+  });
+}
+function caixa(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function quebrar(ctx, texto, largura) {
+  const saida = [];
+  String(texto || "").split("\n").forEach((par) => {
+    const palavras = par.split(" ");
+    let atual = "";
+    palavras.forEach((p) => {
+      const teste = atual ? `${atual} ${p}` : p;
+      if (ctx.measureText(teste).width > largura && atual) { saida.push(atual); atual = p; } else atual = teste;
+    });
+    saida.push(atual);
+  });
+  return saida;
+}
+function linhasDaArte(a) {
+  const l = String(a.texto || "").replace(/\*/g, "").split("\n").slice(1).map((x) => x.trim());
+  const out = [];
+  l.forEach((x) => { if (!x && (!out.length || !out[out.length - 1])) return; if (/^Divulga[çc][ãa]o:/i.test(x)) return; out.push(x); });
+  while (out.length && !out[out.length - 1]) out.pop();
+  return out;
+}
+
+export async function desenharArte(canvas, a, formato, config = {}) {
+  const F = FORMATOS[formato];
+  const m = MODELOS_AVISO[a.modelo] || MODELOS_AVISO.aviso;
+  const W = F.w, H = F.h, M = 80;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  try { await document.fonts?.load?.(`800 60px Manrope`); } catch { /* */ }
+  const [logo, foto] = await Promise.all([carregarImg(config.logo_url || "/sala-do-empreendedor-logo.png"), carregarImg(a.imagem_url)]);
+
+  // Fundo
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, "#052A4D"); g.addColorStop(1, "#0A5AA8");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(245,183,0,0.18)"; ctx.beginPath(); ctx.arc(W - 60, 120, 300, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = `${m.c}55`; ctx.beginPath(); ctx.arc(-80, H - 160, 320, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.05)"; ctx.beginPath(); ctx.arc(W - 200, H - 60, 220, 0, Math.PI * 2); ctx.fill();
+
+  let y = F.topo;
+  // Logo em selo branco
+  if (logo) {
+    const lh = 92, lw = Math.min(460, (logo.width / logo.height) * lh);
+    ctx.fillStyle = "#fff"; caixa(ctx, M, y, lw + 48, lh + 36, 26); ctx.fill();
+    ctx.drawImage(logo, M + 24, y + 18, lw, lh);
+    y += lh + 36 + 44;
+  } else {
+    ctx.fillStyle = "#fff"; ctx.font = `800 44px ${FONTE}`; ctx.fillText("SALA DO EMPREENDEDOR", M, y + 44); y += 90;
+  }
+  // Selo do modelo
+  ctx.font = `800 34px ${FONTE}`;
+  const rotulo = `${m.emoji}  ${m.r.toUpperCase()}`;
+  const rw = ctx.measureText(rotulo).width + 56;
+  ctx.fillStyle = m.c; caixa(ctx, M, y, rw, 68, 34); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.fillText(rotulo, M + 28, y + 36); ctx.textBaseline = "alphabetic";
+  y += 68 + 40;
+
+  // Rodapé (reserva espaço)
+  const rodapeH = 120;
+  const limite = H - F.base - rodapeH;
+
+  // Título (encolhe até caber em 4 linhas)
+  let tam = formato === "story" ? 92 : 80, linhasT;
+  do { ctx.font = `800 ${tam}px ${FONTE}`; linhasT = quebrar(ctx, a.titulo || m.r, W - 2 * M); tam -= 4; } while (linhasT.length > 4 && tam > 44);
+  tam += 4;
+  ctx.fillStyle = "#fff";
+  linhasT.slice(0, 4).forEach((l) => { y += tam * 1.08; ctx.fillText(l, M, y); });
+  y += 40;
+
+  // Foto
+  const corpo = linhasDaArte(a);
+  if (foto) {
+    const espaco = limite - y - (corpo.length ? 260 : 0);
+    const fh = Math.min(formato === "story" ? 620 : 420, espaco);
+    if (fh > 160) {
+      ctx.save(); caixa(ctx, M, y, W - 2 * M, fh, 32); ctx.clip();
+      const esc = Math.max((W - 2 * M) / foto.width, fh / foto.height);
+      const dw = foto.width * esc, dh = foto.height * esc;
+      ctx.drawImage(foto, M + (W - 2 * M - dw) / 2, y + (fh - dh) / 2, dw, dh);
+      ctx.restore();
+      y += fh + 32;
+    }
+  }
+
+  // Cartão branco com as informações (encolhe a fonte até caber)
+  if (corpo.length && limite - y > 120) {
+    const pad = 44, largura = W - 2 * M - 2 * pad, altMax = limite - y;
+    let f = formato === "story" ? 42 : 38, linhas;
+    const medir = () => { ctx.font = `600 ${f}px ${FONTE}`; linhas = []; corpo.forEach((c) => { if (!c) linhas.push(""); else linhas.push(...quebrar(ctx, c, largura)); }); return linhas.reduce((s, l) => s + (l ? f * 1.38 : f * 0.6), 0) + 2 * pad; };
+    let alt = medir();
+    while (alt > altMax && f > 22) { f -= 2; alt = medir(); }
+    let corte = linhas.length;
+    while (alt > altMax && corte > 1) { corte -= 1; linhas = linhas.slice(0, corte); alt = linhas.reduce((s, l) => s + (l ? f * 1.38 : f * 0.6), 0) + 2 * pad; }
+    ctx.fillStyle = "rgba(255,255,255,0.97)"; caixa(ctx, M, y, W - 2 * M, alt, 32); ctx.fill();
+    ctx.fillStyle = m.c; caixa(ctx, M, y + 30, 10, alt - 60, 5); ctx.fill();
+    let yy = y + pad;
+    ctx.fillStyle = "#0E2233"; ctx.font = `600 ${f}px ${FONTE}`;
+    linhas.forEach((l) => { if (!l) { yy += f * 0.6; return; } yy += f * 1.38; ctx.fillText(l, M + pad, yy - f * 0.38); });
+  }
+
+  // Rodapé
+  const yb = H - F.base - 30;
+  ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.fillRect(M, yb - 78, W - 2 * M, 2);
+  ctx.fillStyle = "#fff"; ctx.font = `800 36px ${FONTE}`;
+  ctx.fillText("Sala do Empreendedor · Ivatuba-PR", M, yb - 22);
+  ctx.font = `600 30px ${FONTE}`; ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.fillText(config.whatsapp ? `WhatsApp ${foneBR(config.whatsapp)} · atendimento gratuito` : "Atendimento gratuito ao empreendedor", M, yb + 22);
+}
+
+function nomeArquivo(a, formato) {
+  const base = String(a.titulo || "aviso").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 50);
+  return `sala-${base || "aviso"}-${formato}.png`;
+}
+
+function ArteModal({ aviso, config, onFechar, avisar }) {
+  const [formato, setFormato] = useState("feed");
+  const [pronto, setPronto] = useState(false);
+  const refs = { feed: React.useRef(null), story: React.useRef(null) };
+  useEffect(() => {
+    let vivo = true;
+    setPronto(false);
+    Promise.all(["feed", "story"].map((f) => refs[f].current && desenharArte(refs[f].current, aviso, f, config))).then(() => vivo && setPronto(true));
+    return () => { vivo = false; };
+  }, [aviso]);
+
+  const blobDe = (f) => new Promise((ok) => { try { refs[f].current.toBlob((b) => ok(b), "image/png"); } catch { ok(null); } });
+  const baixar = async (f) => {
+    const b = await blobDe(f);
+    if (!b) { avisar("Não consegui gerar a imagem (a foto pode estar bloqueando). Tente sem foto.", "erro"); return; }
+    const url = URL.createObjectURL(b);
+    const el = document.createElement("a"); el.href = url; el.download = nomeArquivo(aviso, f); document.body.appendChild(el); el.click(); el.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
+  const compartilhar = async (f) => {
+    const b = await blobDe(f);
+    if (!b) { avisar("Não consegui gerar a imagem.", "erro"); return; }
+    const arq = new File([b], nomeArquivo(aviso, f), { type: "image/png" });
+    if (navigator.canShare?.({ files: [arq] })) {
+      try { await navigator.share({ files: [arq], text: String(aviso.texto || "").replace(/\*/g, "") }); } catch { /* cancelado */ }
+    } else baixar(f);
+  };
+  const podeCompartilhar = typeof navigator !== "undefined" && !!navigator.share;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-start md:items-center justify-center p-3 overflow-y-auto" onClick={onFechar}>
+      <div className="bg-white rounded-3xl w-full max-w-3xl p-4 md:p-6 my-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-display font-extrabold text-lg" style={{ color: A.ink }}>Arte para postar</p>
+          <button onClick={onFechar} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} color={A.muted} /></button>
+        </div>
+        <div className="flex gap-1.5 mb-3 md:hidden">
+          {Object.entries(FORMATOS).map(([k, f]) => (
+            <button key={k} onClick={() => setFormato(k)} className="font-body text-xs font-bold rounded-full px-3 py-1.5 border"
+              style={formato === k ? { background: A.blue, color: "#fff", borderColor: A.blue } : { background: "#fff", color: "#425A70", borderColor: A.line }}>{f.r}</button>
+          ))}
+        </div>
+        <div className="grid md:grid-cols-[1.25fr_1fr] gap-5 items-start">
+          {["feed", "story"].map((f) => (
+            <div key={f} className={formato === f ? "" : "hidden md:block"}>
+              <p className="font-body text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: A.muted }}>{FORMATOS[f].r} · {FORMATOS[f].w}×{FORMATOS[f].h}</p>
+              <canvas ref={refs[f]} className="w-full h-auto rounded-xl border shadow-sm" style={{ borderColor: A.line, aspectRatio: `${FORMATOS[f].w} / ${FORMATOS[f].h}`, background: A.blueTint2 }} />
+              <div className="flex gap-2 mt-2 flex-wrap">
+                <button disabled={!pronto} onClick={() => baixar(f)} className="font-body text-xs font-bold rounded-lg px-3 py-2 text-white inline-flex items-center gap-1.5 disabled:opacity-50" style={{ background: A.blue }}><Download size={14} /> Baixar {f === "feed" ? "feed" : "story"}</button>
+                {podeCompartilhar && <button disabled={!pronto} onClick={() => compartilhar(f)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border bg-white inline-flex items-center gap-1.5 disabled:opacity-50" style={{ borderColor: A.line, color: A.blue }}><Share2 size={14} /> Compartilhar</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="font-body text-[11px] mt-4" style={{ color: A.soft }}>Dica: no celular, "Compartilhar" abre direto o Instagram, WhatsApp ou Facebook. A legenda (texto do aviso) vai junto quando o app aceita — se não, use "Copiar texto".</p>
+      </div>
+    </div>
+  );
+}
+
 function estadoDe(a, hoje = hojeISO()) {
   if (!a.publicar) return { r: "Rascunho", c: A.soft, k: "rascunho" };
   if (a.fim && a.fim < hoje) return { r: "Encerrado", c: A.soft, k: "encerrado" };
@@ -281,6 +475,7 @@ export function AbaAvisos({ ctx }) {
   const [form, setForm] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [filtro, setFiltro] = useState("ativo");
+  const [arte, setArte] = useState(null);
 
   const carregar = () => {
     if (!supabaseConfigurado) { setLista([...demo.avisos]); return; }
@@ -378,6 +573,7 @@ export function AbaAvisos({ ctx }) {
 
   return (
     <div>
+      {arte && <ArteModal aviso={arte} config={ctx.config || {}} onFechar={() => setArte(null)} avisar={ctx.avisar} />}
       <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
         <div>
           <p className="font-body text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: A.blue }}>Comunicação</p>
@@ -459,6 +655,7 @@ export function AbaAvisos({ ctx }) {
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4 flex-wrap">
+            <button onClick={() => setArte({ modelo: form.modelo, titulo: titulo || m.r, texto, imagem_url: form.imagem_url })} className="font-body text-xs font-bold rounded-lg px-3 py-2 border bg-white inline-flex items-center gap-1.5" style={{ borderColor: A.line, color: A.blue }}><ImageIcon size={14} /> Gerar arte (feed e story)</button>
             <button onClick={() => copiar(texto)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border bg-white inline-flex items-center gap-1.5" style={{ borderColor: A.line, color: A.blue }}><Copy size={14} /> Copiar texto</button>
             <button onClick={() => setForm(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border bg-white" style={{ borderColor: A.line, color: A.muted }}>Cancelar</button>
             <button onClick={salvar} disabled={salvando} className="font-body text-xs font-bold rounded-lg px-4 py-2 text-white disabled:opacity-50 inline-flex items-center gap-1.5" style={{ background: A.blue }}><Megaphone size={14} /> {salvando ? "Salvando..." : form.publicar ? "Publicar" : "Salvar rascunho"}</button>
@@ -498,6 +695,7 @@ export function AbaAvisos({ ctx }) {
                   <p className="font-body text-[11px]" style={{ color: A.soft }}>No site {a.fim ? `de ${dataBR(a.inicio)} até ${dataBR(a.fim)}` : `desde ${dataBR(a.inicio)} (sem prazo)`}{a.criado_por_nome ? ` · por ${a.criado_por_nome}` : ""}</p>
                 </div>
                 <div className="flex items-center gap-0.5 shrink-0 flex-wrap justify-end">
+                  <button onClick={() => setArte(a)} title="Arte para feed e story" className="p-1.5 rounded-lg hover:bg-slate-100"><ImageIcon size={14} color={A.blueHex} /></button>
                   <button onClick={() => copiar(a.texto || "")} title="Copiar texto" className="p-1.5 rounded-lg hover:bg-slate-100"><Copy size={14} color={A.muted} /></button>
                   <button onClick={() => editar(a)} title="Editar" className="p-1.5 rounded-lg hover:bg-slate-100"><Pencil size={14} color={A.muted} /></button>
                   <button onClick={() => novo(a.modelo, a)} title="Duplicar (usar de base)" className="p-1.5 rounded-lg hover:bg-slate-100"><CopyPlus size={14} color={A.muted} /></button>
