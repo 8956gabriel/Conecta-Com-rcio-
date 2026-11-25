@@ -15,13 +15,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Store, MessageCircle, MapPin, Clock, CalendarDays, ClipboardList, Inbox, BarChart3, Settings, Users,
   ExternalLink, Download, Trash2, Pencil, CheckCircle2, X, ShieldCheck, PlusCircle, Search, LayoutDashboard,
-  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge, Building2,
+  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge, Building2, History,
 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { ImportarGise } from "./SalaImportarGise.jsx";
 import { exportarPDF } from "./central/motor.js";
 import { AbaEstrategias, AbaCalendario, AgendaPublicaSala } from "./SalaPlanejamento.jsx";
 import { AbaBaseEmpresas } from "./SalaEmpresas.jsx";
+import { AbaRetrospectiva, RetrospectivaPublica } from "./SalaRetrospectiva.jsx";
 import { AbaSelo, AbaGestao, AbaOrientacoes, AbaEmpreendedores, AbaIndicadores, OrientacoesPublicas, DocProtegido } from "./SalaGestao.jsx";
 
 // As mesmas categorias do relatório oficial do Sebrae (usadas também no
@@ -350,6 +351,8 @@ export function SalaPublico() {
 
       <OrientacoesPublicas />
 
+      <RetrospectivaPublica config={config} />
+
       {/* ONDE FICA + NÚMEROS */}
       <section id="sala-onde" className="max-w-6xl mx-auto px-4 md:px-6 mt-10 scroll-mt-20 grid md:grid-cols-2 gap-4">
         <div className="rounded-2xl border bg-white overflow-hidden" style={{ borderColor: S.line }}>
@@ -580,6 +583,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
     { id: "gestao", label: "Gestão da Sala", icon: Briefcase },
     { id: "selo", label: "Selo Sebrae", icon: Award },
     { id: "relatorio", label: "Relatório", icon: BarChart3 },
+    { id: "retrospectiva", label: "Retrospectiva", icon: History },
     ...(area === "admin" ? [{ id: "config", label: "Página pública", icon: Settings }, { id: "equipe", label: "Equipe e permissões", icon: Users }] : []),
   ];
   const abaAtual = itens.some((i) => i.id === aba) ? aba : itens[0].id;
@@ -628,6 +632,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
         {abaAtual === "estrategias" && <AbaEstrategias ctx={ctx} />}
         {abaAtual === "calendario" && <AbaCalendario ctx={ctx} />}
         {abaAtual === "relatorio" && <AbaRelatorio ctx={ctx} />}
+        {abaAtual === "retrospectiva" && <AbaRetrospectiva ctx={ctx} />}
         {abaAtual === "config" && <AbaConfig ctx={ctx} />}
         {abaAtual === "equipe" && <AbaEquipe ctx={ctx} />}
       </div>
