@@ -15,9 +15,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Store, MessageCircle, MapPin, Clock, CalendarDays, ClipboardList, Inbox, BarChart3, Settings, Users,
   ExternalLink, Download, Trash2, Pencil, CheckCircle2, X, ShieldCheck, PlusCircle, Search, LayoutDashboard,
-  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail,
+  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange,
 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
+import { AbaEstrategias, AbaCalendario, AgendaPublicaSala } from "./SalaPlanejamento.jsx";
 
 // As mesmas categorias do relatório oficial do Sebrae (usadas também no
 // Painel Admin → "Sala do Empreendedor - Atendimentos").
@@ -334,6 +335,8 @@ export function SalaPublico() {
         </section>
       )}
 
+      <AgendaPublicaSala />
+
       {/* ONDE FICA + NÚMEROS */}
       <section id="sala-onde" className="max-w-6xl mx-auto px-4 md:px-6 mt-10 scroll-mt-20 grid md:grid-cols-2 gap-4">
         <div className="rounded-2xl border bg-white overflow-hidden" style={{ borderColor: S.line }}>
@@ -549,6 +552,8 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
     { id: "pedidos", label: "Pedidos do site", icon: Inbox, badge: novos },
     { id: "agenda", label: "Agenda", icon: CalendarDays },
     { id: "atendimentos", label: "Atendimentos", icon: ClipboardList },
+    { id: "estrategias", label: "Estratégias", icon: Target },
+    { id: "calendario", label: "Calendário", icon: CalendarRange },
     { id: "relatorio", label: "Relatório", icon: BarChart3 },
     ...(area === "admin" ? [{ id: "config", label: "Página pública", icon: Settings }, { id: "equipe", label: "Equipe", icon: Users }] : []),
   ];
@@ -588,6 +593,8 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
         {abaAtual === "pedidos" && <AbaPedidos ctx={ctx} />}
         {abaAtual === "agenda" && <AbaAgenda ctx={ctx} />}
         {abaAtual === "atendimentos" && <AbaAtendimentos ctx={ctx} />}
+        {abaAtual === "estrategias" && <AbaEstrategias ctx={ctx} />}
+        {abaAtual === "calendario" && <AbaCalendario ctx={ctx} />}
         {abaAtual === "relatorio" && <AbaRelatorio ctx={ctx} />}
         {abaAtual === "config" && <AbaConfig ctx={ctx} />}
         {abaAtual === "equipe" && <AbaEquipe ctx={ctx} />}
