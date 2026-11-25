@@ -36,6 +36,7 @@ export const GRUPOS = {
   capacitacoes: { r: "Capacitações", emoji: "🎓" },
   acoes: { r: "Ações", emoji: "🎯" },
   marcos: { r: "Marcos", emoji: "🏆" },
+  noticias: { r: "Notícias", emoji: "📰" },
 };
 // Tipos lançados à mão na Retrospectiva (tabela sala_marcos)
 export const TIPOS_MARCO = {
@@ -63,6 +64,7 @@ const TIPOS_CONECTA = {
   curso: { r: "Curso", emoji: "🎓", c: "#0EA5A5", g: "capacitacoes" },
   institucional: { r: "Evento institucional", emoji: "🏛️", c: "#0A5AA8", g: "eventos" },
   outro: { r: "Evento", emoji: "📅", c: "#0A5AA8", g: "eventos" },
+  noticia: { r: "Notícia", emoji: "📰", c: "#425A70", g: "noticias" },
 };
 const ORIGEM_CURSO = { sala_empreendedor: "Sala do Empreendedor", sebrae: "Sebrae", prefeitura: "Prefeitura" };
 
@@ -150,6 +152,7 @@ export function montarRetrospectiva({ ano, fichas = [], totais = [], eventos = [
     cursos: contar((i) => i.grupo === "capacitacoes"),
     estrategias: contar((i) => i.grupo === "acoes" && i.rotulo !== "Estratégia iniciada"),
     marcos: contar((i) => i.grupo === "marcos"),
+    noticias: contar((i) => i.grupo === "noticias"),
     participantes: itens.reduce((s, i) => s + (i.participantes || 0), 0),
   };
 }
@@ -189,6 +192,7 @@ function Capa({ r, selo, publico }) {
   const destaques = [
     !publico && r.pessoas > 0 && `👥 ${num(r.pessoas)} empreendedores atendidos`,
     r.participantes > 0 && `🙋 ${num(r.participantes)} participantes nos eventos e capacitações`,
+    r.noticias > 0 && `📰 ${r.noticias} notícia${r.noticias === 1 ? "" : "s"} publicada${r.noticias === 1 ? "" : "s"}`,
     r.marcos > 0 && `🏆 ${r.marcos} conquista${r.marcos === 1 ? "" : "s"} e marco${r.marcos === 1 ? "" : "s"}`,
     r.melhorMes && `🔥 Mês mais movimentado: ${MES_NOME[r.melhorMes.m]} (${num(r.melhorMes.v)})`,
     r.topCats[0] && `🔎 Assunto mais procurado: ${r.topCats[0][0]}`,
@@ -350,10 +354,12 @@ function useDadosRetrospectiva(ano, { publico = false, fichasDemo = [], recarga 
       publico ? Promise.resolve({ data: [] }) : lista(supabase.from("sala_selo_itens").select("pontos,status").eq("ciclo", ano)),
       lista(supabase.from("eventos_calendario").select("*").gte("data_inicio", ini).lte("data_inicio", fim).limit(2000)),
       lista(supabase.from("cursos").select("*").gte("data_evento", ini).lte("data_evento", fim).limit(2000)),
-    ]).then(([f, t, e, s, m, selo, cal, cur]) => {
+      lista(supabase.from("noticias").select("id,titulo,conteudo,imagem_url,publicada_em").gte("publicada_em", `${ini}T00:00:00`).lte("publicada_em", `${fim}T23:59:59`).limit(2000)),
+    ]).then(([f, t, e, s, m, selo, cal, cur, not]) => {
       if (!vivo) return;
       const conecta = [
         ...cal.data.map((x) => ({ fonte: "cal", id: x.id, data: x.data_inicio, titulo: x.titulo, descricao: x.descricao, local: x.local, tipo: x.tipo, status: x.status, imagem_url: x.imagem_url })),
+        ...not.data.map((x) => ({ fonte: "not", id: x.id, data: new Date(x.publicada_em).toLocaleDateString("sv-SE"), titulo: x.titulo, descricao: x.conteudo, tipo: "noticia", imagem_url: x.imagem_url })),
         ...cur.data.map((x) => ({ fonte: "cur", id: x.id, data: x.data_evento, titulo: x.titulo, descricao: x.descricao, local: x.local, tipo: "curso", rotulo: ORIGEM_CURSO[x.origem] ? `Curso · ${ORIGEM_CURSO[x.origem]}` : "Curso" })),
       ];
       setDados({ fichas: f.data, totais: t.data, eventos: e.data, estrategias: s.data, marcos: m.data, conecta, selo: selo.data, faltaMarcos: faltaTabela(m.error) });
@@ -477,7 +483,7 @@ export function AbaRetrospectiva({ ctx }) {
         <div>
           <p className="font-body text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: R.blue }}>Linha do tempo</p>
           <h2 className="font-display font-extrabold text-xl md:text-2xl mt-1" style={{ color: R.ink }}>Retrospectiva da Sala</h2>
-          <p className="font-body text-sm mt-1" style={{ color: R.muted }}>Os atendimentos, o Calendário da Sala e o do Conecta Comércio (feiras, cursos, eventos), as Estratégias e o Selo entram sozinhos. Lance aqui os eventos, ações e capacitações que a Sala fez, com data, local, participantes e foto.</p>
+          <p className="font-body text-sm mt-1" style={{ color: R.muted }}>Entra tudo sozinho, sempre atualizado: atendimentos, Calendário da Sala, o que for postado no Conecta Comércio (feiras, cursos, eventos e notícias), Estratégias e Selo. Lance aqui os eventos, ações e capacitações que a Sala fez, com data, local, participantes e foto.</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <select value={ano} onChange={(e) => setAno(Number(e.target.value))} className="font-body text-xs font-bold border rounded-lg px-3 py-2 bg-white" style={inputStyle}>
