@@ -17,6 +17,7 @@ import { supabase, supabaseConfigurado } from "./supabaseClient";
 // Módulo Fomento Paraná (acrescentado — ver src/FomentoParana.jsx e supabase-fomento-parana.sql)
 import { FomentoPublico, FomentoAdmin, useFomentoAcesso } from "./FomentoParana.jsx";
 import { SalaPublico, SalaPainel, useSalaAcesso } from "./SalaEmpreendedor.jsx";
+import { PortalAcesso } from "./SalaGestao.jsx";
 
 // ---------------------------------------------------------------------------
 // Cidade — nome configurável pelo admin (em vez de "Ivatuba" fixo no código),
@@ -14864,7 +14865,7 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", prestador: "#/prestador", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", votacao: "#/votacao", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados", fomento: "#/fomento", "fomento-admin": "#/fomento-admin", "fomento-agente": "#/fomento-agente", sala: "#/sala", "sala-agente": "#/sala-agente", "sala-admin": "#/sala-admin" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", prestador: "#/prestador", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", votacao: "#/votacao", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados", fomento: "#/fomento", "fomento-admin": "#/fomento-admin", "fomento-agente": "#/fomento-agente", sala: "#/sala", "sala-agente": "#/sala-agente", "sala-admin": "#/sala-admin", acesso: "#/acesso" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
@@ -14876,6 +14877,7 @@ function modoDaHash(hash) {
   if (h.startsWith("#/sala-admin")) return "sala-admin";
   if (h.startsWith("#/sala-agente") || h.startsWith("#/sala-atendente")) return "sala-agente";
   if (h.startsWith("#/sala")) return "sala";
+  if (h.startsWith("#/acesso")) return "acesso";
   if (h.startsWith("#/estatisticas") || h.startsWith("#/numeros")) return "estatisticas";
   if (h.startsWith("#/turismo")) return "turismo";
   if (h.startsWith("#/mural")) return "mural";
@@ -16302,6 +16304,7 @@ export default function ConectaComercio() {
     ...(siteConfig?.estatisticas_ativo ? [{ id: "estatisticas", label: "Números", icon: TrendingUp }] : []),
     { id: "fomento", label: "Fomento Paraná", icon: Landmark },
     { id: "sala", label: "Sala do Empreendedor", icon: Store },
+    { id: "acesso", label: "Acesso", icon: Store, oculto: true },
     { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
     { id: "empresario", label: "Painel Empresário", icon: Briefcase, restrito: "empresario" },
@@ -16433,6 +16436,7 @@ export default function ConectaComercio() {
       {modo === "classificados" && <PaginaClassificados />}
       {modo === "fomento" && <FomentoPublico siteConfig={siteConfig} />}
       {modo === "sala" && <SalaPublico />}
+      {modo === "acesso" && <PortalAcesso />}
       {modo === "sala-agente" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <SalaPainel key="sala-agente" area="agente" sessao={sessao} perfil={perfil} />)}
       {modo === "sala-admin" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <SalaPainel key="sala-admin" area="admin" sessao={sessao} perfil={perfil} />)}
       {modo === "fomento-admin" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <FomentoAdmin key="admin" area="admin" sessao={sessao} perfil={perfil} />)}

@@ -15,10 +15,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Store, MessageCircle, MapPin, Clock, CalendarDays, ClipboardList, Inbox, BarChart3, Settings, Users,
   ExternalLink, Download, Trash2, Pencil, CheckCircle2, X, ShieldCheck, PlusCircle, Search, LayoutDashboard,
-  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange,
+  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge,
 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { AbaEstrategias, AbaCalendario, AgendaPublicaSala } from "./SalaPlanejamento.jsx";
+import { AbaSelo, AbaGestao, AbaOrientacoes, AbaEmpreendedores, AbaIndicadores, OrientacoesPublicas, DocProtegido } from "./SalaGestao.jsx";
 
 // As mesmas categorias do relatório oficial do Sebrae (usadas também no
 // Painel Admin → "Sala do Empreendedor - Atendimentos").
@@ -49,6 +50,7 @@ const STATUS_PEDIDO = {
   cancelado: { r: "Cancelado", c: "#8896A6" },
 };
 
+export const LOGO_SALA = "/sala-do-empreendedor-logo.png";
 export const LINKS_SALA = { publico: "/sala", agente: "/sala/agente", admin: "/sala/admin" };
 
 const S = {
@@ -258,14 +260,12 @@ export function SalaPublico() {
           <div aria-hidden className="absolute right-24 -bottom-20 w-48 h-48 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }} />
           <div className={`relative ${config.banner_url ? "grid md:grid-cols-[1.25fr_1fr] gap-6 items-center" : ""}`}>
             <div className="max-w-2xl">
-              {config.logo_url && (
-                <span className="inline-flex items-center bg-white rounded-2xl px-4 py-2.5 mb-4 shadow-lg">
-                  <img src={config.logo_url} alt="Sala do Empreendedor" className="h-10 md:h-12 w-auto object-contain" />
-                </span>
-              )}
+              <span className="inline-flex items-center bg-white rounded-2xl px-4 py-2.5 mb-4 shadow-lg">
+                <img src={config.logo_url || LOGO_SALA} alt="Sala do Empreendedor" className="h-10 md:h-14 w-auto object-contain" />
+              </span>
               <div>
                 <span className="inline-flex items-center gap-2 font-body text-[11px] font-bold uppercase tracking-[0.16em] px-3 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.14)" }}>
-                  <Store size={13} /> Sala do Empreendedor · Ivatuba
+                  <MapPin size={13} /> Ivatuba - PR
                 </span>
               </div>
               <h1 className="font-display font-extrabold text-3xl md:text-5xl mt-4 leading-tight">Seu negócio em dia, sem complicação</h1>
@@ -337,6 +337,8 @@ export function SalaPublico() {
 
       <AgendaPublicaSala />
 
+      <OrientacoesPublicas />
+
       {/* ONDE FICA + NÚMEROS */}
       <section id="sala-onde" className="max-w-6xl mx-auto px-4 md:px-6 mt-10 scroll-mt-20 grid md:grid-cols-2 gap-4">
         <div className="rounded-2xl border bg-white overflow-hidden" style={{ borderColor: S.line }}>
@@ -368,6 +370,9 @@ export function SalaPublico() {
             </>
           )}
         </div>
+      </section>
+      <section className="max-w-6xl mx-auto px-4 md:px-6 mt-10 text-center">
+        <a href="#/acesso" className="font-body text-xs font-bold inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border bg-white" style={{ borderColor: S.line, color: S.muted }}><ShieldCheck size={13} /> Acesso da equipe da Sala</a>
       </section>
     </div>
   );
@@ -494,7 +499,8 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
   const [equipe, setEquipe] = useState(null);
   const [toast, setToast] = useState(null);
   const avisar = (m, tipo = "ok") => { setToast({ m, tipo }); setTimeout(() => setToast(null), 3200); };
-  const [aba, setAbaEstado] = useState(() => { try { return sessionStorage.getItem(`sala-aba-${area}`) || "painel"; } catch { return "painel"; } });
+  const abaInicial = area === "admin" ? "indicadores" : "painel";
+  const [aba, setAbaEstado] = useState(() => { try { return sessionStorage.getItem(`sala-aba-${area}`) || abaInicial; } catch { return abaInicial; } });
   const setAba = (a) => { setAbaEstado(a); try { sessionStorage.setItem(`sala-aba-${area}`, a); } catch { /* */ } };
   const [formAtendimento, setFormAtendimento] = useState(null); // registro inicial ao abrir o formulário
 
@@ -548,16 +554,21 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
   const novos = (pedidos || []).filter((p) => p.status === "novo").length;
 
   const itens = [
-    { id: "painel", label: "Painel", icon: LayoutDashboard },
+    ...(area === "admin" ? [{ id: "indicadores", label: "Indicadores", icon: Gauge }] : []),
+    { id: "painel", label: "Painel do dia", icon: LayoutDashboard },
     { id: "pedidos", label: "Pedidos do site", icon: Inbox, badge: novos },
     { id: "agenda", label: "Agenda", icon: CalendarDays },
     { id: "atendimentos", label: "Atendimentos", icon: ClipboardList },
+    { id: "empreendedores", label: "Empreendedores", icon: Contact },
+    { id: "orientacoes", label: "Orientações", icon: BookOpen },
     { id: "estrategias", label: "Estratégias", icon: Target },
     { id: "calendario", label: "Calendário", icon: CalendarRange },
+    { id: "gestao", label: "Gestão da Sala", icon: Briefcase },
+    { id: "selo", label: "Selo Sebrae", icon: Award },
     { id: "relatorio", label: "Relatório", icon: BarChart3 },
-    ...(area === "admin" ? [{ id: "config", label: "Página pública", icon: Settings }, { id: "equipe", label: "Equipe", icon: Users }] : []),
+    ...(area === "admin" ? [{ id: "config", label: "Página pública", icon: Settings }, { id: "equipe", label: "Equipe e permissões", icon: Users }] : []),
   ];
-  const abaAtual = itens.some((i) => i.id === aba) ? aba : "painel";
+  const abaAtual = itens.some((i) => i.id === aba) ? aba : itens[0].id;
   const ctx = { config, setConfig, pedidos, setPedidos, atendimentos, setAtendimentos, equipe, setEquipe, avisar, meuNome, meuCadastro, gerir: acesso.gerir, abrirAtendimento: (ini) => { setFormAtendimento(ini || {}); setAba("atendimentos"); }, formAtendimento, setFormAtendimento, recarregar: carregar };
 
   return (
@@ -567,7 +578,8 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
       )}
       <div className="rounded-3xl p-5 md:p-6 text-white relative overflow-hidden" style={{ background: `linear-gradient(125deg, ${S.blueDeep}, ${S.blue})` }}>
         <div aria-hidden className="absolute -right-10 -top-10 w-48 h-48 rounded-full" style={{ background: "rgba(245,183,0,0.18)" }} />
-        <p className="font-body text-[11px] font-bold uppercase tracking-[0.16em] text-white/70 relative">Sala do Empreendedor · {area === "admin" ? "Administração" : "Área do atendente"}</p>
+        <span className="inline-flex items-center bg-white rounded-xl px-3 py-1.5 mb-3 relative"><img src={config?.logo_url || LOGO_SALA} alt="Sala do Empreendedor" className="h-8 w-auto object-contain" /></span>
+        <p className="font-body text-[11px] font-bold uppercase tracking-[0.16em] text-white/70 relative">{area === "admin" ? "Administração" : "Área do atendente"}</p>
         <h1 className="font-display font-extrabold text-2xl md:text-3xl mt-1 relative">Olá, {meuNome.split(" ")[0]}!</h1>
         <div className="flex flex-wrap gap-2 mt-4 relative">
           {[["Página pública", LINKS_SALA.publico], ["Área do atendente", LINKS_SALA.agente], ...(acesso.gerir ? [["Administração", LINKS_SALA.admin]] : [])].map(([r, l]) => (
@@ -578,7 +590,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
         </div>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto mt-4 pb-1">
+      <div className="flex flex-wrap gap-1.5 mt-4">
         {itens.map((i) => (
           <button key={i.id} onClick={() => setAba(i.id)} className="font-body text-xs font-bold rounded-xl px-3 py-2 inline-flex items-center gap-1.5 whitespace-nowrap border"
             style={abaAtual === i.id ? { background: S.blue, color: "#fff", borderColor: S.blue } : { background: "#fff", color: "#425A70", borderColor: S.line }}>
@@ -593,6 +605,11 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
         {abaAtual === "pedidos" && <AbaPedidos ctx={ctx} />}
         {abaAtual === "agenda" && <AbaAgenda ctx={ctx} />}
         {abaAtual === "atendimentos" && <AbaAtendimentos ctx={ctx} />}
+        {abaAtual === "indicadores" && <AbaIndicadores ctx={ctx} />}
+        {abaAtual === "empreendedores" && <AbaEmpreendedores ctx={ctx} />}
+        {abaAtual === "orientacoes" && <AbaOrientacoes ctx={ctx} />}
+        {abaAtual === "gestao" && <AbaGestao ctx={ctx} />}
+        {abaAtual === "selo" && <AbaSelo ctx={ctx} />}
         {abaAtual === "estrategias" && <AbaEstrategias ctx={ctx} />}
         {abaAtual === "calendario" && <AbaCalendario ctx={ctx} />}
         {abaAtual === "relatorio" && <AbaRelatorio ctx={ctx} />}
@@ -633,7 +650,7 @@ function CartaoPedido({ ctx, p, compacto = false }) {
       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 font-body text-[11px]" style={{ color: "#425A70" }}>
         {p.data_agendada && <span className="inline-flex items-center gap-1"><CalendarDays size={12} /> {dataBR(p.data_agendada)} {p.hora_agendada}</span>}
         <span className="inline-flex items-center gap-1"><Phone size={12} /> {formatarFone(p.whatsapp)}</span>
-        {p.documento && <span>Doc.: {p.documento}</span>}
+        {p.documento && <DocProtegido doc={p.documento} referencia={p.nome} ctx={ctx} />}
         <span style={{ color: S.soft }}>{p.origem === "balcao" ? "Lançado pela equipe" : `Pedido em ${new Date(p.criado_em).toLocaleDateString("pt-BR")}`}</span>
       </div>
       {!compacto && p.mensagem && <p className="font-body text-xs mt-2 rounded-lg px-2.5 py-2" style={{ background: S.blueTint2, color: "#425A70" }}>{p.mensagem}</p>}
@@ -810,7 +827,7 @@ function AbaAgenda({ ctx }) {
 // ---------------------------------------------------------------------------
 // Aba: Atendimentos
 // ---------------------------------------------------------------------------
-const ATENDIMENTO_VAZIO = { data: "", nome: "", documento: "", whatsapp: "", empresa: "", categoria: "", canal: "presencial", situacao: "concluido", observacoes: "", pedido_id: null };
+const ATENDIMENTO_VAZIO = { data: "", nome: "", documento: "", whatsapp: "", empresa: "", categoria: "", canal: "presencial", situacao: "concluido", observacoes: "", pedido_id: null, encaminhado_para: "", retorno_em: "" };
 
 function AbaAtendimentos({ ctx }) {
   const [form, setForm] = useState(null);
@@ -838,6 +855,8 @@ function AbaAtendimentos({ ctx }) {
       data: form.data || hojeISO(), nome: form.nome.trim(), documento: soDigitos(form.documento) || null, whatsapp: soDigitos(form.whatsapp) || null,
       empresa: form.empresa?.trim() || null, categoria: form.categoria, canal: form.canal, situacao: form.situacao, observacoes: form.observacoes?.trim() || null,
       pedido_id: form.pedido_id && !String(form.pedido_id).startsWith("demo-") ? form.pedido_id : null,
+      ...(form.encaminhado_para?.trim() ? { encaminhado_para: form.encaminhado_para.trim() } : editandoId ? { encaminhado_para: null } : {}),
+      ...(form.retorno_em ? { retorno_em: form.retorno_em } : editandoId ? { retorno_em: null } : {}),
       ...(editandoId ? {} : { atendente_id: ctx.meuCadastro?.id || null, atendente_nome: ctx.meuNome }),
     };
     setSalvando(true);
@@ -906,6 +925,12 @@ function AbaAtendimentos({ ctx }) {
               {Object.entries(SITUACOES).map(([k, v]) => <option key={k} value={k}>{v.r}</option>)}
             </select>
           </Campo>
+          {form.situacao !== "concluido" && (
+            <>
+              <Campo label={form.situacao === "encaminhado" ? "Encaminhado para" : "O que falta"}><input value={form.encaminhado_para || ""} onChange={(e) => setForm({ ...form, encaminhado_para: e.target.value })} placeholder={form.situacao === "encaminhado" ? "Ex.: Fomento Paraná, contador, prefeitura" : "Ex.: trazer comprovante"} className={inputCls} style={inputStyle} /></Campo>
+              <Campo label="Retornar em"><input type="date" value={form.retorno_em || ""} onChange={(e) => setForm({ ...form, retorno_em: e.target.value })} className={inputCls} style={inputStyle} /></Campo>
+            </>
+          )}
           <Campo label="Observações" className="md:col-span-2"><textarea rows={2} value={form.observacoes || ""} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} className={inputCls} style={inputStyle} /></Campo>
           <div className="md:col-span-3 flex gap-2">
             <Botao type="submit" disabled={salvando}><CheckCircle2 size={14} /> {salvando ? "Salvando..." : "Salvar atendimento"}</Botao>
@@ -938,12 +963,12 @@ function AbaAtendimentos({ ctx }) {
                 <div className="flex-1 min-w-0">
                   <p className="font-display font-bold text-sm" style={{ color: S.ink }}>{a.nome} {a.empresa && <span className="font-body font-normal text-xs" style={{ color: S.muted }}>· {a.empresa}</span>}</p>
                   <p className="font-body text-xs" style={{ color: "#425A70" }}>{a.categoria}</p>
-                  <p className="font-body text-[11px]" style={{ color: S.soft }}>{dataBR(a.data)} · {CANAIS[a.canal] || a.canal}{a.atendente_nome ? ` · ${a.atendente_nome}` : ""}{a.observacoes ? ` · ${a.observacoes}` : ""}</p>
+                  <p className="font-body text-[11px]" style={{ color: S.soft }}>{dataBR(a.data)} · {CANAIS[a.canal] || a.canal}{a.atendente_nome ? ` · ${a.atendente_nome}` : ""}{a.encaminhado_para ? ` · → ${a.encaminhado_para}` : ""}{a.retorno_em ? ` · retorno ${dataBR(a.retorno_em)}` : ""}{a.observacoes ? ` · ${a.observacoes}` : ""}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Selo texto={st.r} cor={st.c} />
                   {a.whatsapp && <a href={linkWhats(a.whatsapp, `Olá, ${a.nome.split(" ")[0]}! Aqui é ${ctx.meuNome}, da Sala do Empreendedor de Ivatuba.`)} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg" style={{ color: S.greenBright }} title="WhatsApp"><MessageCircle size={15} /></a>}
-                  <button onClick={() => { setForm({ ...ATENDIMENTO_VAZIO, ...a, documento: a.documento || "", whatsapp: a.whatsapp || "", empresa: a.empresa || "", observacoes: a.observacoes || "" }); setEditandoId(a.id); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="p-2 rounded-lg" style={{ color: S.blue }} title="Editar"><Pencil size={15} /></button>
+                  <button onClick={() => { setForm({ ...ATENDIMENTO_VAZIO, ...a, documento: a.documento || "", whatsapp: a.whatsapp || "", empresa: a.empresa || "", observacoes: a.observacoes || "", encaminhado_para: a.encaminhado_para || "", retorno_em: a.retorno_em || "" }); setEditandoId(a.id); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="p-2 rounded-lg" style={{ color: S.blue }} title="Editar"><Pencil size={15} /></button>
                   {apagando === a.id ? (
                     <span className="flex gap-1"><Botao cor={S.danger} onClick={() => apagar(a)}>Excluir</Botao><Botao contorno onClick={() => setApagando(null)}>Não</Botao></span>
                   ) : (
@@ -1107,7 +1132,7 @@ function AbaConfig({ ctx }) {
         {[["logo_url", "Logo"], ["banner_url", "Foto/banner do topo"]].map(([campo, rotulo]) => (
           <div key={campo} className="flex items-center gap-3">
             <span className="w-16 h-16 rounded-xl border overflow-hidden flex items-center justify-center shrink-0" style={{ borderColor: S.line, background: S.blueTint2 }}>
-              {f[campo] ? <img src={f[campo]} alt="" className="w-full h-full object-cover" /> : <Store size={18} color={S.soft} />}
+              {f[campo] ? <img src={f[campo]} alt="" className="w-full h-full object-contain" /> : campo === "logo_url" ? <img src={LOGO_SALA} alt="" className="w-full h-full object-contain p-1" /> : <Store size={18} color={S.soft} />}
             </span>
             <div className="flex flex-col gap-1">
               <span className="font-body text-xs font-bold" style={{ color: S.ink }}>{rotulo}</span>
