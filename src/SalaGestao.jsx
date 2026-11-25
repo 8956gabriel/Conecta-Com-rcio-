@@ -892,8 +892,13 @@ export function AbaIndicadores({ ctx }) {
   const ano = String(new Date().getFullYear());
   const atend = ctx.atendimentos || [];
   const doAno = atend.filter((a) => String(a.data).startsWith(ano));
-  const porMes = MESES.map((m, i) => [m, doAno.filter((a) => Number(String(a.data).slice(5, 7)) === i + 1).length]);
-  const demandas = {}; doAno.forEach((a) => { demandas[a.categoria] = (demandas[a.categoria] || 0) + 1; });
+  // Fichas + totais lançados antes das fichas: por mês/tipo vale o maior dos dois
+  const gradeAno = {};
+  doAno.forEach((a) => { const k = `${Number(String(a.data).slice(5, 7))}|${a.categoria}`; gradeAno[k] = (gradeAno[k] || 0) + 1; });
+  (ctx.totais || []).forEach((t) => { if (String(t.ano) !== ano) return; const k = `${Number(t.mes)}|${t.categoria}`; gradeAno[k] = Math.max(gradeAno[k] || 0, Number(t.total) || 0); });
+  const porMes = MESES.map((m, i) => [m, Object.entries(gradeAno).filter(([k]) => k.startsWith(`${i + 1}|`)).reduce((s, [, v]) => s + v, 0)]);
+  const totalAno = porMes.reduce((s, [, v]) => s + v, 0);
+  const demandas = {}; Object.entries(gradeAno).forEach(([k, v]) => { if (!v) return; const c = k.split("|").slice(1).join("|"); demandas[c] = (demandas[c] || 0) + v; });
   const aprovadas = (empresas || []).filter((e) => e.status === "aprovada");
   const totEmp = aprovadas.reduce((s, e) => s + Number(e.total), 0);
   const porSeg = {}; aprovadas.forEach((e) => { porSeg[e.categoria] = (porSeg[e.categoria] || 0) + Number(e.total); });
@@ -903,7 +908,7 @@ export function AbaIndicadores({ ctx }) {
   const pdf = () => {
     registrarAcessoSala("exportou_relatorio", `Indicadores ${ano}`, ctx.meuNome);
     exportarPDF(`indicadores-sala-${ano}`, `Indicadores — Sala do Empreendedor ${ano}`, [
-      { titulo: "Resumo", cabecalho: ["Indicador", "Valor"], linhas: [["Empresas aprovadas no Conecta Comércio", totEmp], ["Atendimentos no ano", doAno.length], ["Empreendedores distintos atendidos", unicos], ["Pedidos do site (em aberto)", (ctx.pedidos || []).filter((p) => p.status === "novo" || p.status === "agendado").length], ["Votos nas campanhas/votações", votos ?? "—"], ["Selo Sebrae: pontos com evidência pronta", `${seloOk} de ${seloTot}`]] },
+      { titulo: "Resumo", cabecalho: ["Indicador", "Valor"], linhas: [["Empresas aprovadas no Conecta Comércio", totEmp], ["Atendimentos no ano", totalAno], ["Empreendedores distintos atendidos", unicos], ["Pedidos do site (em aberto)", (ctx.pedidos || []).filter((p) => p.status === "novo" || p.status === "agendado").length], ["Votos nas campanhas/votações", votos ?? "—"], ["Selo Sebrae: pontos com evidência pronta", `${seloOk} de ${seloTot}`]] },
       { titulo: "Atendimentos por mês", cabecalho: MESES, linhas: [porMes.map(([, v]) => v)] },
       { titulo: "Principais demandas", cabecalho: ["Demanda", "Atendimentos"], linhas: Object.entries(demandas).sort((a, b) => b[1] - a[1]) },
       { titulo: "Empresas por segmento", cabecalho: ["Segmento", "Empresas"], linhas: Object.entries(porSeg).sort((a, b) => b[1] - a[1]) },
@@ -914,7 +919,7 @@ export function AbaIndicadores({ ctx }) {
       <Cab eyebrow="Administração" title={`Indicadores ${ano}`} sub="Comércio cadastrado, atendimentos, demandas, campanhas e Selo — num painel só." direita={<Bt contorno onClick={pdf}><Download size={14} /> Relatório gerencial (PDF)</Bt>} />
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <KPI titulo="Empresas cadastradas" valor={empresas === null ? "…" : totEmp} sub="aprovadas" icon={Store} />
-        <KPI titulo="Atendimentos no ano" valor={doAno.length} icon={BarChart3} cor={G.green} />
+        <KPI titulo="Atendimentos no ano" valor={totalAno} icon={BarChart3} cor={G.green} />
         <KPI titulo="Empreendedores" valor={unicos} sub="distintos no ano" icon={Users} cor="#7E5BEF" />
         <KPI titulo="Votos em campanhas" valor={votos ?? "—"} icon={Target} cor={G.amber} />
         <KPI titulo="Selo Sebrae" valor={seloTot ? `${Math.round((seloOk / seloTot) * 100)}%` : "—"} sub="pontos com evidência pronta" icon={Award} cor="#0EA5A5" />
