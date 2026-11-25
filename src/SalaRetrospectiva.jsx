@@ -56,13 +56,22 @@ const TIPOS_CAL = {
   comercio: { r: "Data do comércio", emoji: "🛍️", c: "#E8A23D", g: "eventos" },
 };
 
+// Itens que vêm do calendário do Conecta Comércio (eventos_calendario e cursos)
+const TIPOS_CONECTA = {
+  feira: { r: "Feira", emoji: "🎪", c: "#E8A23D", g: "eventos" },
+  curso: { r: "Curso", emoji: "🎓", c: "#0EA5A5", g: "capacitacoes" },
+  institucional: { r: "Evento institucional", emoji: "🏛️", c: "#0A5AA8", g: "eventos" },
+  outro: { r: "Evento", emoji: "📅", c: "#0A5AA8", g: "eventos" },
+};
+const ORIGEM_CURSO = { sala_empreendedor: "Sala do Empreendedor", sebrae: "Sebrae", prefeitura: "Prefeitura" };
+
 // Modo demonstração (sem Supabase)
 const demo = { marcos: [] };
 
 // -----------------------------------------------------------------------------
 // Monta a retrospectiva a partir dos dados brutos
 // -----------------------------------------------------------------------------
-export function montarRetrospectiva({ ano, fichas = [], totais = [], eventos = [], estrategias = [], marcos = [] }) {
+export function montarRetrospectiva({ ano, fichas = [], totais = [], eventos = [], estrategias = [], marcos = [], conecta = [] }) {
   const hoje = hojeISO();
   const anoAtual = new Date().getFullYear();
   const ultimoMes = ano < anoAtual ? 11 : ano === anoAtual ? new Date().getMonth() : -1;
@@ -112,6 +121,15 @@ export function montarRetrospectiva({ ano, fichas = [], totais = [], eventos = [
     } else if (e.status === "em_andamento" && doAno(e.data_inicio) && e.data_inicio <= hoje) {
       itens.push({ chave: `s-${e.id}`, origem: "estrategia", grupo: "acoes", data: e.data_inicio, emoji: "🚀", cor: "#E8A23D", rotulo: "Estratégia iniciada", titulo: e.titulo, descricao: e.objetivo, publicar: e.publicar });
     }
+  });
+  // Calendário do Conecta Comércio (feiras, cursos, eventos) — sem repetir o que já está na Sala
+  const ja = new Set(itens.map((i) => `${i.data}|${String(i.titulo || "").trim().toLowerCase()}`));
+  conecta.filter((e) => doAno(e.data) && e.data <= hoje && !["cancelado", "adiado"].includes(e.status)).forEach((e) => {
+    const chave = `${e.data}|${String(e.titulo || "").trim().toLowerCase()}`;
+    if (ja.has(chave)) return;
+    ja.add(chave);
+    const t = TIPOS_CONECTA[e.tipo] || TIPOS_CONECTA.outro;
+    itens.push({ chave: `c-${e.fonte}-${e.id}`, origem: "conecta", grupo: t.g, data: e.data, emoji: t.emoji, cor: t.c, rotulo: e.rotulo || t.r, titulo: e.titulo, descricao: e.descricao, local: e.local, foto: e.imagem_url, publicar: true, fonte: "Calendário do Conecta Comércio" });
   });
   itens.sort((a, b) => a.data.localeCompare(b.data) || (a.origem === "marco" ? -1 : 1));
 
@@ -265,6 +283,7 @@ function LinhaDoTempo({ r, filtro = "", onEditar, onApagar }) {
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${i.cor}1A`, color: i.cor }}>{i.rotulo}</span>
                           <span className="font-body text-[11px]" style={{ color: R.soft }}>{dataBR(i.data)}</span>
+                          {i.fonte && <span className="font-body text-[10px]" style={{ color: R.soft }}>· {i.fonte}</span>}
                           {onEditar && i.publicar === false && <span title="Não aparece na página pública" className="inline-flex"><EyeOff size={12} color={R.soft} /></span>}
                         </div>
                         <p className="font-display font-bold text-sm mt-1" style={{ color: R.ink }}>{i.titulo}</p>
@@ -301,7 +320,7 @@ function useDadosRetrospectiva(ano, { publico = false, fichasDemo = [], recarga 
   useEffect(() => {
     if (!ativo) { setDados(null); return undefined; }
     if (!supabaseConfigurado) {
-      setDados({ fichas: publico ? [] : fichasDemo, totais: [], eventos: [], estrategias: [], marcos: demo.marcos.filter((m) => !publico || m.publicar), selo: [], faltaMarcos: false });
+      setDados({ fichas: publico ? [] : fichasDemo, totais: [], eventos: [], estrategias: [], marcos: demo.marcos.filter((m) => !publico || m.publicar), conecta: [], selo: [], faltaMarcos: false });
       return;
     }
     let vivo = true;
@@ -317,9 +336,15 @@ function useDadosRetrospectiva(ano, { publico = false, fichasDemo = [], recarga 
       lista(supabase.from("sala_atendimentos_totais").select("ano,mes,categoria,total").eq("ano", ano).limit(5000)),
       lista(qEv), lista(qEst), lista(qMar),
       publico ? Promise.resolve({ data: [] }) : lista(supabase.from("sala_selo_itens").select("pontos,status").eq("ciclo", ano)),
-    ]).then(([f, t, e, s, m, selo]) => {
+      lista(supabase.from("eventos_calendario").select("*").gte("data_inicio", ini).lte("data_inicio", fim).limit(2000)),
+      lista(supabase.from("cursos").select("*").gte("data_evento", ini).lte("data_evento", fim).limit(2000)),
+    ]).then(([f, t, e, s, m, selo, cal, cur]) => {
       if (!vivo) return;
-      setDados({ fichas: f.data, totais: t.data, eventos: e.data, estrategias: s.data, marcos: m.data, selo: selo.data, faltaMarcos: faltaTabela(m.error) });
+      const conecta = [
+        ...cal.data.map((x) => ({ fonte: "cal", id: x.id, data: x.data_inicio, titulo: x.titulo, descricao: x.descricao, local: x.local, tipo: x.tipo, status: x.status, imagem_url: x.imagem_url })),
+        ...cur.data.map((x) => ({ fonte: "cur", id: x.id, data: x.data_evento, titulo: x.titulo, descricao: x.descricao, local: x.local, tipo: "curso", rotulo: ORIGEM_CURSO[x.origem] ? `Curso · ${ORIGEM_CURSO[x.origem]}` : "Curso" })),
+      ];
+      setDados({ fichas: f.data, totais: t.data, eventos: e.data, estrategias: s.data, marcos: m.data, conecta, selo: selo.data, faltaMarcos: faltaTabela(m.error) });
     });
     return () => { vivo = false; };
   }, [ano, publico, recarga, ativo]);
@@ -440,7 +465,7 @@ export function AbaRetrospectiva({ ctx }) {
         <div>
           <p className="font-body text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: R.blue }}>Linha do tempo</p>
           <h2 className="font-display font-extrabold text-xl md:text-2xl mt-1" style={{ color: R.ink }}>Retrospectiva da Sala</h2>
-          <p className="font-body text-sm mt-1" style={{ color: R.muted }}>Os atendimentos, o Calendário, as Estratégias e o Selo entram sozinhos. Lance aqui os eventos, ações e capacitações que a Sala fez, com data, local, participantes e foto.</p>
+          <p className="font-body text-sm mt-1" style={{ color: R.muted }}>Os atendimentos, o Calendário da Sala e o do Conecta Comércio (feiras, cursos, eventos), as Estratégias e o Selo entram sozinhos. Lance aqui os eventos, ações e capacitações que a Sala fez, com data, local, participantes e foto.</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <select value={ano} onChange={(e) => setAno(Number(e.target.value))} className="font-body text-xs font-bold border rounded-lg px-3 py-2 bg-white" style={inputStyle}>
