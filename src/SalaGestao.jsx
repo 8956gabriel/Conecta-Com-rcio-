@@ -156,6 +156,81 @@ export const SELO_2026 = [
 ];
 const STATUS_SELO = { nao_iniciado: { r: "Não iniciado", c: "#8896A6" }, em_andamento: { r: "Em andamento", c: "#E8A23D" }, concluido: { r: "Concluído", c: "#1E8E5A" } };
 
+// Categorias do Selo (Regulamento 2026, Art. 23): estadual Bronze/Prata/Ouro; nacional Diamante = 100 pontos (só para quem foi Ouro)
+export const FAIXAS_SELO = [
+  { k: "diamante", r: "Diamante", emoji: "💎", min: 100, cor: "#0EA5C6", fundo: "#E6F8FC", txt: "100 pontos — etapa nacional (só para quem conquistou o Ouro)" },
+  { k: "ouro", r: "Ouro", emoji: "🥇", min: 90, cor: "#C99700", fundo: "#FFF7D6", txt: "90 a 100 pontos" },
+  { k: "prata", r: "Prata", emoji: "🥈", min: 81, cor: "#7C8A99", fundo: "#F0F3F6", txt: "81 a 89,99 pontos" },
+  { k: "bronze", r: "Bronze", emoji: "🥉", min: 75, cor: "#B06A35", fundo: "#FBEFE6", txt: "75 a 80,99 pontos" },
+];
+export function faixaSelo(pontos) {
+  return FAIXAS_SELO.find((f) => pontos >= f.min - 1e-9) || { k: "nenhum", r: "Não selado", emoji: "⏳", min: 0, cor: "#B4462F", fundo: "#FBEAE5", txt: "abaixo de 75 pontos" };
+}
+function TrofeuSelo({ itens, prontos, total }) {
+  const pct = total ? (prontos / total) * 100 : 0;
+  const pontos = total ? (prontos * 100) / total : 0;
+  const atual = faixaSelo(pontos);
+  const proxima = [...FAIXAS_SELO].reverse().find((f) => f.min > pontos + 1e-9);
+  const pendentes = (itens || []).filter((i) => i.status !== "concluido").sort((a, b) => Number(b.pontos || 0) - Number(a.pontos || 0));
+  const possivel = pontos + pendentes.reduce((s, i) => s + Number(i.pontos || 0), 0);
+  const fmt = (n) => Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  return (
+    <div className="rounded-2xl border p-4 md:p-5 mb-5" style={{ borderColor: atual.cor, background: atual.fundo }}>
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="text-5xl leading-none">{atual.emoji}</div>
+        <div className="flex-1 min-w-[200px]">
+          <p className="font-body text-[11px] font-bold uppercase tracking-wider" style={{ color: G.muted }}>Troféu que a Sala ganharia hoje</p>
+          <p className="font-display font-extrabold text-2xl" style={{ color: atual.cor }}>{atual.k === "nenhum" ? "Ainda não selaria" : `Selo ${atual.r}`}</p>
+          <p className="font-body text-sm" style={{ color: G.ink }}><b>{fmt(pct)}%</b> · {fmt(pontos)} de 100 pontos com evidência pronta</p>
+        </div>
+        {proxima && (
+          <div className="rounded-xl bg-white border px-3 py-2" style={{ borderColor: G.line }}>
+            <p className="font-body text-[11px]" style={{ color: G.muted }}>Para o {proxima.emoji} {proxima.r}</p>
+            <p className="font-display font-bold text-lg" style={{ color: proxima.cor }}>faltam {fmt(proxima.min - pontos)} pts</p>
+          </div>
+        )}
+      </div>
+
+      {/* régua com as faixas */}
+      <div className="relative mt-5 mb-6">
+        <div className="h-3 rounded-full overflow-hidden flex" style={{ background: "#fff" }}>
+          <div style={{ width: "75%", background: "#F6D9D2" }} />
+          <div style={{ width: "6%", background: "#F2D2BC" }} />
+          <div style={{ width: "9%", background: "#DCE2E8" }} />
+          <div style={{ width: "10%", background: "#F7E7A6" }} />
+        </div>
+        <div className="absolute top-0 h-3 rounded-full" style={{ width: `${Math.min(100, pontos)}%`, background: atual.cor, opacity: 0.85 }} />
+        {[[75, "🥉 75"], [81, "🥈 81"], [90, "🥇 90"], [100, "💎 100"]].map(([v, r]) => (
+          <div key={v} className="absolute top-4 -translate-x-1/2 font-body text-[10px] font-bold whitespace-nowrap" style={{ left: `${v === 100 ? 97 : v}%`, color: G.muted }}>{r}</div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {[...FAIXAS_SELO].reverse().map((f) => {
+          const ok = pontos >= f.min - 1e-9;
+          return (
+            <div key={f.k} className="rounded-xl bg-white border px-3 py-2" style={{ borderColor: ok ? f.cor : G.line, opacity: ok ? 1 : 0.75 }}>
+              <p className="font-display font-bold text-sm" style={{ color: f.cor }}>{f.emoji} {f.r} {ok ? "✓" : ""}</p>
+              <p className="font-body text-[11px]" style={{ color: G.muted }}>{f.txt}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {pendentes.length > 0 && (
+        <div className="mt-3 rounded-xl bg-white border px-3 py-2.5" style={{ borderColor: G.line }}>
+          <p className="font-display font-bold text-xs mb-1" style={{ color: G.ink }}>Para subir de categoria, conclua com evidência:</p>
+          <ul className="font-body text-xs space-y-0.5" style={{ color: "#425A70" }}>
+            {pendentes.map((i) => <li key={i.id}>• {i.numero}. {i.criterio} — <b>{fmt(i.pontos || 0)} pts</b> ({STATUS_SELO[i.status]?.r || i.status})</li>)}
+          </ul>
+          <p className="font-body text-[11px] mt-1.5" style={{ color: G.soft }}>Concluindo tudo, a Sala chegaria a {fmt(possivel)} pontos ({faixaSelo(possivel).emoji} {faixaSelo(possivel).r}).</p>
+        </div>
+      )}
+      <p className="font-body text-[10px] mt-2" style={{ color: G.soft }}>Estimativa interna pelos critérios marcados como concluídos. A nota oficial é dada pelo Comitê do Sebrae (o Cliente oculto, por exemplo, depende das ligações e visitas de avaliação). Faixas: Regulamento do Selo 2026, Art. 23.</p>
+    </div>
+  );
+}
+
 export function AbaSelo({ ctx }) {
   const [ciclo, setCiclo] = useState(2026);
   const [itens, setItens] = useState(null);
@@ -209,7 +284,7 @@ export function AbaSelo({ ctx }) {
   const pdf = () => exportarPDF(`selo-sebrae-${ciclo}`, `Selo Sebrae de Referência em Atendimento — Ciclo ${ciclo}`, [{
     titulo: "Checklist de acompanhamento", cabecalho: ["Nº", "Critério", "Pts", "Evidência necessária", "Responsável", "Prazo", "Status", "Anexos"],
     linhas: (itens || []).map((i) => [i.numero ?? "", `${i.criterio}\n(${i.pilar || ""})`, i.pontos ?? "", i.evidencia || "", i.responsavel || "", dataBR(i.prazo), STATUS_SELO[i.status]?.r, (i.anexos || []).length]),
-  }], `Critérios conforme o regulamento oficial do Selo (ciclo ${ciclo}). Pontuação final definida pelo Sebrae.`, "Sala do Empreendedor · Ivatuba");
+  }], `Estimativa interna: ${prontos.toLocaleString("pt-BR")} de ${total.toLocaleString("pt-BR")} pontos (${faixaSelo(total ? (prontos * 100) / total : 0).r}). Faixas 2026: Bronze 75–80,99 · Prata 81–89,99 · Ouro 90–100 · Diamante 100 (nacional). Pontuação final definida pelo Sebrae.`, "Sala do Empreendedor · Ivatuba");
 
   return (
     <div>
@@ -244,7 +319,7 @@ export function AbaSelo({ ctx }) {
             <KPI titulo="Em andamento" valor={itens.filter((i) => i.status === "em_andamento").length} icon={Clock} cor={G.amber} />
             <KPI titulo="Prazo vencido" valor={atrasados} sub="sem concluir" icon={AlertTriangle} cor={G.danger} />
           </div>
-          <div className="h-3 rounded-full overflow-hidden mb-5" style={{ background: G.blueTint }}><div className="h-full" style={{ width: `${total ? (prontos / total) * 100 : 0}%`, background: G.green }} /></div>
+          <TrofeuSelo itens={itens} prontos={prontos} total={total} />
           <div className="flex flex-wrap gap-1.5 mb-3">
             <button onClick={() => setFiltroPilar("")} className="font-body text-xs font-bold rounded-full px-3 py-1.5 border" style={!filtroPilar ? { background: G.blueHex, color: "#fff", borderColor: G.blueHex } : { background: "#fff", color: "#425A70", borderColor: G.line }}>Todos</button>
             {pilares.map((p) => <button key={p} onClick={() => setFiltroPilar(p)} className="font-body text-xs font-bold rounded-full px-3 py-1.5 border" style={filtroPilar === p ? { background: G.blueHex, color: "#fff", borderColor: G.blueHex } : { background: "#fff", color: "#425A70", borderColor: G.line }}>{p}</button>)}
@@ -922,7 +997,7 @@ export function AbaIndicadores({ ctx }) {
         <KPI titulo="Atendimentos no ano" valor={totalAno} icon={BarChart3} cor={G.green} />
         <KPI titulo="Empreendedores" valor={unicos} sub="distintos no ano" icon={Users} cor="#7E5BEF" />
         <KPI titulo="Votos em campanhas" valor={votos ?? "—"} icon={Target} cor={G.amber} />
-        <KPI titulo="Selo Sebrae" valor={seloTot ? `${Math.round((seloOk / seloTot) * 100)}%` : "—"} sub="pontos com evidência pronta" icon={Award} cor="#0EA5A5" />
+        <KPI titulo="Selo Sebrae" valor={seloTot ? `${Math.round((seloOk / seloTot) * 100)}%` : "—"} sub={seloTot ? `${faixaSelo((seloOk * 100) / seloTot).emoji} ${faixaSelo((seloOk * 100) / seloTot).r} (estimativa)` : "pontos com evidência pronta"} icon={Award} cor="#0EA5A5" />
       </div>
       <div className="grid md:grid-cols-3 gap-4 mt-5">
         <div className="rounded-2xl border p-4 bg-white" style={{ borderColor: G.line }}><p className="font-display font-bold text-sm mb-3" style={{ color: G.ink }}>Atendimentos por mês</p><Barras itens={porMes.filter(([, v], i) => i <= new Date().getMonth())} /></div>
