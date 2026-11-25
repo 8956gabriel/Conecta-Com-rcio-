@@ -499,6 +499,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
   const [config, setConfig] = useSalaConfig();
   const [pedidos, setPedidos] = useState(null);
   const [atendimentos, setAtendimentos] = useState(null);
+  const [totais, setTotais] = useState(null); // totais mensais já lançados (histórico, antes das fichas)
   const [equipe, setEquipe] = useState(null);
   const [toast, setToast] = useState(null);
   const avisar = (m, tipo = "ok") => { setToast({ m, tipo }); setTimeout(() => setToast(null), 3200); };
@@ -513,13 +514,14 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
 
   const carregar = () => {
     if (!supabaseConfigurado) {
-      setPedidos((p) => p ?? demoPedidos()); setAtendimentos((a) => a ?? demoAtendimentos()); setEquipe((e) => e ?? DEMO_EQUIPE);
+      setPedidos((p) => p ?? demoPedidos()); setAtendimentos((a) => a ?? demoAtendimentos()); setEquipe((e) => e ?? DEMO_EQUIPE); setTotais((t) => t ?? []);
       return;
     }
     const desde = somarDias(hojeISO(), -400);
     supabase.from("sala_pedidos").select("*").order("criado_em", { ascending: false }).limit(1000).then(({ data, error }) => setPedidos(error ? [] : data || []));
     supabase.from("sala_atendimentos").select("*").gte("data", desde).order("data", { ascending: false }).order("criado_em", { ascending: false }).then(({ data, error }) => setAtendimentos(error ? [] : data || []));
     supabase.from("sala_equipe").select("*").order("nome").then(({ data, error }) => setEquipe(error ? [] : data || []));
+    supabase.from("sala_atendimentos_totais").select("ano,mes,categoria,total").limit(10000).then(({ data, error }) => setTotais(error ? [] : data || []));
   };
   useEffect(() => { if (acesso?.pode) carregar(); }, [acesso?.pode]);
 
@@ -573,7 +575,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
     ...(area === "admin" ? [{ id: "config", label: "Página pública", icon: Settings }, { id: "equipe", label: "Equipe e permissões", icon: Users }] : []),
   ];
   const abaAtual = itens.some((i) => i.id === aba) ? aba : itens[0].id;
-  const ctx = { config, setConfig, pedidos, setPedidos, atendimentos, setAtendimentos, equipe, setEquipe, avisar, meuNome, meuCadastro, gerir: acesso.gerir, abrirAtendimento: (ini) => { setFormAtendimento(ini || {}); setAba("atendimentos"); }, formAtendimento, setFormAtendimento, recarregar: carregar };
+  const ctx = { config, setConfig, pedidos, setPedidos, atendimentos, setAtendimentos, totais, equipe, setEquipe, avisar, meuNome, meuCadastro, gerir: acesso.gerir, abrirAtendimento: (ini) => { setFormAtendimento(ini || {}); setAba("atendimentos"); }, formAtendimento, setFormAtendimento, recarregar: carregar };
 
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
@@ -894,6 +896,20 @@ function AbaAtendimentos({ ctx }) {
     ctx.avisar("Atendimento excluído.");
   };
 
+  // Totais lançados antes das fichas (Painel Admin do Conecta → Sala do Empreendedor - Atendimentos)
+  const historico = useMemo(() => {
+    if (!mes) return [];
+    const [a, m] = mes.split("-").map(Number);
+    const fichas = {};
+    (ctx.atendimentos || []).forEach((x) => { if (String(x.data).startsWith(mes)) { const c = CATEGORIAS_SALA.includes(x.categoria) ? x.categoria : "Outros"; fichas[c] = (fichas[c] || 0) + 1; } });
+    return (ctx.totais || [])
+      .filter((t) => Number(t.ano) === a && Number(t.mes) === m && (!cat || t.categoria === cat))
+      .map((t) => ({ categoria: t.categoria, semFicha: Math.max(0, (Number(t.total) || 0) - (fichas[t.categoria] || 0)) }))
+      .filter((t) => t.semFicha > 0)
+      .sort((x, y) => y.semFicha - x.semFicha);
+  }, [ctx.totais, ctx.atendimentos, mes, cat]);
+  const totHistorico = historico.reduce((s, t) => s + t.semFicha, 0);
+
   const lista = (ctx.atendimentos || []).filter((a) => {
     if (mes && !String(a.data).startsWith(mes)) return false;
     if (cat && a.categoria !== cat) return false;
@@ -954,11 +970,23 @@ function AbaAtendimentos({ ctx }) {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color={S.soft} />
           <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar nome, CPF/CNPJ..." className="font-body text-sm border rounded-lg pl-8 pr-3 py-2 outline-none" style={inputStyle} />
         </div>
-        <span className="font-body text-xs ml-auto" style={{ color: S.muted }}>{lista.length} atendimento(s)</span>
+        <span className="font-body text-xs ml-auto" style={{ color: S.muted }}>{lista.length} com ficha{totHistorico ? ` + ${totHistorico} lançado(s) por total = ${lista.length + totHistorico}` : ""}</span>
       </div>
 
+      {historico.length > 0 && (
+        <div className="rounded-2xl border p-4 mb-3" style={{ borderColor: S.line, background: S.blueTint2 }}>
+          <p className="font-display font-bold text-sm" style={{ color: S.ink }}>{totHistorico} atendimento(s) lançado(s) por total neste mês</p>
+          <p className="font-body text-[11px] mb-2" style={{ color: S.muted }}>Números lançados antes da ficha individual (Painel Admin do Conecta → Sala do Empreendedor - Atendimentos). Contam no relatório e nos indicadores, mas não têm nome nem CPF/CNPJ.</p>
+          <div className="flex flex-wrap gap-1.5">
+            {historico.map((t) => (
+              <span key={t.categoria} className="font-body text-xs rounded-lg px-2.5 py-1 bg-white border" style={{ borderColor: S.line, color: "#425A70" }}>{t.categoria}: <b style={{ color: S.ink }}>{t.semFicha}</b></span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {ctx.atendimentos === null ? <p className="font-body text-sm" style={{ color: S.muted }}>Carregando...</p> : lista.length === 0 ? (
-        <p className="font-body text-sm" style={{ color: S.muted }}>Nenhum atendimento nesse filtro.</p>
+        <p className="font-body text-sm" style={{ color: S.muted }}>{totHistorico ? "Nenhuma ficha individual nesse filtro." : "Nenhum atendimento nesse filtro."}</p>
       ) : (
         <div className="rounded-2xl border bg-white overflow-hidden" style={{ borderColor: S.line }}>
           {lista.map((a, i) => {
@@ -997,6 +1025,11 @@ function AbaRelatorio({ ctx }) {
   const [ano, setAno] = useState(anoAtual);
   const [dados, setDados] = useState(null);
   const [publicando, setPublicando] = useState(false);
+  const anosComDados = useMemo(() => {
+    const set = new Set([anoAtual, anoAtual - 1, anoAtual - 2]);
+    (ctx.totais || []).forEach((t) => { if ((Number(t.total) || 0) > 0) set.add(Number(t.ano)); });
+    return [...set].sort((a, b) => b - a);
+  }, [ctx.totais, anoAtual]);
 
   useEffect(() => {
     if (!supabaseConfigurado) { setDados((ctx.atendimentos || []).filter((a) => String(a.data).startsWith(String(ano)))); return; }
@@ -1012,8 +1045,16 @@ function AbaRelatorio({ ctx }) {
       const c = g[a.categoria] ? a.categoria : "Outros";
       if (m >= 0 && m < 12) g[c][m] += 1;
     });
+    // Totais já lançados (antes das fichas): em cada mês/tipo vale o MAIOR dos dois,
+    // assim o histórico não some e nada é contado em dobro.
+    (ctx.totais || []).forEach((t) => {
+      if (Number(t.ano) !== Number(ano)) return;
+      const m = Number(t.mes) - 1;
+      const c = g[t.categoria] ? t.categoria : "Outros";
+      if (m >= 0 && m < 12) g[c][m] = Math.max(g[c][m], Number(t.total) || 0);
+    });
     return g;
-  }, [dados]);
+  }, [dados, ctx.totais, ano]);
   const totMes = MESES.map((_, i) => CATEGORIAS_SALA.reduce((s, c) => s + grade[c][i], 0));
   const totGeral = totMes.reduce((s, v) => s + v, 0);
   const porCanal = {};
@@ -1033,11 +1074,11 @@ function AbaRelatorio({ ctx }) {
 
   return (
     <div>
-      <Titulo eyebrow="Prestação de contas" title={`Relatório ${ano}`} sub="Contagem automática dos atendimentos registrados, por tipo e mês (mesmas categorias do relatório do Sebrae)."
+      <Titulo eyebrow="Prestação de contas" title={`Relatório ${ano}`} sub="Fichas registradas + totais já lançados antes das fichas, por tipo e mês (mesmas categorias do relatório do Sebrae)."
         direita={
           <div className="flex flex-wrap gap-2 items-center">
             <select value={ano} onChange={(e) => setAno(Number(e.target.value))} className="font-body text-sm border rounded-lg px-2 py-2 outline-none" style={inputStyle}>
-              {[anoAtual, anoAtual - 1, anoAtual - 2].map((a) => <option key={a}>{a}</option>)}
+              {anosComDados.map((a) => <option key={a}>{a}</option>)}
             </select>
             <Botao contorno onClick={csv}><Download size={14} /> Planilha (CSV)</Botao>
             {ctx.gerir && <Botao onClick={publicar} disabled={publicando}><Upload size={14} /> {publicando ? "Publicando..." : "Publicar números no site"}</Botao>}
@@ -1077,7 +1118,7 @@ function AbaRelatorio({ ctx }) {
           </table>
         </div>
       )}
-      {ctx.gerir && <p className="font-body text-[11px] mt-2" style={{ color: S.soft }}>"Publicar números no site" substitui os totais de {ano} que aparecem na página pública e no Painel Admin → Sala do Empreendedor - Atendimentos.</p>}
+      {ctx.gerir && <p className="font-body text-[11px] mt-2" style={{ color: S.soft }}>"Publicar números no site" atualiza os totais de {ano} (nunca diminui o que já foi lançado) que aparecem na página pública e no Painel Admin → Sala do Empreendedor - Atendimentos.</p>}
     </div>
   );
 }
