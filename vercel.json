@@ -43,6 +43,14 @@
     {
       "source": "/demo",
       "destination": "/"
+    },
+    {
+      "source": "/publico",
+      "destination": "/"
+    },
+    {
+      "source": "/atendente",
+      "destination": "/"
     }
   ]
 }

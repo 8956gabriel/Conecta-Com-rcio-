@@ -15,10 +15,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Store, MessageCircle, MapPin, Clock, CalendarDays, ClipboardList, Inbox, BarChart3, Settings, Users,
   ExternalLink, Download, Trash2, Pencil, CheckCircle2, X, ShieldCheck, PlusCircle, Search, LayoutDashboard,
-  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge,
+  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge, Building2,
 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { AbaEstrategias, AbaCalendario, AgendaPublicaSala } from "./SalaPlanejamento.jsx";
+import { AbaBaseEmpresas } from "./SalaEmpresas.jsx";
 import { AbaSelo, AbaGestao, AbaOrientacoes, AbaEmpreendedores, AbaIndicadores, OrientacoesPublicas, DocProtegido } from "./SalaGestao.jsx";
 
 // As mesmas categorias do relatório oficial do Sebrae (usadas também no
@@ -51,7 +52,9 @@ const STATUS_PEDIDO = {
 };
 
 export const LOGO_SALA = "/sala-do-empreendedor-logo.png";
-export const LINKS_SALA = { publico: "/sala", agente: "/sala/agente", admin: "/sala/admin" };
+// No site próprio da Sala (VITE_SITE=sala) os links são curtos: /publico, /agente, /admin
+export const SITE_SALA = import.meta.env.VITE_SITE === "sala";
+export const LINKS_SALA = SITE_SALA ? { publico: "/publico", agente: "/agente", admin: "/admin" } : { publico: "/sala", agente: "/sala/agente", admin: "/sala/admin" };
 
 const S = {
   blue: "var(--cor-principal, #0A5AA8)",
@@ -560,6 +563,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
     { id: "agenda", label: "Agenda", icon: CalendarDays },
     { id: "atendimentos", label: "Atendimentos", icon: ClipboardList },
     { id: "empreendedores", label: "Empreendedores", icon: Contact },
+    { id: "empresas", label: "Base de empresas", icon: Building2 },
     { id: "orientacoes", label: "Orientações", icon: BookOpen },
     { id: "estrategias", label: "Estratégias", icon: Target },
     { id: "calendario", label: "Calendário", icon: CalendarRange },
@@ -607,6 +611,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
         {abaAtual === "atendimentos" && <AbaAtendimentos ctx={ctx} />}
         {abaAtual === "indicadores" && <AbaIndicadores ctx={ctx} />}
         {abaAtual === "empreendedores" && <AbaEmpreendedores ctx={ctx} />}
+        {abaAtual === "empresas" && <AbaBaseEmpresas ctx={ctx} />}
         {abaAtual === "orientacoes" && <AbaOrientacoes ctx={ctx} />}
         {abaAtual === "gestao" && <AbaGestao ctx={ctx} />}
         {abaAtual === "selo" && <AbaSelo ctx={ctx} />}
