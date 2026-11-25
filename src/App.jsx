@@ -4792,7 +4792,8 @@ function AdminPanel() {
   // Enquetes — cadastro real (pergunta + opções) e encerrar/reabrir.
   // -------------------------------------------------------------------------
   const [enquetesAdmin, setEnquetesAdmin] = useState(null);
-  const ENQUETE_VAZIA = { pergunta: "", descricao: "", opcoes: [{ texto: "", foto_url: "" }, { texto: "", foto_url: "" }], exigir_localizacao: true, raio_km: 12, encerra_em: "" };
+  const ENQUETE_VAZIA = { pergunta: "", descricao: "", opcoes: [{ texto: "", foto_url: "" }, { texto: "", foto_url: "" }], exigir_localizacao: true, raio_km: 12, encerra_em: "", mostrar_resultado: false };
+  const [confirmandoZerar, setConfirmandoZerar] = useState(null);
   const [novaEnquete, setNovaEnquete] = useState(ENQUETE_VAZIA);
   const [enviandoFotoOpcao, setEnviandoFotoOpcao] = useState(null);
   const [comercianteParaOpcao, setComercianteParaOpcao] = useState("");
@@ -4824,8 +4825,48 @@ function AdminPanel() {
       exigir_localizacao: eq.exigir_localizacao !== false,
       raio_km: eq.raio_km ?? 12,
       encerra_em: eq.encerra_em ? new Date(eq.encerra_em).toISOString().slice(0, 10) : "",
+      mostrar_resultado: !!eq.mostrar_resultado,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const duplicarEnquete = (eq) => {
+    setEditandoEnqueteId(null);
+    setStatusEnquete("");
+    setNovaEnquete({
+      pergunta: `${eq.pergunta} (nova)`,
+      descricao: eq.descricao || "",
+      opcoes: (eq.opcoes || []).map(({ votos, existente, ...o }) => o),
+      exigir_localizacao: eq.exigir_localizacao !== false,
+      raio_km: eq.raio_km ?? 12,
+      encerra_em: "",
+      mostrar_resultado: false,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    notificar("Copiado para o formulário. Ajuste e clique em Publicar votação.");
+  };
+  const zerarEnquete = async (eq) => {
+    setConfirmandoZerar(null);
+    const zeradas = (eq.opcoes || []).map((o) => ({ ...o, votos: 0 }));
+    if (!supabaseConfigurado || String(eq.id).startsWith("demo-")) {
+      setEnquetesAdmin((atual) => (atual ?? listaEnquetes).map((x) => (x.id === eq.id ? { ...x, opcoes: zeradas } : x)));
+      notificar("Votos zerados.");
+      return;
+    }
+    const { data, error } = await supabase.rpc("zerar_enquete", { p_enquete: eq.id });
+    if (error) { notificar(/function|schema cache/i.test(error.message) ? "Falta rodar o arquivo supabase-votacao-resultado-admin.sql no Supabase." : "Não consegui zerar: " + error.message, "erro"); return; }
+    setEnquetesAdmin((atual) => (atual ?? []).map((x) => (x.id === eq.id ? { ...x, opcoes: data || zeradas } : x)));
+    notificar("Votos zerados. A votação recomeça do zero.");
+  };
+  const alternarResultadoPublico = async (eq) => {
+    const valor = !eq.mostrar_resultado;
+    if (!supabaseConfigurado || String(eq.id).startsWith("demo-")) {
+      setEnquetesAdmin((atual) => (atual ?? listaEnquetes).map((x) => (x.id === eq.id ? { ...x, mostrar_resultado: valor } : x)));
+      return;
+    }
+    const { error } = await supabase.from("enquetes").update({ mostrar_resultado: valor }).eq("id", eq.id);
+    if (error) { notificar(/column|schema cache/i.test(error.message) ? "Falta rodar o arquivo supabase-votacao-resultado-admin.sql no Supabase." : error.message, "erro"); return; }
+    setEnquetesAdmin((atual) => (atual ?? []).map((x) => (x.id === eq.id ? { ...x, mostrar_resultado: valor } : x)));
+    notificar(valor ? "Resultado liberado para o público." : "Resultado escondido. Só o admin vê.");
   };
   const cancelarEdicaoEnquete = () => { setEditandoEnqueteId(null); setNovaEnquete(ENQUETE_VAZIA); setStatusEnquete(""); };
   const adicionarComercianteNaEnquete = (id) => {
@@ -4871,6 +4912,7 @@ function AdminPanel() {
       exigir_localizacao: !!novaEnquete.exigir_localizacao,
       raio_km: Number(novaEnquete.raio_km) || 12,
       encerra_em: novaEnquete.encerra_em ? new Date(`${novaEnquete.encerra_em}T23:59:59`).toISOString() : null,
+      mostrar_resultado: !!novaEnquete.mostrar_resultado,
     };
     if (!supabaseConfigurado || String(editandoEnqueteId || "").startsWith("demo-")) {
       if (editandoEnqueteId) setEnquetesAdmin((atual) => (atual ?? listaEnquetes).map((x) => (x.id === editandoEnqueteId ? { ...x, ...registro } : x)));
@@ -4888,6 +4930,7 @@ function AdminPanel() {
         const votosAtuais = (atual?.opcoes || []).map((o) => o.votos || 0);
         registro.opcoes = registro.opcoes.map((o, i) => ({ ...o, votos: votosAtuais[i] ?? 0 }));
         const { data, error } = await supabase.from("enquetes").update(registro).eq("id", editandoEnqueteId).select().single();
+        if (error && /column|schema cache/i.test(error.message || "")) throw new Error("Falta rodar o arquivo supabase-votacao-resultado-admin.sql no SQL Editor do Supabase.");
         if (error) throw error;
         setEnquetesAdmin((lista) => (lista ?? []).map((x) => (x.id === data.id ? data : x)));
         setNovaEnquete(ENQUETE_VAZIA);
@@ -4897,7 +4940,7 @@ function AdminPanel() {
       }
       let { data, error } = await supabase.from("enquetes").insert({ ...registro, ativa: true }).select().single();
       if (error && /column|schema cache/i.test(error.message || "")) {
-        throw new Error("Falta rodar o arquivo supabase-votacao-publica.sql no SQL Editor do Supabase.");
+        throw new Error("Falta rodar no Supabase (SQL Editor) os arquivos supabase-votacao-publica.sql e supabase-votacao-resultado-admin.sql.");
       }
       if (error) throw error;
       setEnquetesAdmin((atual) => [data, ...(atual ?? [])]);
@@ -8249,6 +8292,10 @@ function AdminPanel() {
                     <input type="date" value={novaEnquete.encerra_em} onChange={(e) => setNovaEnquete((v) => ({ ...v, encerra_em: e.target.value }))} className="w-full mt-1 font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
                   </label>
                 </div>
+                <label className="flex items-start gap-2 font-body text-sm" style={{ color: C.ink }}>
+                  <input type="checkbox" className="mt-1" checked={!!novaEnquete.mostrar_resultado} onChange={(e) => setNovaEnquete((v) => ({ ...v, mostrar_resultado: e.target.checked }))} />
+                  <span><strong>Mostrar resultado ao público</strong><br /><span className="text-xs" style={{ color: "#5C7186" }}>Desmarcado: só o admin vê os votos (dá pra liberar depois, na lista abaixo)</span></span>
+                </label>
                 <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>Sempre: sem cadastro e 1 voto por aparelho.</p>
               </div>
 
@@ -8264,7 +8311,7 @@ function AdminPanel() {
                 const total = eq.opcoes.reduce((s, o) => s + (o.votos || 0), 0);
                 return (
                   <div key={eq.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
-                    <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 mb-3">
                       <div>
                         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{eq.pergunta}</p>
                         <p className="font-body text-[11px] mt-0.5" style={{ color: "#5C7186" }}>
@@ -8272,11 +8319,23 @@ function AdminPanel() {
                           {" · "}<button type="button" onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/#/votacao-${eq.id}`); notificar("Link da votação copiado."); }} className="font-bold" style={{ color: C.blue }}>copiar link</button>
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
                           style={{ background: eq.ativa ? "#E7F6EE" : C.blueTint, color: eq.ativa ? "#1E8E5A" : "#5C7186" }}>
                           {eq.ativa ? "Ativa" : "Encerrada"}
                         </span>
+                        <button onClick={() => alternarResultadoPublico(eq)} title="Quem pode ver o resultado" className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: eq.mostrar_resultado ? "#1E8E5A" : C.line, color: eq.mostrar_resultado ? "#1E8E5A" : "#425A70" }}>
+                          {eq.mostrar_resultado ? "👁 Resultado público" : "🔒 Resultado só admin"}
+                        </button>
+                        {confirmandoZerar === eq.id ? (
+                          <span className="flex items-center gap-1">
+                            <button onClick={() => zerarEnquete(eq)} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg text-white" style={{ background: "#B4462F" }}>Sim, zerar</button>
+                            <button onClick={() => setConfirmandoZerar(null)} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Não</button>
+                          </span>
+                        ) : (
+                          <button onClick={() => setConfirmandoZerar(eq.id)} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: C.line, color: "#B4462F" }}>Zerar votos</button>
+                        )}
+                        <button onClick={() => duplicarEnquete(eq)} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Duplicar como nova</button>
                         <button onClick={() => editarEnquete(eq)} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: C.line, color: C.blue }}>Editar</button>
                         <button onClick={() => alternarAtivaEnquete(eq.id, !eq.ativa)} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
                           {eq.ativa ? "Encerrar" : "Reabrir"}
@@ -14928,8 +14987,13 @@ function PaginaVotacao() {
       try { setMeusVotos(JSON.parse(localStorage.getItem("cc_votos_demo") || "{}")); } catch (_) {}
       return;
     }
-    supabase.from("enquetes").select("*").order("criada_em", { ascending: false }).then(({ data, error }) => {
-      if (!error) setLista(data || []); else setLista((a) => a ?? []);
+    supabase.rpc("enquetes_publicas").then(({ data, error }) => {
+      if (!error) { setLista(data || []); return; }
+      // Antes de rodar supabase-votacao-resultado-admin.sql a função não existe: lê a tabela direto.
+      supabase.from("enquetes").select("*").order("criada_em", { ascending: false }).then(({ data: d2, error: e2 }) => {
+        if (!e2) setLista((d2 || []).map((x) => ({ mostrar_resultado: false, ...x })));
+        else setLista((a) => a ?? []);
+      });
     });
   };
 
@@ -15001,7 +15065,8 @@ function PaginaVotacao() {
   const Cartao = ({ eq }) => {
     const fim = encerrada(eq);
     const votou = meusVotos[eq.id] !== undefined;
-    const mostrarResultado = fim || votou;
+    const mostrarResultado = fim || votou; // não deixa mais escolher
+    const verNumeros = mostrarResultado && !!eq.mostrar_resultado; // contagem só se o admin liberou
     const total = (eq.opcoes || []).reduce((s, o) => s + (o.votos || 0), 0);
     const temFoto = (eq.opcoes || []).some((o) => o.foto_url);
     const temVideo = (eq.opcoes || []).some((o) => o.video_url);
@@ -15012,12 +15077,12 @@ function PaginaVotacao() {
         <div className="px-5 py-5 text-white relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.blueDeep}, ${C.blue})` }}>
           <div className="absolute -right-6 -top-6 w-32 h-32 rounded-full opacity-20" style={{ background: C.amber, filter: "blur(30px)" }} />
           <span className="font-body text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full" style={{ background: fim ? "rgba(255,255,255,.15)" : C.amber, color: fim ? "#fff" : C.ink }}>
-            {fim ? "Encerrada · resultado final" : "Votação aberta"}
+            {fim ? (eq.mostrar_resultado ? "Encerrada · resultado final" : "Encerrada") : "Votação aberta"}
           </span>
           <h3 className="font-display text-xl md:text-2xl font-extrabold mt-3 relative">{eq.pergunta}</h3>
           {eq.descricao && <p className="font-body text-sm text-white/80 mt-1.5 relative">{eq.descricao}</p>}
           <div className="flex flex-wrap items-center gap-3 mt-3 font-body text-[11px] text-white/75 relative">
-            <span>{total} {total === 1 ? "voto" : "votos"}</span>
+            {eq.mostrar_resultado && <span>{total} {total === 1 ? "voto" : "votos"}</span>}
             {eq.exigir_localizacao && <span className="flex items-center gap-1"><MapPin size={11} /> Só para quem está em {nomeCidade}</span>}
             {eq.encerra_em && !fim && <span>Até {new Date(eq.encerra_em).toLocaleDateString("pt-BR")}</span>}
             <button onClick={() => compartilhar(eq)} className="flex items-center gap-1 font-bold text-white"><Share2 size={11} /> Compartilhar</button>
@@ -15026,9 +15091,15 @@ function PaginaVotacao() {
 
         <div className="p-4 md:p-5">
           {votou && !fim && (
-            <p className="font-body text-sm font-semibold flex items-center gap-1.5 mb-4" style={{ color: "#1E8E5A" }}>
-              <CheckCircle2 size={16} /> Seu voto foi registrado! Obrigado por participar.
-            </p>
+            <div className="rounded-xl px-3 py-2.5 mb-4" style={{ background: "#E7F6EE" }}>
+              <p className="font-body text-sm font-semibold flex items-center gap-1.5" style={{ color: "#1E8E5A" }}>
+                <CheckCircle2 size={16} /> Seu voto foi registrado! Obrigado por participar.
+              </p>
+              {!eq.mostrar_resultado && <p className="font-body text-xs mt-0.5" style={{ color: "#2F6B4E" }}>O resultado será divulgado pela organização{eq.encerra_em ? ` após ${new Date(eq.encerra_em).toLocaleDateString("pt-BR")}` : ""}.</p>}
+            </div>
+          )}
+          {fim && !eq.mostrar_resultado && (
+            <p className="font-body text-sm font-semibold mb-4" style={{ color: "#425A70" }}>Votação encerrada. O resultado será divulgado pela organização.</p>
           )}
 
           <div className={rico ? "grid grid-cols-1 md:grid-cols-2 gap-4" : temFoto ? "grid grid-cols-2 md:grid-cols-3 gap-3" : "flex flex-col gap-2.5"}>
@@ -15036,7 +15107,7 @@ function PaginaVotacao() {
               const pct = total ? Math.round(((o.votos || 0) / total) * 100) : 0;
               const selecionada = escolha[eq.id] === i;
               const meu = meusVotos[eq.id] === i;
-              const lider = mostrarResultado && total > 0 && (o.votos || 0) === maior;
+              const lider = verNumeros && total > 0 && (o.votos || 0) === maior;
               const chaveHist = `${eq.id}-${i}`;
               const histAberta = !!historiaAberta[chaveHist];
               const legendaLonga = (o.legenda || "").length > 160;
@@ -15092,7 +15163,7 @@ function PaginaVotacao() {
                       </div>
                     )}
                     {meu && <p className="font-body text-[10px] font-bold mt-2" style={{ color: C.blue }}>✓ Seu voto</p>}
-                    {mostrarResultado && (
+                    {verNumeros && (
                       <div className="mt-auto pt-2">
                         <div className="flex justify-between font-body text-[11px] mb-1" style={{ color: "#425A70" }}>
                           <span>{o.votos || 0} {(o.votos || 0) === 1 ? "voto" : "votos"}</span>
