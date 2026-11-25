@@ -24,6 +24,7 @@ const MES_NOME = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "J
 const hojeISO = () => new Date().toLocaleDateString("sv-SE");
 const dataBR = (iso) => (iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR") : "—");
 const diaMes = (iso) => (iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "");
+const resumir = (t, n = 180) => { const x = String(t || "").replace(/\s+/g, " ").trim(); return x.length > n ? `${x.slice(0, n - 1)}…` : x; };
 const num = (n) => Number(n || 0).toLocaleString("pt-BR");
 const inputCls = "font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white w-full";
 const inputStyle = { borderColor: R.line };
@@ -219,6 +220,17 @@ function Capa({ r, selo, publico }) {
   );
 }
 
+function Descricao({ texto }) {
+  const [aberto, setAberto] = useState(false);
+  const longo = texto.length > 160 || texto.split("\n").length > 3;
+  return (
+    <>
+      <p className={`font-body text-xs mt-0.5 whitespace-pre-line ${longo && !aberto ? "line-clamp-3" : ""}`} style={{ color: R.muted }}>{texto}</p>
+      {longo && <button onClick={() => setAberto(!aberto)} className="font-body text-[11px] font-bold mt-0.5" style={{ color: R.blueHex }}>{aberto ? "ver menos" : "ver mais"}</button>}
+    </>
+  );
+}
+
 function FiltroGrupos({ r, filtro, setFiltro }) {
   const qtd = (g) => r.itens.filter((i) => i.grupo === g && i.rotulo !== "Estratégia iniciada").length;
   const opcoes = [["", "Tudo", r.itens.length], ...Object.entries(GRUPOS).map(([k, g]) => [k, `${g.emoji} ${g.r}`, qtd(k)])];
@@ -292,7 +304,7 @@ function LinhaDoTempo({ r, filtro = "", onEditar, onApagar }) {
                             {[i.local && `📍 ${i.local}`, i.participantes > 0 && `🙋 ${num(i.participantes)} participante${i.participantes === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}
                           </p>
                         )}
-                        {i.descricao && <p className="font-body text-xs mt-0.5 whitespace-pre-line" style={{ color: R.muted }}>{i.descricao}</p>}
+                        {i.descricao && <Descricao texto={i.descricao} />}
                       </div>
                       {onEditar && i.origem === "marco" && (
                         <div className="flex flex-col gap-1 shrink-0">
@@ -454,7 +466,7 @@ export function AbaRetrospectiva({ ctx }) {
     ];
     Object.entries(GRUPOS).forEach(([g, info]) => {
       const lista = r.itens.filter((i) => i.grupo === g && i.rotulo !== "Estratégia iniciada");
-      if (lista.length) secoes.push({ titulo: info.r, cabecalho: ["Data", "Tipo", "O quê", "Local", "Participantes", "Detalhes"], linhas: lista.map((i) => [dataBR(i.data), i.rotulo, i.titulo, i.local || "", i.participantes ? num(i.participantes) : "", i.descricao || ""]) });
+      if (lista.length) secoes.push({ titulo: info.r, cabecalho: ["Data", "Tipo", "O quê", "Local", "Participantes", "Detalhes"], linhas: lista.map((i) => [dataBR(i.data), i.rotulo, i.titulo, i.local || "", i.participantes ? num(i.participantes) : "", resumir(i.descricao)]) });
     });
     exportarPDF(`retrospectiva-sala-do-empreendedor-${ano}`, `Retrospectiva ${ano} — Sala do Empreendedor`, secoes, "Atendimentos: fichas registradas + totais lançados (GISE). Eventos, estratégias e marcos lançados na plataforma.", "Sala do Empreendedor · Ivatuba-PR");
   };
