@@ -4797,19 +4797,37 @@ function AdminPanel() {
   const [enviandoFotoOpcao, setEnviandoFotoOpcao] = useState(null);
   const [comercianteParaOpcao, setComercianteParaOpcao] = useState("");
   const mudarOpcao = (i, campo, valor) => setNovaEnquete((v) => ({ ...v, opcoes: v.opcoes.map((o, j) => (j === i ? { ...o, [campo]: valor } : o)) }));
-  const enviarFotoOpcao = (i, e) => {
+  const [editandoEnqueteId, setEditandoEnqueteId] = useState(null);
+  const enviarFotoOpcao = (i, e, tipo = "foto") => {
     const arquivo = e.target.files?.[0];
+    e.target.value = "";
     if (!arquivo) return;
-    if (!supabaseConfigurado) { mudarOpcao(i, "foto_url", URL.createObjectURL(arquivo)); return; }
-    setEnviandoFotoOpcao(i);
+    const campo = tipo === "video" ? "video_url" : "foto_url";
+    if (tipo === "video" && arquivo.size > 50 * 1024 * 1024) { notificar("Vídeo muito grande (máx. 50 MB). Grave mais curto ou em qualidade menor.", "erro"); return; }
+    if (!supabaseConfigurado) { mudarOpcao(i, campo, URL.createObjectURL(arquivo)); return; }
+    setEnviandoFotoOpcao(`${i}-${tipo}`);
     const caminho = `votacao/${Date.now()}-${arquivo.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-    supabase.storage.from("uploads").upload(caminho, arquivo).then(({ error }) => {
+    supabase.storage.from("uploads").upload(caminho, arquivo, { contentType: arquivo.type }).then(({ error }) => {
       setEnviandoFotoOpcao(null);
-      if (error) { notificar("Não consegui enviar a foto: " + error.message, "erro"); return; }
+      if (error) { notificar(`Não consegui enviar ${tipo === "video" ? "o vídeo" : "a foto"}: ` + error.message, "erro"); return; }
       const { data: pub } = supabase.storage.from("uploads").getPublicUrl(caminho);
-      mudarOpcao(i, "foto_url", pub.publicUrl);
+      mudarOpcao(i, campo, pub.publicUrl);
     });
   };
+  const editarEnquete = (eq) => {
+    setEditandoEnqueteId(eq.id);
+    setStatusEnquete("");
+    setNovaEnquete({
+      pergunta: eq.pergunta || "",
+      descricao: eq.descricao || "",
+      opcoes: (eq.opcoes || []).map((o) => ({ ...o, existente: true })),
+      exigir_localizacao: eq.exigir_localizacao !== false,
+      raio_km: eq.raio_km ?? 12,
+      encerra_em: eq.encerra_em ? new Date(eq.encerra_em).toISOString().slice(0, 10) : "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const cancelarEdicaoEnquete = () => { setEditandoEnqueteId(null); setNovaEnquete(ENQUETE_VAZIA); setStatusEnquete(""); };
   const adicionarComercianteNaEnquete = (id) => {
     const emp = listaEmpresas.find((x) => String(x.id) === String(id));
     if (!emp) return;
@@ -4837,28 +4855,47 @@ function AdminPanel() {
   const publicarEnquete = async (e) => {
     e.preventDefault();
     setStatusEnquete("");
+    const limpar = (v) => (typeof v === "string" ? v.trim() : v);
     const opcoes = novaEnquete.opcoes
       .filter((o) => o.texto.trim())
-      .map((o) => ({ texto: o.texto.trim(), votos: 0, ...(o.foto_url ? { foto_url: o.foto_url } : {}), ...(o.empresa_id ? { empresa_id: o.empresa_id } : {}) }));
+      .map((o) => {
+        const r = { texto: o.texto.trim(), votos: o.votos || 0 };
+        ["titulo", "legenda", "promocao", "foto_url", "video_url", "empresa_id"].forEach((k) => { if (limpar(o[k])) r[k] = limpar(o[k]); });
+        return r;
+      });
     if (!novaEnquete.pergunta.trim() || opcoes.length < 2) { setStatusEnquete("Informe o título e ao menos 2 opções."); return; }
     const registro = {
       pergunta: novaEnquete.pergunta.trim(),
       descricao: novaEnquete.descricao.trim() || null,
       opcoes,
-      ativa: true,
       exigir_localizacao: !!novaEnquete.exigir_localizacao,
       raio_km: Number(novaEnquete.raio_km) || 12,
       encerra_em: novaEnquete.encerra_em ? new Date(`${novaEnquete.encerra_em}T23:59:59`).toISOString() : null,
     };
-    if (!supabaseConfigurado) {
-      setEnquetesAdmin((atual) => [{ id: `demo-${Date.now()}`, ...registro }, ...(atual ?? listaEnquetes)]);
+    if (!supabaseConfigurado || String(editandoEnqueteId || "").startsWith("demo-")) {
+      if (editandoEnqueteId) setEnquetesAdmin((atual) => (atual ?? listaEnquetes).map((x) => (x.id === editandoEnqueteId ? { ...x, ...registro } : x)));
+      else setEnquetesAdmin((atual) => [{ id: `demo-${Date.now()}`, ativa: true, ...registro }, ...(atual ?? listaEnquetes)]);
       setNovaEnquete(ENQUETE_VAZIA);
+      setEditandoEnqueteId(null);
       setStatusEnquete("ok");
       return;
     }
     setPublicandoEnquete(true);
     try {
-      let { data, error } = await supabase.from("enquetes").insert(registro).select().single();
+      if (editandoEnqueteId) {
+        // Pega os votos mais recentes antes de salvar, pra não apagar votos que chegaram enquanto editava.
+        const { data: atual } = await supabase.from("enquetes").select("opcoes").eq("id", editandoEnqueteId).single();
+        const votosAtuais = (atual?.opcoes || []).map((o) => o.votos || 0);
+        registro.opcoes = registro.opcoes.map((o, i) => ({ ...o, votos: votosAtuais[i] ?? 0 }));
+        const { data, error } = await supabase.from("enquetes").update(registro).eq("id", editandoEnqueteId).select().single();
+        if (error) throw error;
+        setEnquetesAdmin((lista) => (lista ?? []).map((x) => (x.id === data.id ? data : x)));
+        setNovaEnquete(ENQUETE_VAZIA);
+        setEditandoEnqueteId(null);
+        setStatusEnquete("ok");
+        return;
+      }
+      let { data, error } = await supabase.from("enquetes").insert({ ...registro, ativa: true }).select().single();
       if (error && /column|schema cache/i.test(error.message || "")) {
         throw new Error("Falta rodar o arquivo supabase-votacao-publica.sql no SQL Editor do Supabase.");
       }
@@ -8149,7 +8186,10 @@ function AdminPanel() {
             </div>
 
             <form onSubmit={publicarEnquete} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-2xl mb-6" style={{ borderColor: C.line }}>
-              <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Criar nova votação / enquete</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{editandoEnqueteId ? "Editando votação" : "Criar nova votação / enquete"}</p>
+                {editandoEnqueteId && <button type="button" onClick={cancelarEdicaoEnquete} className="font-body text-xs font-bold" style={{ color: "#B4462F" }}>Cancelar edição</button>}
+              </div>
               <input value={novaEnquete.pergunta} onChange={(e) => setNovaEnquete((v) => ({ ...v, pergunta: e.target.value }))} placeholder='Título (ex.: "Meu Comércio Iluminado 2026 — vote na fachada mais bonita")' className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               <textarea value={novaEnquete.descricao} onChange={(e) => setNovaEnquete((v) => ({ ...v, descricao: e.target.value }))} rows={2} placeholder="Descrição / regras (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
 
@@ -8163,15 +8203,31 @@ function AdminPanel() {
 
               <p className="font-body text-xs font-bold mt-1" style={{ color: C.ink }}>Opções ({novaEnquete.opcoes.length})</p>
               {novaEnquete.opcoes.map((o, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <label className="w-12 h-12 rounded-lg border shrink-0 overflow-hidden flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, background: C.blueTint2 }} title="Foto da opção (opcional)">
-                    {o.foto_url ? <img src={o.foto_url} alt="" className="w-full h-full object-cover" /> : <span className="font-body text-[9px] text-center leading-tight" style={{ color: "#5C7186" }}>{enviandoFotoOpcao === i ? "..." : "+ foto"}</span>}
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => enviarFotoOpcao(i, e)} />
-                  </label>
-                  <input value={o.texto} onChange={(e) => mudarOpcao(i, "texto", e.target.value)} placeholder={`Opção ${i + 1} (ex.: nome do comércio)`} className="flex-1 min-w-0 font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-                  {novaEnquete.opcoes.length > 2 && (
-                    <button type="button" onClick={() => setNovaEnquete((v) => ({ ...v, opcoes: v.opcoes.filter((_, j) => j !== i) }))} style={{ color: "#B4462F" }}><Trash2 size={14} /></button>
-                  )}
+                <div key={i} className="rounded-xl border p-3 flex flex-col gap-2" style={{ borderColor: C.line, background: "#fff" }}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-14 h-14 rounded-lg border shrink-0 overflow-hidden flex items-center justify-center" style={{ borderColor: C.line, background: C.blueTint2 }}>
+                      {o.video_url ? <video src={o.video_url} muted playsInline className="w-full h-full object-cover" /> : o.foto_url ? <img src={o.foto_url} alt="" className="w-full h-full object-cover" /> : <span className="font-body text-[9px] text-center" style={{ color: "#5C7186" }}>sem mídia</span>}
+                    </div>
+                    <input value={o.texto} onChange={(e) => mudarOpcao(i, "texto", e.target.value)} placeholder={`Comércio ${i + 1} (nome)`} className="flex-1 min-w-0 font-body text-sm font-semibold border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                    {novaEnquete.opcoes.length > 2 && !o.existente && (
+                      <button type="button" onClick={() => setNovaEnquete((v) => ({ ...v, opcoes: v.opcoes.filter((_, j) => j !== i) }))} style={{ color: "#B4462F" }} title="Remover"><Trash2 size={14} /></button>
+                    )}
+                  </div>
+                  <input value={o.titulo || ""} onChange={(e) => mudarOpcao(i, "titulo", e.target.value)} placeholder='Título da decoração (ex.: "Natal Encantado na Farma Luz")' className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                  <textarea value={o.legenda || ""} onChange={(e) => mudarOpcao(i, "legenda", e.target.value)} rows={3} placeholder="Legenda / história: como nasceu a decoração, quem montou, o que significa..." className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                  <input value={o.promocao || ""} onChange={(e) => mudarOpcao(i, "promocao", e.target.value)} placeholder='🎁 Promoção de Natal (ex.: "10% off mostrando esta tela no caixa até 24/12")' className="font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="font-body text-xs font-bold px-3 py-1.5 rounded-lg border cursor-pointer" style={{ borderColor: C.line, color: C.blue }}>
+                      {enviandoFotoOpcao === `${i}-foto` ? "Enviando..." : o.foto_url ? "📷 Trocar foto" : "📷 Enviar foto"}
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => enviarFotoOpcao(i, e, "foto")} />
+                    </label>
+                    <label className="font-body text-xs font-bold px-3 py-1.5 rounded-lg border cursor-pointer" style={{ borderColor: C.line, color: C.blue }}>
+                      {enviandoFotoOpcao === `${i}-video` ? "Enviando vídeo..." : o.video_url ? "🎬 Trocar vídeo" : "🎬 Enviar vídeo"}
+                      <input type="file" accept="video/*" className="hidden" onChange={(e) => enviarFotoOpcao(i, e, "video")} />
+                    </label>
+                    {o.video_url && <button type="button" onClick={() => mudarOpcao(i, "video_url", "")} className="font-body text-[11px]" style={{ color: "#B4462F" }}>remover vídeo</button>}
+                    {o.existente && <span className="font-body text-[10px]" style={{ color: "#8896A6" }}>{o.votos || 0} votos</span>}
+                  </div>
                 </div>
               ))}
               <button type="button" onClick={() => setNovaEnquete((v) => ({ ...v, opcoes: [...v.opcoes, { texto: "", foto_url: "" }] }))} className="font-body text-xs font-bold self-start px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: C.blue }}>
@@ -8197,9 +8253,9 @@ function AdminPanel() {
               </div>
 
               {statusEnquete && statusEnquete !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusEnquete}</p>}
-              {statusEnquete === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Publicada! Já aparece em {`${window.location.origin}/#/votacao`}</p>}
+              {statusEnquete === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Salvo! Já aparece em {`${window.location.origin}/#/votacao`}</p>}
               <button type="submit" disabled={publicandoEnquete} className="glow-btn font-body text-sm font-bold text-white rounded-lg py-2.5 flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: C.blue }}>
-                <Vote size={14} /> {publicandoEnquete ? "Publicando..." : "Publicar votação"}
+                <Vote size={14} /> {publicandoEnquete ? "Salvando..." : editandoEnqueteId ? "Salvar alterações" : "Publicar votação"}
               </button>
             </form>
 
@@ -8221,6 +8277,7 @@ function AdminPanel() {
                           style={{ background: eq.ativa ? "#E7F6EE" : C.blueTint, color: eq.ativa ? "#1E8E5A" : "#5C7186" }}>
                           {eq.ativa ? "Ativa" : "Encerrada"}
                         </span>
+                        <button onClick={() => editarEnquete(eq)} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: C.line, color: C.blue }}>Editar</button>
                         <button onClick={() => alternarAtivaEnquete(eq.id, !eq.ativa)} className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
                           {eq.ativa ? "Encerrar" : "Reabrir"}
                         </button>
@@ -14857,6 +14914,7 @@ function PaginaVotacao() {
   const [votando, setVotando] = useState(null);
   const [erros, setErros] = useState({});
   const [aberta, setAberta] = useState(null); // id da votação aberta (quando há mais de uma)
+  const [historiaAberta, setHistoriaAberta] = useState({});
   const dispositivo = useMemo(() => idDoAparelho(), []);
 
   useEffect(() => {
@@ -14946,6 +15004,8 @@ function PaginaVotacao() {
     const mostrarResultado = fim || votou;
     const total = (eq.opcoes || []).reduce((s, o) => s + (o.votos || 0), 0);
     const temFoto = (eq.opcoes || []).some((o) => o.foto_url);
+    const temVideo = (eq.opcoes || []).some((o) => o.video_url);
+    const rico = temVideo || (eq.opcoes || []).some((o) => o.legenda || o.titulo || o.promocao);
     const maior = Math.max(0, ...(eq.opcoes || []).map((o) => o.votos || 0));
     return (
       <div className="rounded-3xl border overflow-hidden bg-white shadow-sm" style={{ borderColor: C.line }}>
@@ -14971,36 +15031,69 @@ function PaginaVotacao() {
             </p>
           )}
 
-          <div className={temFoto ? "grid grid-cols-2 md:grid-cols-3 gap-3" : "flex flex-col gap-2.5"}>
+          <div className={rico ? "grid grid-cols-1 md:grid-cols-2 gap-4" : temFoto ? "grid grid-cols-2 md:grid-cols-3 gap-3" : "flex flex-col gap-2.5"}>
             {(eq.opcoes || []).map((o, i) => {
               const pct = total ? Math.round(((o.votos || 0) / total) * 100) : 0;
               const selecionada = escolha[eq.id] === i;
               const meu = meusVotos[eq.id] === i;
               const lider = mostrarResultado && total > 0 && (o.votos || 0) === maior;
+              const chaveHist = `${eq.id}-${i}`;
+              const histAberta = !!historiaAberta[chaveHist];
+              const legendaLonga = (o.legenda || "").length > 160;
+              const escolher = () => { if (!mostrarResultado) setEscolha((v) => ({ ...v, [eq.id]: i })); };
               return (
-                <button key={i} type="button" disabled={mostrarResultado}
-                  onClick={() => setEscolha((v) => ({ ...v, [eq.id]: i }))}
-                  className="text-left rounded-2xl border-2 overflow-hidden transition-all relative"
-                  style={{ borderColor: selecionada || meu ? C.blue : C.line, background: selecionada ? C.blueTint2 : "#fff", cursor: mostrarResultado ? "default" : "pointer" }}>
-                  {temFoto && (
-                    <div className="aspect-[4/3] w-full" style={{ background: C.blueTint }}>
-                      {o.foto_url && <img src={o.foto_url} alt={o.texto} loading="lazy" className="w-full h-full object-cover" />}
+                <div key={i} role="button" tabIndex={0} onClick={escolher} onKeyDown={(e) => { if (e.key === "Enter") escolher(); }}
+                  className="text-left rounded-2xl border-2 overflow-hidden transition-all relative flex flex-col"
+                  style={{ borderColor: selecionada || meu ? C.blue : C.line, background: selecionada ? C.blueTint2 : "#fff", cursor: mostrarResultado ? "default" : "pointer", boxShadow: selecionada ? "0 8px 24px rgba(10,90,168,.15)" : "none" }}>
+                  {(temFoto || temVideo) && (
+                    <div className={`${rico ? "aspect-video" : "aspect-[4/3]"} w-full relative`} style={{ background: C.blueTint }}>
+                      {o.video_url ? (
+                        <video src={o.video_url} poster={o.foto_url || undefined} controls playsInline preload="metadata"
+                          onClick={(e) => e.stopPropagation()} className="w-full h-full object-cover bg-black" />
+                      ) : o.foto_url ? (
+                        <img src={o.foto_url} alt={o.titulo || o.texto} loading="lazy" className="w-full h-full object-cover" />
+                      ) : null}
+                      {o.video_url && <span className="absolute top-2 left-2 font-body text-[10px] font-bold px-2 py-0.5 rounded-full text-white pointer-events-none" style={{ background: "rgba(0,0,0,.55)" }}>🎬 Vídeo</span>}
                     </div>
                   )}
-                  <div className="p-3">
+                  <div className="p-3 flex flex-col flex-1">
                     <div className="flex items-start gap-2">
                       {!mostrarResultado && (
                         <span className="mt-0.5 w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center" style={{ borderColor: selecionada ? C.blue : "#B8C7D6" }}>
                           {selecionada && <span className="w-2 h-2 rounded-full" style={{ background: C.blue }} />}
                         </span>
                       )}
-                      <p className="font-body text-sm font-semibold leading-snug" style={{ color: C.ink }}>
-                        {lider && "🏆 "}{o.texto}
-                      </p>
+                      <div className="min-w-0">
+                        {o.titulo && <p className="font-display text-base font-extrabold leading-snug" style={{ color: C.ink }}>{lider && "🏆 "}{o.titulo}</p>}
+                        <p className={`font-body leading-snug ${o.titulo ? "text-xs font-bold" : "text-sm font-semibold"}`} style={{ color: o.titulo ? C.blue : C.ink }}>
+                          {!o.titulo && lider && "🏆 "}{o.texto}
+                        </p>
+                      </div>
                     </div>
-                    {meu && <p className="font-body text-[10px] font-bold mt-1" style={{ color: C.blue }}>Seu voto</p>}
-                    {mostrarResultado && (
+                    {o.legenda && (
                       <div className="mt-2">
+                        <p className="font-body text-[13px] leading-relaxed whitespace-pre-line" style={{ color: "#425A70", ...(legendaLonga && !histAberta ? { display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" } : {}) }}>
+                          {o.legenda}
+                        </p>
+                        {legendaLonga && (
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setHistoriaAberta((v) => ({ ...v, [chaveHist]: !histAberta })); }} className="font-body text-xs font-bold mt-1" style={{ color: C.blue }}>
+                            {histAberta ? "Mostrar menos" : "Ler a história completa"}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {o.promocao && (
+                      <div className="mt-2.5 rounded-xl px-3 py-2 flex gap-2 items-start" style={{ background: "linear-gradient(135deg,#FFF4E0,#FDE7E4)", border: "1px dashed #E8A23D" }}>
+                        <span className="text-base leading-none">🎁</span>
+                        <div>
+                          <p className="font-body text-[10px] font-extrabold uppercase tracking-wide" style={{ color: "#B4462F" }}>Promoção de Natal</p>
+                          <p className="font-body text-xs font-semibold" style={{ color: "#5A3A12" }}>{o.promocao}</p>
+                        </div>
+                      </div>
+                    )}
+                    {meu && <p className="font-body text-[10px] font-bold mt-2" style={{ color: C.blue }}>✓ Seu voto</p>}
+                    {mostrarResultado && (
+                      <div className="mt-auto pt-2">
                         <div className="flex justify-between font-body text-[11px] mb-1" style={{ color: "#425A70" }}>
                           <span>{o.votos || 0} {(o.votos || 0) === 1 ? "voto" : "votos"}</span>
                           <span className="font-bold">{pct}%</span>
@@ -15011,13 +15104,13 @@ function PaginaVotacao() {
                       </div>
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
 
           {!mostrarResultado && (
-            <div className="mt-4">
+            <div className={rico ? "mt-4 sticky bottom-3 z-10 rounded-2xl p-2 -mx-2" : "mt-4"} style={rico ? { background: "rgba(255,255,255,.92)", backdropFilter: "blur(8px)" } : undefined}>
               {erros[eq.id] && <p className="font-body text-xs mb-2" style={{ color: "#B4462F" }}>{erros[eq.id]}</p>}
               <button onClick={() => votar(eq)} disabled={votando === eq.id}
                 className="glow-btn w-full font-body text-sm font-bold text-white rounded-xl py-3 flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: C.blue }}>
