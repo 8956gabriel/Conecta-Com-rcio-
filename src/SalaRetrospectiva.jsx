@@ -170,7 +170,7 @@ function textoResumo(r, selo) {
   if (selo) linhas.push(`${selo.emoji} Selo Sebrae: ${selo.r} (${selo.pontos.toFixed(0)} pontos com evidência)`);
   if (r.itens.length) {
     linhas.push("", "*O que fizemos:*");
-    r.itens.filter((i) => i.rotulo !== "Estratégia iniciada").forEach((i) => linhas.push(`${i.emoji} ${diaMes(i.data)} — ${i.titulo}${i.participantes ? ` (${num(i.participantes)} participantes)` : ""}`));
+    r.itens.filter((i) => i.rotulo !== "Estratégia iniciada" && i.grupo !== "noticias").forEach((i) => linhas.push(`${i.emoji} ${diaMes(i.data)} — ${i.titulo}${i.participantes ? ` (${num(i.participantes)} participantes)` : ""}`));
   }
   linhas.push("", "Obrigado a todos os empreendedores que passaram pela Sala! 💙");
   return linhas.join("\n");
