@@ -18,9 +18,9 @@ if (!import.meta.env.VITE_SITE) {
   if (destino) window.history.replaceState(null, "", destino);
 }
 
-// VITE_SITE=fomento → site do Fomento · VITE_SITE=maisbb → Mais BB Digital · vazio → Conecta Comércio
+// VITE_SITE=fomento → site do Fomento · VITE_SITE=maisbb → Mais BB Digital · VITE_SITE=sala → Sala do Empreendedor · vazio → Conecta Comércio
 const SITE = import.meta.env.VITE_SITE;
-const carregar = SITE === "fomento" ? import("./FomentoSite.jsx") : SITE === "maisbb" ? import("./maisbb/MaisBBSite.jsx") : import("./App.jsx");
+const carregar = SITE === "fomento" ? import("./FomentoSite.jsx") : SITE === "maisbb" ? import("./maisbb/MaisBBSite.jsx") : SITE === "sala" ? import("./SalaSite.jsx") : import("./App.jsx");
 // Crédito do desenvolvedor no fim de todas as páginas/abas dos três sites.
 function CreditoDesenvolvedor() {
   return (

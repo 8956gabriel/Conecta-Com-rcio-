@@ -954,7 +954,7 @@ export function PortalAcesso() {
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-10">
       <div className="text-center max-w-2xl mx-auto mb-8">
-        <img src="/sala-do-empreendedor-logo.png" alt="Sala do Empreendedor" className="h-16 md:h-20 w-auto mx-auto object-contain" />
+        <img src="/sala-do-empreendedor-logo.png" alt="Sala do Empreendedor" className="h-16 md:h-20 w-auto mx-auto object-contain mix-blend-multiply" />
         <h1 className="font-display font-extrabold text-3xl md:text-4xl mt-4" style={{ color: G.ink }}>Como você quer entrar?</h1>
         <p className="font-body text-sm mt-2" style={{ color: G.muted }}>Escolha a área de acordo com o seu perfil.</p>
       </div>

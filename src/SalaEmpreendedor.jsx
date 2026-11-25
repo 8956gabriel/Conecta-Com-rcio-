@@ -51,7 +51,9 @@ const STATUS_PEDIDO = {
 };
 
 export const LOGO_SALA = "/sala-do-empreendedor-logo.png";
-export const LINKS_SALA = { publico: "/sala", agente: "/sala/agente", admin: "/sala/admin" };
+// No site próprio da Sala (VITE_SITE=sala) os links são curtos: /publico, /agente, /admin
+export const SITE_SALA = import.meta.env.VITE_SITE === "sala";
+export const LINKS_SALA = SITE_SALA ? { publico: "/publico", agente: "/agente", admin: "/admin" } : { publico: "/sala", agente: "/sala/agente", admin: "/sala/admin" };
 
 const S = {
   blue: "var(--cor-principal, #0A5AA8)",
