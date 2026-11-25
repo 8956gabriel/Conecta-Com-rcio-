@@ -25,6 +25,10 @@
       "destination": "/"
     },
     {
+      "source": "/acesso",
+      "destination": "/"
+    },
+    {
       "source": "/agente",
       "destination": "/"
     },

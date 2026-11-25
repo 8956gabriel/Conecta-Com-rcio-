@@ -14,7 +14,7 @@ registerSW({ immediate: true });
 // Sala do Empreendedor: /sala (público), /sala/agente (atendente), /sala/admin (gestão).
 if (!import.meta.env.VITE_SITE) {
   const p = window.location.pathname.toLowerCase().replace(/\/+$/, "");
-  const destino = { "/fomento": "/#/fomento", "/fomento/publico": "/#/fomento", "/fomento/agente": "/#/fomento-agente", "/fomento/admin": "/#/fomento-admin", "/sala": "/#/sala", "/sala/publico": "/#/sala", "/sala/agente": "/#/sala-agente", "/sala/atendente": "/#/sala-agente", "/sala/admin": "/#/sala-admin" }[p];
+  const destino = { "/fomento": "/#/fomento", "/fomento/publico": "/#/fomento", "/fomento/agente": "/#/fomento-agente", "/fomento/admin": "/#/fomento-admin", "/sala": "/#/sala", "/sala/publico": "/#/sala", "/sala/agente": "/#/sala-agente", "/sala/atendente": "/#/sala-agente", "/sala/admin": "/#/sala-admin", "/acesso": "/#/acesso", "/sala/acesso": "/#/acesso" }[p];
   if (destino) window.history.replaceState(null, "", destino);
 }
 
