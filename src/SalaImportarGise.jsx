@@ -122,6 +122,28 @@ async function lerPDF(arquivo) {
   }
   return linhas;
 }
+// Relatório anual do GISE/Sebrae ("Relatório de Atendimento - Sala do Empreendedor - Ano 2026",
+// colunas TOTAIS Jan..Dez). Pega só as linhas dos tipos principais (as subcategorias somam neles).
+function lerRelatorioAnual(linhas, categorias) {
+  const texto = linhas.map((l) => l.join(" ")).join("\n");
+  const ano = Number((texto.match(/Ano\s+(\d{4})/i) || [])[1]);
+  if (!ano) return null;
+  const grade = {};
+  linhas.forEach((l) => {
+    const partes = l.join(" ").trim().split(/\s+/);
+    if (partes.length < 14) return;
+    const nums = partes.slice(-13);
+    if (!nums.every((n) => /^\d+$/.test(n))) return;
+    const nome = partes.slice(0, -13).join(" ");
+    const cat = categorias.find((c) => semAcento(c) === semAcento(nome));
+    if (!cat) return;
+    const meses = nums.slice(1).map(Number);
+    if (meses.reduce((a, b) => a + b, 0) !== Number(nums[0])) return;
+    grade[cat] = meses;
+  });
+  return Object.keys(grade).length ? { ano, grade } : null;
+}
+
 function acharCabecalho(linhas) {
   let melhor = { i: -1, pontos: 0 };
   linhas.slice(0, 40).forEach((l, i) => {
@@ -160,13 +182,16 @@ export function ImportarGise({ ctx, categorias, onFechar }) {
   const [lendo, setLendo] = useState(false);
   const [gravando, setGravando] = useState(false);
   const [erro, setErro] = useState("");
+  const [anual, setAnual] = useState(null); // { ano, grade: { categoria: [12 meses] } }
 
   const abrir = async (f) => {
     if (!f) return;
-    setErro(""); setLendo(true); setArquivo(f); setLinhas(null);
+    setErro(""); setLendo(true); setArquivo(f); setLinhas(null); setAnual(null);
     try {
       const ehPDF = /\.pdf$/i.test(f.name) || f.type === "application/pdf";
       const l = ehPDF ? await lerPDF(f) : await lerTabela(f);
+      const rel = lerRelatorioAnual(l.map((x) => (x || []).map((c) => String(c ?? ""))), categorias);
+      if (rel) { setAnual(rel); setLendo(false); return; }
       const i = acharCabecalho(l);
       const cab = i >= 0 ? l[i].map(semAcento) : [];
       const m = i >= 0 ? mapaInicial(cab) : {};
@@ -260,6 +285,24 @@ export function ImportarGise({ ctx, categorias, onFechar }) {
     setGravando(false);
   };
 
+  const gravarAnual = async () => {
+    if (!anual) return;
+    setGravando(true);
+    try {
+      const linhasA = categorias.flatMap((categoria) => (anual.grade[categoria] || Array(12).fill(0)).map((total, i) => ({ ano: anual.ano, mes: i + 1, categoria, total })));
+      if (supabaseConfigurado) {
+        const { error } = await supabase.from("sala_atendimentos_totais").upsert(linhasA, { onConflict: "ano,mes,categoria" });
+        if (error) throw error;
+      }
+      ctx.avisar(`Totais de ${anual.ano} substituídos pelos do relatório do GISE.`);
+      ctx.recarregar?.();
+      onFechar();
+    } catch (e) {
+      ctx.avisar("Não consegui lançar: " + (e?.message || e), "erro");
+    }
+    setGravando(false);
+  };
+
   const gravarTotais = async () => {
     const [ano, mes] = mesTotais.split("-").map(Number);
     const entradas = Object.entries(totais);
@@ -300,6 +343,24 @@ export function ImportarGise({ ctx, categorias, onFechar }) {
       </label>
 
       {erro && <p className="font-body text-xs mt-3 flex items-center gap-1.5" style={{ color: C.danger }}><AlertTriangle size={14} /> {erro}</p>}
+
+      {anual && (() => {
+        const tot = Object.values(anual.grade).reduce((s, m) => s + m.reduce((a, b) => a + b, 0), 0);
+        const porMes = Array.from({ length: 12 }, (_, i) => Object.values(anual.grade).reduce((s, m) => s + m[i], 0));
+        return (
+          <div className="mt-4">
+            <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Relatório anual do GISE · {anual.ano} · {tot} atendimento(s)</p>
+            <p className="font-body text-xs mt-1" style={{ color: C.muted }}>Por mês: {porMes.map((n, i) => `${["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"][i]} ${n}`).join(" · ")}</p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {Object.entries(anual.grade).map(([c, m]) => [c, m.reduce((a, b) => a + b, 0)]).filter(([, n]) => n).sort((a, b) => b[1] - a[1]).map(([c, n]) => <span key={c} className="font-body text-xs rounded-lg px-2.5 py-1 border" style={{ borderColor: C.line, color: "#425A70", background: C.tint }}>{c}: <b style={{ color: C.ink }}>{n}</b></span>)}
+            </div>
+            <p className="font-body text-[11px] mt-2" style={{ color: C.soft }}>Substitui os totais de {anual.ano} na plataforma pelos números deste relatório (tipos que não aparecem ficam zerados).</p>
+            <button disabled={gravando} onClick={gravarAnual} className="mt-3 font-body text-sm font-bold rounded-xl px-4 py-2.5 text-white inline-flex items-center gap-1.5 disabled:opacity-50" style={{ background: C.green }}>
+              <CheckCircle2 size={15} /> {gravando ? "Lançando..." : `Zerar e lançar ${anual.ano}`}
+            </button>
+          </div>
+        );
+      })()}
 
       {linhas && (
         <div className="mt-4">
