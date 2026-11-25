@@ -166,6 +166,22 @@ export const MODELOS_AVISO = {
     ),
     fim: (c) => c.data || null,
   },
+  dica: {
+    r: "Dica / orientação", emoji: "💡", c: "#C98A00", link: "Link oficial (opcional)", botao: "Saiba mais",
+    campos: [
+      { k: "tema", r: "Assunto", tipo: "select", opcoes: ["MEI", "DAS e impostos", "Nota fiscal", "Declaração anual", "Crédito", "Vendas", "Marketing e redes sociais", "Gestão financeira", "Compras públicas", "Atendimento ao cliente", "Outro"] },
+      { k: "titulo", r: "Título da dica", obrig: true, ph: "Ex.: 3 passos para não atrasar o DAS" },
+      { k: "dicas", r: "Dicas (uma por linha)", obrig: true, tipo: "textarea", ph: "Ex.:\nAtive o débito automático\nAnote a data no celular\nGuarde os comprovantes" },
+      { k: "fechamento", r: "Frase final (opcional)", ph: "Ex.: Dúvidas? A Sala ajuda de graça!" },
+    ],
+    titulo: (c) => c.titulo || "",
+    texto: (c) => juntar(
+      `💡 *DICA DA SALA${c.tema ? ` — ${String(c.tema).toUpperCase()}` : ""}*`, "",
+      String(c.dicas || "").split("\n").map((x) => x.trim()).filter(Boolean).map((x) => `✅ ${x.replace(/^[-•✅\d.)\s]+/, "")}`),
+      c.fechamento ? ["", c.fechamento] : null,
+    ),
+    fim: () => null,
+  },
   aviso: {
     r: "Aviso geral", emoji: "📢", c: "#425A70", link: "Link (opcional)", botao: "Saiba mais",
     campos: [
@@ -314,7 +330,7 @@ function nomeArquivo(a, formato) {
   return `sala-${base || "aviso"}-${formato}.png`;
 }
 
-function ArteModal({ aviso, config, onFechar, avisar }) {
+export function ArteModal({ aviso, config, onFechar, avisar }) {
   const [formato, setFormato] = useState("feed");
   const [pronto, setPronto] = useState(false);
   const refs = { feed: React.useRef(null), story: React.useRef(null) };

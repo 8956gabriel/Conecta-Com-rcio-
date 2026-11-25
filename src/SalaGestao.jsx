@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { exportarPDF } from "./central/motor.js";
+import { ArteModal } from "./SalaAvisos.jsx";
 
 const G = {
   blue: "var(--cor-principal, #0A5AA8)", blueHex: "#0A5AA8", blueDeep: "var(--cor-principal-profunda, #052A4D)", blueTint: "#EAF2FB", blueTint2: "#F5F9FD",
@@ -733,8 +734,13 @@ function textoOrientacao(o) {
   return [`📌 ${o.tema || o.titulo}`, o.resumo || "", ...(o.passos ? o.passos.map((p, i) => `${i + 1}. ${p}`) : [o.conteudo]), ...(o.links || []).map(([r, u]) => `${r}: ${u.startsWith("/") ? window.location.origin + u : u}`), "— Sala do Empreendedor · Ivatuba"].filter(Boolean).join("\n");
 }
 
+const arteDeOrientacao = (o) => (o.passos
+  ? { modelo: "dica", titulo: o.tema, texto: `💡 DICA DA SALA\n${o.resumo}\n\n${o.passos.map((p, i) => `${i + 1}. ${p}`).join("\n")}` }
+  : { modelo: "dica", titulo: o.titulo, texto: `💡 DICA DA SALA — ${String(o.tema || "").toUpperCase()}\n${o.conteudo}` });
+
 export function AbaOrientacoes({ ctx }) {
   const [aberto, setAberto] = useState(0);
+  const [arte, setArte] = useState(null);
   const [proprias, setProprias] = useState(null);
   const [f, setF] = useState(null);
   const [busca, setBusca] = useState("");
@@ -762,6 +768,7 @@ export function AbaOrientacoes({ ctx }) {
   const lista = ORIENTACOES.filter((o) => !busca || `${o.tema} ${o.resumo} ${o.passos.join(" ")}`.toLowerCase().includes(busca.toLowerCase()));
   return (
     <div>
+      {arte && <ArteModal aviso={arte} config={ctx.config || {}} onFechar={() => setArte(null)} avisar={ctx.avisar} />}
       <Cab eyebrow="Orientação empresarial" title="Como orientar o empreendedor" sub="Passo a passo e links oficiais de cada assunto. Copie o texto para mandar no WhatsApp."
         direita={<div className="flex gap-2"><Bt contorno onClick={pdf}><Download size={14} /> PDF de todas</Bt><Bt onClick={() => setF({ tema: ORIENTACOES[0].tema, titulo: "", conteudo: "", link: "", publicar: true })}><PlusCircle size={14} /> Nova orientação</Bt></div>} />
       {f && (
@@ -785,6 +792,7 @@ export function AbaOrientacoes({ ctx }) {
                 <p className="font-body text-xs mt-1 whitespace-pre-line" style={{ color: "#425A70" }}>{o.conteudo}</p>
                 <div className="flex gap-3 mt-2">
                   <button onClick={() => { copiarTexto(textoOrientacao(o)); ctx.avisar("Texto copiado."); }} className="font-body text-[11px] font-bold" style={{ color: G.blue }}>copiar</button>
+                  <button onClick={() => setArte(arteDeOrientacao(o))} className="font-body text-[11px] font-bold" style={{ color: G.blue }}>arte p/ postar</button>
                   <button onClick={() => setF({ ...o })} className="font-body text-[11px] font-bold" style={{ color: G.blue }}>editar</button>
                   <button onClick={() => remover(o)} className="font-body text-[11px]" style={{ color: G.danger }}>excluir</button>
                 </div>
@@ -809,6 +817,7 @@ export function AbaOrientacoes({ ctx }) {
                   <div className="flex flex-wrap gap-2 mt-3">
                     {o.links.map(([r, u]) => <a key={u} href={u.startsWith("/") ? `#/${u.slice(1)}` : u} target={u.startsWith("/") ? undefined : "_blank"} rel="noopener noreferrer" className="font-body text-xs font-bold px-3 py-2 rounded-lg border inline-flex items-center gap-1" style={{ borderColor: G.line, color: G.blue }}>{r} <ExternalLink size={11} /></a>)}
                     <Bt contorno onClick={() => { copiarTexto(textoOrientacao(o)); ctx.avisar("Orientação copiada. Cole no WhatsApp ou no site."); }}><Copy size={13} /> Copiar texto</Bt>
+                    <Bt contorno onClick={() => setArte(arteDeOrientacao(o))}><FileText size={13} /> Arte para postar</Bt>
                   </div>
                 </div>
               )}
