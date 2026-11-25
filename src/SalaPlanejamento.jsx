@@ -7,6 +7,7 @@
 // =============================================================================
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Copy, Download, Eye, EyeOff, Pencil, PlusCircle, Trash2, CheckCircle2, Target, Sparkles } from "lucide-react";
+import { ESTRATEGIAS_SEGMENTO } from "./SalaSegmentos.js";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { exportarPDF } from "./central/motor.js";
 
@@ -279,6 +280,7 @@ export function AbaEstrategias({ ctx }) {
   const [editId, setEditId] = useState(null);
   const [apagando, setApagando] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [segmento, setSegmento] = useState(ESTRATEGIAS_SEGMENTO[0].k);
 
   const abrirModelo = (m) => {
     setEditId(null);
@@ -370,6 +372,52 @@ export function AbaEstrategias({ ctx }) {
           })}
         </div>
       )}
+
+      <p className="font-display font-bold text-sm mb-1 flex items-center gap-1.5" style={{ color: P.ink }}><Target size={15} color={P.blueHex} /> Estratégias por segmento</p>
+      <p className="font-body text-xs mb-3" style={{ color: P.muted }}>Orientação de gestão, dicas, marketing e mensagem pronta para cada tipo de negócio. Use no atendimento, mande o PDF ao comerciante ou publique no site.</p>
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {ESTRATEGIAS_SEGMENTO.map((m) => (
+          <button key={m.k} onClick={() => setSegmento(m.k)} className="font-body text-xs font-bold rounded-xl px-3 py-1.5 border whitespace-nowrap"
+            style={segmento === m.k ? { background: P.blueHex, color: "#fff", borderColor: P.blueHex } : { background: "#fff", color: "#425A70", borderColor: P.line }}>
+            {m.emoji} {m.segmento}
+          </button>
+        ))}
+      </div>
+      {(() => {
+        const m = ESTRATEGIAS_SEGMENTO.find((x) => x.k === segmento) || ESTRATEGIAS_SEGMENTO[0];
+        const grupos = [["Gestão", "📋 Gestão e organização"], ["Dica", "💡 Dicas práticas"], ["Marketing", "📣 Marketing e divulgação"], ["Sala ajuda", "🤝 Como a Sala ajuda"]];
+        const usada = minhas.some((e) => e.modelo === m.k && e.status !== "concluida");
+        return (
+          <div className="rounded-2xl border p-4 md:p-5 bg-white mb-8" style={{ borderColor: P.line }}>
+            <p className="font-body text-[11px] font-bold uppercase tracking-wider" style={{ color: P.soft }}>{m.emoji} {m.segmento} · {m.quando}</p>
+            <p className="font-display font-bold text-base mt-1" style={{ color: P.ink }}>{m.titulo}</p>
+            <p className="font-body text-xs mt-1" style={{ color: "#425A70" }}><b>Objetivo:</b> {m.objetivo}</p>
+            <p className="font-body text-xs mt-0.5" style={{ color: "#425A70" }}><b>Para quem:</b> {m.publico}</p>
+            <div className="grid md:grid-cols-2 gap-3 mt-3">
+              {grupos.map(([pre, rotulo]) => {
+                const itens = m.passos.filter((p) => p.startsWith(pre + ":")).map((p) => p.slice(pre.length + 1).trim());
+                if (!itens.length) return null;
+                return (
+                  <div key={pre} className="rounded-xl p-3" style={{ background: P.blueTint2 }}>
+                    <p className="font-display font-bold text-xs mb-1.5" style={{ color: P.ink }}>{rotulo}</p>
+                    <ul className="font-body text-xs space-y-1 list-disc pl-4" style={{ color: "#425A70" }}>{itens.map((t) => <li key={t}>{t}</li>)}</ul>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="rounded-xl border p-3 mt-3" style={{ borderColor: P.line }}>
+              <p className="font-display font-bold text-xs mb-1" style={{ color: P.ink }}>💬 Mensagem pronta para divulgar</p>
+              <p className="font-body text-xs" style={{ color: "#425A70" }}>{m.mensagem}</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              <Bt onClick={() => abrirModelo(m)}><Target size={13} /> {usada ? "Usar de novo" : "Usar esta"}</Bt>
+              <Bt contorno onClick={() => pdfEstrategia(m)}><Download size={13} /> PDF para o comerciante</Bt>
+              <Bt contorno onClick={() => copiar(m)}><Copy size={13} /> Copiar texto</Bt>
+              <Bt contorno onClick={() => pdfPlano("Estratégias por segmento — Sala do Empreendedor", [], ESTRATEGIAS_SEGMENTO, "estrategias-por-segmento")}><Download size={13} /> PDF de todos os segmentos</Bt>
+            </div>
+          </div>
+        );
+      })()}
 
       <p className="font-display font-bold text-sm mb-2 flex items-center gap-1.5" style={{ color: P.ink }}><Sparkles size={15} color={P.amber} /> Estratégias prontas</p>
       <div className="grid md:grid-cols-2 gap-3">
