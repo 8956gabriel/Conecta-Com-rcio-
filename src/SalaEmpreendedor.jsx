@@ -15,7 +15,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Store, MessageCircle, MapPin, Clock, CalendarDays, ClipboardList, Inbox, BarChart3, Settings, Users,
   ExternalLink, Download, Trash2, Pencil, CheckCircle2, X, ShieldCheck, PlusCircle, Search, LayoutDashboard,
-  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge, Building2, History,
+  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge, Building2, History, Megaphone,
 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { ImportarGise } from "./SalaImportarGise.jsx";
@@ -23,6 +23,7 @@ import { exportarPDF } from "./central/motor.js";
 import { AbaEstrategias, AbaCalendario, AgendaPublicaSala } from "./SalaPlanejamento.jsx";
 import { AbaBaseEmpresas } from "./SalaEmpresas.jsx";
 import { AbaRetrospectiva, RetrospectivaPublica } from "./SalaRetrospectiva.jsx";
+import { AbaAvisos, AvisosPublicos } from "./SalaAvisos.jsx";
 import { AbaSelo, AbaGestao, AbaOrientacoes, AbaEmpreendedores, AbaIndicadores, OrientacoesPublicas, DocProtegido } from "./SalaGestao.jsx";
 
 // As mesmas categorias do relatório oficial do Sebrae (usadas também no
@@ -320,6 +321,8 @@ export function SalaPublico() {
         </div>
       </section>
 
+      <AvisosPublicos />
+
       {/* SERVIÇOS ONLINE */}
       <section id="sala-servicos" className="max-w-6xl mx-auto px-4 md:px-6 mt-10 scroll-mt-20">
         <Titulo eyebrow="Faça você mesmo" title="Serviços online" sub="Links oficiais do governo. Se travar em alguma etapa, agende um atendimento que a gente ajuda." />
@@ -573,6 +576,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
     ...(area === "admin" ? [{ id: "indicadores", label: "Indicadores", icon: Gauge }] : []),
     { id: "painel", label: "Painel do dia", icon: LayoutDashboard },
     { id: "pedidos", label: "Pedidos do site", icon: Inbox, badge: novos },
+    { id: "avisos", label: "Avisos e publicações", icon: Megaphone },
     { id: "agenda", label: "Agenda", icon: CalendarDays },
     { id: "atendimentos", label: "Atendimentos", icon: ClipboardList },
     { id: "empreendedores", label: "Empreendedores", icon: Contact },
@@ -621,6 +625,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
       <div className="mt-5">
         {abaAtual === "painel" && <AbaPainel ctx={ctx} setAba={setAba} />}
         {abaAtual === "pedidos" && <AbaPedidos ctx={ctx} />}
+        {abaAtual === "avisos" && <AbaAvisos ctx={ctx} />}
         {abaAtual === "agenda" && <AbaAgenda ctx={ctx} />}
         {abaAtual === "atendimentos" && <AbaAtendimentos ctx={ctx} />}
         {abaAtual === "indicadores" && <AbaIndicadores ctx={ctx} />}
