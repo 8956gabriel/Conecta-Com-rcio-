@@ -16,6 +16,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 // Módulo Fomento Paraná (acrescentado — ver src/FomentoParana.jsx e supabase-fomento-parana.sql)
 import { FomentoPublico, FomentoAdmin, useFomentoAcesso } from "./FomentoParana.jsx";
+import { SalaPublico, SalaPainel, useSalaAcesso } from "./SalaEmpreendedor.jsx";
 
 // ---------------------------------------------------------------------------
 // Cidade — nome configurável pelo admin (em vez de "Ivatuba" fixo no código),
@@ -7464,6 +7465,17 @@ function AdminPanel() {
         {tab === "sala-empreendedor" && (
           <div>
             <SectionHeader eyebrow="Empreendedorismo" title="Sala do Empreendedor — Atendimentos" sub="Totais oficiais mensais (transcritos do relatório do Sebrae) — aparece no site público" />
+            <div className="mb-4 rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 max-w-3xl" style={{ borderColor: C.line, background: C.blueTint2 }}>
+              <div>
+                <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Módulo Sala do Empreendedor</p>
+                <p className="font-body text-xs" style={{ color: "#5C7186" }}>Agenda, pedidos do site, ficha de atendimento e relatório automático — com links separados.</p>
+              </div>
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <a href="#/sala" className="font-body text-xs font-bold px-3 py-2 rounded-lg border bg-white" style={{ borderColor: C.line, color: "#425A70" }}>Página pública</a>
+                <a href="#/sala-agente" className="font-body text-xs font-bold px-3 py-2 rounded-lg border bg-white" style={{ borderColor: C.line, color: C.blue }}>Área do atendente</a>
+                <a href="#/sala-admin" className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: C.blue }}>Administração</a>
+              </div>
+            </div>
             {!supabaseConfigurado && (
               <div className="mb-4 rounded-xl px-3.5 py-2.5 font-body text-xs flex items-start gap-2 max-w-2xl" style={{ background: "#FFF6E9", color: "#8A5A12" }}>
                 <BadgeCheck size={14} className="mt-0.5 shrink-0" />
@@ -13371,12 +13383,15 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
           <Reveal>
             <div className="flex items-end justify-between flex-wrap gap-3">
               <SectionHeader eyebrow="Empreendedorismo · dados em tempo real" title="Sala do Empreendedor" sub={`Atendimentos prestados em ${anoSalaPublico} — números oficiais (fonte: Sebrae)`} />
+              <div className="flex items-center gap-2 flex-wrap">
+              <a href="#/sala" className="glow-btn font-body text-sm font-bold rounded-lg px-4 py-2 text-white" style={{ background: C.blue }}>Agendar atendimento</a>
               {anosSalaPublico.length > 1 && (
                 <select value={anoSalaPublico} onChange={(e) => setAnoSalaPublicoEscolhido(Number(e.target.value))}
                   className="font-body text-sm font-bold border rounded-lg px-3 py-2 outline-none bg-white" style={{ borderColor: C.line, color: C.blue }}>
                   {anosSalaPublico.map((ano) => <option key={ano} value={ano}>{ano}</option>)}
                 </select>
               )}
+              </div>
             </div>
           </Reveal>
 
@@ -14849,7 +14864,7 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", prestador: "#/prestador", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", votacao: "#/votacao", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados", fomento: "#/fomento", "fomento-admin": "#/fomento-admin", "fomento-agente": "#/fomento-agente" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", prestador: "#/prestador", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", votacao: "#/votacao", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados", fomento: "#/fomento", "fomento-admin": "#/fomento-admin", "fomento-agente": "#/fomento-agente", sala: "#/sala", "sala-agente": "#/sala-agente", "sala-admin": "#/sala-admin" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
@@ -14858,6 +14873,9 @@ function modoDaHash(hash) {
   if (h.startsWith("#/fomento-admin")) return "fomento-admin";
   if (h.startsWith("#/fomento-agente")) return "fomento-agente";
   if (h.startsWith("#/fomento")) return "fomento";
+  if (h.startsWith("#/sala-admin")) return "sala-admin";
+  if (h.startsWith("#/sala-agente") || h.startsWith("#/sala-atendente")) return "sala-agente";
+  if (h.startsWith("#/sala")) return "sala";
   if (h.startsWith("#/estatisticas") || h.startsWith("#/numeros")) return "estatisticas";
   if (h.startsWith("#/turismo")) return "turismo";
   if (h.startsWith("#/mural")) return "mural";
@@ -15200,7 +15218,7 @@ function PaginaVotacao() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 md:px-6 py-10">
-      <SectionHeader eyebrow="Sua voz" title="Votação pública" sub="Escolha sua opção e acompanhe o resultado em tempo real — sem cadastro" />
+      <SectionHeader eyebrow="Sua voz" title="Votação pública" sub="Escolha sua opção e confirme — sem cadastro, 1 voto por aparelho" />
       {aberta && (
         <button onClick={() => { setAberta(null); window.history.replaceState(null, "", "#/votacao"); }} className="font-body text-xs font-bold mb-4" style={{ color: C.blue }}>
           ← Ver todas as votações
@@ -16241,6 +16259,7 @@ export default function ConectaComercio() {
   // Busca o perfil (tipo: cliente/empresario/admin) assim que há sessão.
   const [contaBloqueada, setContaBloqueada] = useState(false);
   const podeFomento = useFomentoAcesso(sessao, perfil);
+  const acessoSala = useSalaAcesso(sessao, perfil);
   useEffect(() => {
     if (!supabaseConfigurado || !sessao) { setPerfil(null); return; }
     supabase.from("perfis").select("tipo, nome, bloqueado").eq("id", sessao.user.id).single()
@@ -16282,6 +16301,7 @@ export default function ConectaComercio() {
     ...(siteConfig?.classificados_ativo ? [{ id: "classificados", label: "Classificados", icon: Repeat }] : []),
     ...(siteConfig?.estatisticas_ativo ? [{ id: "estatisticas", label: "Números", icon: TrendingUp }] : []),
     { id: "fomento", label: "Fomento Paraná", icon: Landmark },
+    { id: "sala", label: "Sala do Empreendedor", icon: Store },
     { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
     { id: "empresario", label: "Painel Empresário", icon: Briefcase, restrito: "empresario" },
@@ -16290,6 +16310,8 @@ export default function ConectaComercio() {
     // mas o link #/fomento-admin funciona sempre (pede login se precisar).
     { id: "fomento-agente", label: "Fomento · Agente", icon: HandCoins, restrito: "fomento", oculto: !podeFomento },
     { id: "fomento-admin", label: "Fomento · Admin", icon: ShieldCheck, restrito: "fomento", oculto: !podeFomento },
+    { id: "sala-agente", label: "Sala · Atendente", icon: Store, restrito: "sala", oculto: !acessoSala?.pode },
+    { id: "sala-admin", label: "Sala · Admin", icon: ShieldCheck, restrito: "sala", oculto: !acessoSala?.gerir },
   ];
 
   // Link direto de acesso: le o hash da URL (#/admin, #/empresa, #/entrar,
@@ -16312,6 +16334,8 @@ export default function ConectaComercio() {
             ? "Entre ou cadastre-se como prestador para acessar esse painel."
             : m.restrito === "fomento"
             ? "Entre com a sua conta para acessar o painel do Agente de Crédito do Fomento Paraná."
+            : m.restrito === "sala"
+            ? "Entre com a sua conta para acessar a área da equipe da Sala do Empreendedor."
             : "Entre ou cadastre sua empresa para acessar o painel do empresário."
         );
         setDestinoPosLogin(m.id);
@@ -16408,6 +16432,9 @@ export default function ConectaComercio() {
       {modo === "ouvidoria" && <PaginaOuvidoria />}
       {modo === "classificados" && <PaginaClassificados />}
       {modo === "fomento" && <FomentoPublico siteConfig={siteConfig} />}
+      {modo === "sala" && <SalaPublico />}
+      {modo === "sala-agente" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <SalaPainel key="sala-agente" area="agente" sessao={sessao} perfil={perfil} />)}
+      {modo === "sala-admin" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <SalaPainel key="sala-admin" area="admin" sessao={sessao} perfil={perfil} />)}
       {modo === "fomento-admin" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <FomentoAdmin key="admin" area="admin" sessao={sessao} perfil={perfil} />)}
       {modo === "fomento-agente" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <FomentoAdmin key="agente" area="agente" sessao={sessao} perfil={perfil} />)}
       {modo === "termos" && <PaginaLegal titulo="Termos de uso" texto={siteConfig?.termos_uso} />}

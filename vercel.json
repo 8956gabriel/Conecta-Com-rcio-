@@ -17,6 +17,14 @@
       "destination": "/"
     },
     {
+      "source": "/sala",
+      "destination": "/"
+    },
+    {
+      "source": "/sala/(.*)",
+      "destination": "/"
+    },
+    {
       "source": "/agente",
       "destination": "/"
     },
