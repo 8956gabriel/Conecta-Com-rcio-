@@ -4792,7 +4792,36 @@ function AdminPanel() {
   // Enquetes — cadastro real (pergunta + opções) e encerrar/reabrir.
   // -------------------------------------------------------------------------
   const [enquetesAdmin, setEnquetesAdmin] = useState(null);
-  const [novaEnquete, setNovaEnquete] = useState({ pergunta: "", opcao1: "", opcao2: "", opcao3: "" });
+  const ENQUETE_VAZIA = { pergunta: "", descricao: "", opcoes: [{ texto: "", foto_url: "" }, { texto: "", foto_url: "" }], exigir_localizacao: true, raio_km: 12, encerra_em: "" };
+  const [novaEnquete, setNovaEnquete] = useState(ENQUETE_VAZIA);
+  const [enviandoFotoOpcao, setEnviandoFotoOpcao] = useState(null);
+  const [comercianteParaOpcao, setComercianteParaOpcao] = useState("");
+  const mudarOpcao = (i, campo, valor) => setNovaEnquete((v) => ({ ...v, opcoes: v.opcoes.map((o, j) => (j === i ? { ...o, [campo]: valor } : o)) }));
+  const enviarFotoOpcao = (i, e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    if (!supabaseConfigurado) { mudarOpcao(i, "foto_url", URL.createObjectURL(arquivo)); return; }
+    setEnviandoFotoOpcao(i);
+    const caminho = `votacao/${Date.now()}-${arquivo.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+    supabase.storage.from("uploads").upload(caminho, arquivo).then(({ error }) => {
+      setEnviandoFotoOpcao(null);
+      if (error) { notificar("Não consegui enviar a foto: " + error.message, "erro"); return; }
+      const { data: pub } = supabase.storage.from("uploads").getPublicUrl(caminho);
+      mudarOpcao(i, "foto_url", pub.publicUrl);
+    });
+  };
+  const adicionarComercianteNaEnquete = (id) => {
+    const emp = listaEmpresas.find((x) => String(x.id) === String(id));
+    if (!emp) return;
+    const foto = emp.banner_url || (emp.fotos_urls || [])[0] || emp.logo_url || "";
+    setNovaEnquete((v) => {
+      const vazias = v.opcoes.findIndex((o) => !o.texto.trim());
+      const nova = { texto: emp.nome, foto_url: foto, empresa_id: String(emp.id).startsWith("demo-") ? null : emp.id };
+      const opcoes = vazias >= 0 ? v.opcoes.map((o, j) => (j === vazias ? nova : o)) : [...v.opcoes, nova];
+      return { ...v, opcoes };
+    });
+    setComercianteParaOpcao("");
+  };
   const [publicandoEnquete, setPublicandoEnquete] = useState(false);
   const [statusEnquete, setStatusEnquete] = useState("");
 
@@ -4808,24 +4837,37 @@ function AdminPanel() {
   const publicarEnquete = async (e) => {
     e.preventDefault();
     setStatusEnquete("");
-    const opcoesTexto = [novaEnquete.opcao1, novaEnquete.opcao2, novaEnquete.opcao3].filter((t) => t.trim());
-    if (!novaEnquete.pergunta || opcoesTexto.length < 2) { setStatusEnquete("Informe a pergunta e ao menos 2 opções."); return; }
-    const opcoes = opcoesTexto.map((texto) => ({ texto, votos: 0 }));
+    const opcoes = novaEnquete.opcoes
+      .filter((o) => o.texto.trim())
+      .map((o) => ({ texto: o.texto.trim(), votos: 0, ...(o.foto_url ? { foto_url: o.foto_url } : {}), ...(o.empresa_id ? { empresa_id: o.empresa_id } : {}) }));
+    if (!novaEnquete.pergunta.trim() || opcoes.length < 2) { setStatusEnquete("Informe o título e ao menos 2 opções."); return; }
+    const registro = {
+      pergunta: novaEnquete.pergunta.trim(),
+      descricao: novaEnquete.descricao.trim() || null,
+      opcoes,
+      ativa: true,
+      exigir_localizacao: !!novaEnquete.exigir_localizacao,
+      raio_km: Number(novaEnquete.raio_km) || 12,
+      encerra_em: novaEnquete.encerra_em ? new Date(`${novaEnquete.encerra_em}T23:59:59`).toISOString() : null,
+    };
     if (!supabaseConfigurado) {
-      setEnquetesAdmin((atual) => [{ id: `demo-${Date.now()}`, pergunta: novaEnquete.pergunta, opcoes, ativa: true }, ...(atual ?? listaEnquetes)]);
-      setNovaEnquete({ pergunta: "", opcao1: "", opcao2: "", opcao3: "" });
+      setEnquetesAdmin((atual) => [{ id: `demo-${Date.now()}`, ...registro }, ...(atual ?? listaEnquetes)]);
+      setNovaEnquete(ENQUETE_VAZIA);
       setStatusEnquete("ok");
       return;
     }
     setPublicandoEnquete(true);
     try {
-      const { data, error } = await supabase.from("enquetes").insert({ pergunta: novaEnquete.pergunta, opcoes, ativa: true }).select().single();
+      let { data, error } = await supabase.from("enquetes").insert(registro).select().single();
+      if (error && /column|schema cache/i.test(error.message || "")) {
+        throw new Error("Falta rodar o arquivo supabase-votacao-publica.sql no SQL Editor do Supabase.");
+      }
       if (error) throw error;
       setEnquetesAdmin((atual) => [data, ...(atual ?? [])]);
-      setNovaEnquete({ pergunta: "", opcao1: "", opcao2: "", opcao3: "" });
+      setNovaEnquete(ENQUETE_VAZIA);
       setStatusEnquete("ok");
     } catch (err) {
-      setStatusEnquete(err.message || "Erro ao publicar enquete");
+      setStatusEnquete(err.message || "Erro ao publicar votação");
     } finally {
       setPublicandoEnquete(false);
     }
@@ -8095,26 +8137,85 @@ function AdminPanel() {
             <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
               <SectionHeader eyebrow="Engajamento" title="Enquetes" sub="Pergunte à comunidade e acompanhe os resultados em tempo real" />
             </div>
-            <form onSubmit={publicarEnquete} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-lg mb-6" style={{ borderColor: C.line }}>
-              <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Criar nova enquete</p>
-              <input value={novaEnquete.pergunta} onChange={(e) => setNovaEnquete((v) => ({ ...v, pergunta: e.target.value }))} placeholder="Pergunta da enquete" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <input value={novaEnquete.opcao1} onChange={(e) => setNovaEnquete((v) => ({ ...v, opcao1: e.target.value }))} placeholder="Opção 1" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <input value={novaEnquete.opcao2} onChange={(e) => setNovaEnquete((v) => ({ ...v, opcao2: e.target.value }))} placeholder="Opção 2" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <input value={novaEnquete.opcao3} onChange={(e) => setNovaEnquete((v) => ({ ...v, opcao3: e.target.value }))} placeholder="Opção 3 (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+            <div className="rounded-2xl border p-4 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 max-w-2xl" style={{ borderColor: C.line, background: C.blueTint2 }}>
+              <div>
+                <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Página pública de votação</p>
+                <p className="font-body text-xs break-all" style={{ color: C.blue }}>{`${window.location.origin}/#/votacao`}</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button type="button" onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/#/votacao`); notificar("Link copiado."); }} className="font-body text-xs font-bold px-3 py-2 rounded-lg border bg-white" style={{ borderColor: C.line, color: "#425A70" }}>Copiar link</button>
+                <a href="#/votacao" className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: C.blue }}>Abrir</a>
+              </div>
+            </div>
+
+            <form onSubmit={publicarEnquete} className="rounded-2xl border p-5 flex flex-col gap-3 max-w-2xl mb-6" style={{ borderColor: C.line }}>
+              <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Criar nova votação / enquete</p>
+              <input value={novaEnquete.pergunta} onChange={(e) => setNovaEnquete((v) => ({ ...v, pergunta: e.target.value }))} placeholder='Título (ex.: "Meu Comércio Iluminado 2026 — vote na fachada mais bonita")' className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+              <textarea value={novaEnquete.descricao} onChange={(e) => setNovaEnquete((v) => ({ ...v, descricao: e.target.value }))} rows={2} placeholder="Descrição / regras (opcional)" className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+
+              <div className="flex flex-col gap-1">
+                <label className="font-body text-xs font-bold" style={{ color: C.ink }}>Puxar comerciante cadastrado como opção</label>
+                <select value={comercianteParaOpcao} onChange={(e) => adicionarComercianteNaEnquete(e.target.value)} className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none bg-white" style={{ borderColor: C.line }}>
+                  <option value="">Escolha um comerciante para adicionar...</option>
+                  {listaEmpresas.filter((x) => x.status !== "rejeitada").map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+                </select>
+              </div>
+
+              <p className="font-body text-xs font-bold mt-1" style={{ color: C.ink }}>Opções ({novaEnquete.opcoes.length})</p>
+              {novaEnquete.opcoes.map((o, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <label className="w-12 h-12 rounded-lg border shrink-0 overflow-hidden flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, background: C.blueTint2 }} title="Foto da opção (opcional)">
+                    {o.foto_url ? <img src={o.foto_url} alt="" className="w-full h-full object-cover" /> : <span className="font-body text-[9px] text-center leading-tight" style={{ color: "#5C7186" }}>{enviandoFotoOpcao === i ? "..." : "+ foto"}</span>}
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => enviarFotoOpcao(i, e)} />
+                  </label>
+                  <input value={o.texto} onChange={(e) => mudarOpcao(i, "texto", e.target.value)} placeholder={`Opção ${i + 1} (ex.: nome do comércio)`} className="flex-1 min-w-0 font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
+                  {novaEnquete.opcoes.length > 2 && (
+                    <button type="button" onClick={() => setNovaEnquete((v) => ({ ...v, opcoes: v.opcoes.filter((_, j) => j !== i) }))} style={{ color: "#B4462F" }}><Trash2 size={14} /></button>
+                  )}
+                </div>
+              ))}
+              <button type="button" onClick={() => setNovaEnquete((v) => ({ ...v, opcoes: [...v.opcoes, { texto: "", foto_url: "" }] }))} className="font-body text-xs font-bold self-start px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: C.blue }}>
+                + Adicionar opção
+              </button>
+
+              <div className="rounded-xl border p-3 flex flex-col gap-2 mt-1" style={{ borderColor: C.line }}>
+                <label className="flex items-start gap-2 font-body text-sm" style={{ color: C.ink }}>
+                  <input type="checkbox" className="mt-1" checked={!!novaEnquete.exigir_localizacao} onChange={(e) => setNovaEnquete((v) => ({ ...v, exigir_localizacao: e.target.checked }))} />
+                  <span><strong>Só quem está na cidade pode votar</strong><br /><span className="text-xs" style={{ color: "#5C7186" }}>Pede a localização do celular na hora do voto</span></span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {novaEnquete.exigir_localizacao && (
+                    <label className="font-body text-xs" style={{ color: "#425A70" }}>Raio em volta da cidade (km)
+                      <input type="number" min="1" value={novaEnquete.raio_km} onChange={(e) => setNovaEnquete((v) => ({ ...v, raio_km: e.target.value }))} className="w-full mt-1 font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                    </label>
+                  )}
+                  <label className="font-body text-xs" style={{ color: "#425A70" }}>Encerrar automaticamente em (opcional)
+                    <input type="date" value={novaEnquete.encerra_em} onChange={(e) => setNovaEnquete((v) => ({ ...v, encerra_em: e.target.value }))} className="w-full mt-1 font-body text-sm border rounded-lg px-3 py-2 outline-none" style={{ borderColor: C.line }} />
+                  </label>
+                </div>
+                <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>Sempre: sem cadastro e 1 voto por aparelho.</p>
+              </div>
+
               {statusEnquete && statusEnquete !== "ok" && <p className="font-body text-xs" style={{ color: "#B4462F" }}>{statusEnquete}</p>}
-              {statusEnquete === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Publicada!</p>}
+              {statusEnquete === "ok" && <p className="font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Publicada! Já aparece em {`${window.location.origin}/#/votacao`}</p>}
               <button type="submit" disabled={publicandoEnquete} className="glow-btn font-body text-sm font-bold text-white rounded-lg py-2.5 flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: C.blue }}>
-                <Vote size={14} /> {publicandoEnquete ? "Publicando..." : "Publicar enquete"}
+                <Vote size={14} /> {publicandoEnquete ? "Publicando..." : "Publicar votação"}
               </button>
             </form>
 
             <div className="flex flex-col gap-4">
               {listaEnquetes.map((eq) => {
-                const total = eq.opcoes.reduce((s, o) => s + o.votos, 0);
+                const total = eq.opcoes.reduce((s, o) => s + (o.votos || 0), 0);
                 return (
                   <div key={eq.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                     <div className="flex items-center justify-between gap-3 mb-3">
-                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{eq.pergunta}</p>
+                      <div>
+                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{eq.pergunta}</p>
+                        <p className="font-body text-[11px] mt-0.5" style={{ color: "#5C7186" }}>
+                          {total} {total === 1 ? "voto" : "votos"}{eq.exigir_localizacao ? " · só na cidade" : ""}{eq.encerra_em ? ` · até ${new Date(eq.encerra_em).toLocaleDateString("pt-BR")}` : ""}
+                          {" · "}<button type="button" onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/#/votacao-${eq.id}`); notificar("Link da votação copiado."); }} className="font-bold" style={{ color: C.blue }}>copiar link</button>
+                        </p>
+                      </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
                           style={{ background: eq.ativa ? "#E7F6EE" : C.blueTint, color: eq.ativa ? "#1E8E5A" : "#5C7186" }}>
@@ -8127,13 +8228,13 @@ function AdminPanel() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-2">
-                      {eq.opcoes.map((o) => {
-                        const pct = total ? Math.round((o.votos / total) * 100) : 0;
+                      {eq.opcoes.map((o, oi) => {
+                        const pct = total ? Math.round(((o.votos || 0) / total) * 100) : 0;
                         return (
-                          <div key={o.texto}>
+                          <div key={oi}>
                             <div className="flex justify-between font-body text-xs mb-1" style={{ color: "#425A70" }}>
                               <span>{o.texto}</span>
-                              <span className="font-semibold">{pct}%</span>
+                              <span className="font-semibold">{o.votos || 0} · {pct}%</span>
                             </div>
                             <div className="h-2 rounded-full overflow-hidden" style={{ background: C.blueTint }}>
                               <div className="h-full rounded-full" style={{ width: `${pct}%`, background: C.blue }} />
@@ -14632,7 +14733,7 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", prestador: "#/prestador", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados", fomento: "#/fomento", "fomento-admin": "#/fomento-admin", "fomento-agente": "#/fomento-agente" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", prestador: "#/prestador", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", votacao: "#/votacao", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados", fomento: "#/fomento", "fomento-admin": "#/fomento-admin", "fomento-agente": "#/fomento-agente" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
@@ -14644,6 +14745,7 @@ function modoDaHash(hash) {
   if (h.startsWith("#/estatisticas") || h.startsWith("#/numeros")) return "estatisticas";
   if (h.startsWith("#/turismo")) return "turismo";
   if (h.startsWith("#/mural")) return "mural";
+  if (h.startsWith("#/votacao") || h.startsWith("#/votar")) return "votacao";
   if (h.startsWith("#/utilidade")) return "utilidade";
   if (h.startsWith("#/ouvidoria")) return "ouvidoria";
   if (h.startsWith("#/classificados")) return "classificados";
@@ -14679,6 +14781,273 @@ function PaginaLegal({ titulo, texto }) {
         ) : (
           <p className="font-body text-sm" style={{ color: "#5C7186" }}>Conteúdo ainda não cadastrado.</p>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Votação pública (ex.: "Meu Comércio Iluminado") — sem cadastro.
+// 1 voto por aparelho em cada votação: ID salvo no aparelho + impressão do
+// aparelho + rede (conferidos no banco pela função votar_enquete) e, se a
+// votação exigir, localização dentro da cidade. Ver supabase-votacao-publica.sql.
+// ---------------------------------------------------------------------------
+function lerCookie(nome) {
+  const m = document.cookie.match(new RegExp("(?:^|; )" + nome + "=([^;]*)"));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function idDoAparelho() {
+  const CHAVE = "cc_aparelho_id";
+  let id = null;
+  try { id = localStorage.getItem(CHAVE); } catch (_) {}
+  if (!id) id = lerCookie(CHAVE);
+  if (!id) {
+    id = (window.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`);
+  }
+  try { localStorage.setItem(CHAVE, id); } catch (_) {}
+  document.cookie = `${CHAVE}=${encodeURIComponent(id)}; max-age=${60 * 60 * 24 * 730}; path=/; SameSite=Lax`;
+  return id;
+}
+
+// "Impressão" do aparelho: características do navegador/tela que não mudam
+// quando a pessoa limpa os dados ou abre aba anônima.
+async function impressaoDoAparelho() {
+  try {
+    let canvasTxt = "";
+    try {
+      const cv = document.createElement("canvas");
+      cv.width = 220; cv.height = 40;
+      const cx = cv.getContext("2d");
+      cx.textBaseline = "top"; cx.font = "16px Arial"; cx.fillStyle = "#f60"; cx.fillRect(10, 5, 90, 20);
+      cx.fillStyle = "#069"; cx.fillText("Conecta Comércio ✨", 4, 12);
+      canvasTxt = cv.toDataURL();
+    } catch (_) {}
+    const partes = [
+      navigator.userAgent, navigator.language, (navigator.languages || []).join(","), navigator.platform,
+      navigator.hardwareConcurrency, navigator.deviceMemory, navigator.maxTouchPoints,
+      screen.width, screen.height, screen.colorDepth, window.devicePixelRatio,
+      Intl.DateTimeFormat().resolvedOptions().timeZone, canvasTxt,
+    ].join("|");
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(partes));
+    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch (_) {
+    return null;
+  }
+}
+
+function pegarLocalizacao() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(new Error("Seu navegador não permite localização.")); return; }
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      (err) => reject(new Error(err.code === 1
+        ? "Você precisa permitir a localização para votar. Toque no cadeado ao lado do endereço do site e libere a localização."
+        : "Não consegui pegar sua localização. Ligue o GPS e tente de novo.")),
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 5 * 60 * 1000 }
+    );
+  });
+}
+
+function PaginaVotacao() {
+  const { nomeCidade, nomeCidadeUF } = useCidade();
+  const [lista, setLista] = useState(null);
+  const [meusVotos, setMeusVotos] = useState({}); // { enquete_id: opcao }
+  const [escolha, setEscolha] = useState({}); // { enquete_id: opcao }
+  const [votando, setVotando] = useState(null);
+  const [erros, setErros] = useState({});
+  const [aberta, setAberta] = useState(null); // id da votação aberta (quando há mais de uma)
+  const dispositivo = useMemo(() => idDoAparelho(), []);
+
+  useEffect(() => {
+    document.title = "Votação pública — Conecta Comércio";
+    return () => { document.title = `Conecta Comércio · ${nomeCidadeUF}`; };
+  }, []);
+
+  const carregar = () => {
+    if (!supabaseConfigurado) {
+      setLista((atual) => atual ?? enquetes.map((e, i) => ({ id: `demo-${i}`, ...e })));
+      try { setMeusVotos(JSON.parse(localStorage.getItem("cc_votos_demo") || "{}")); } catch (_) {}
+      return;
+    }
+    supabase.from("enquetes").select("*").order("criada_em", { ascending: false }).then(({ data, error }) => {
+      if (!error) setLista(data || []); else setLista((a) => a ?? []);
+    });
+  };
+
+  useEffect(() => {
+    carregar();
+    if (supabaseConfigurado) {
+      supabase.rpc("meus_votos", { p_dispositivo: dispositivo }).then(({ data, error }) => {
+        if (!error && data) setMeusVotos(Object.fromEntries(data.map((v) => [v.enquete_id, v.opcao])));
+      });
+    }
+    // Resultado "ao vivo": atualiza a cada 20 segundos
+    const t = setInterval(carregar, 20000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Link direto: #/votacao-<id> abre já aquela votação
+  useEffect(() => {
+    const h = window.location.hash;
+    if (h.startsWith("#/votacao-")) setAberta(h.replace("#/votacao-", ""));
+  }, []);
+
+  const encerrada = (eq) => !eq.ativa || (eq.encerra_em && new Date(eq.encerra_em) < new Date());
+
+  const votar = async (eq) => {
+    const opcao = escolha[eq.id];
+    if (opcao === undefined) { setErros((v) => ({ ...v, [eq.id]: "Escolha uma opção antes de votar." })); return; }
+    setErros((v) => ({ ...v, [eq.id]: "" }));
+    setVotando(eq.id);
+    try {
+      if (!supabaseConfigurado) {
+        const novos = { ...meusVotos, [eq.id]: opcao };
+        localStorage.setItem("cc_votos_demo", JSON.stringify(novos));
+        setMeusVotos(novos);
+        setLista((l) => l.map((x) => x.id === eq.id ? { ...x, opcoes: x.opcoes.map((o, i) => i === opcao ? { ...o, votos: (o.votos || 0) + 1 } : o) } : x));
+        return;
+      }
+      let loc = null;
+      if (eq.exigir_localizacao) loc = await pegarLocalizacao();
+      const impressao = await impressaoDoAparelho();
+      const { data, error } = await supabase.rpc("votar_enquete", {
+        p_enquete: eq.id, p_opcao: opcao, p_dispositivo: dispositivo, p_impressao: impressao,
+        p_lat: loc?.lat ?? null, p_lng: loc?.lng ?? null,
+      });
+      if (error) throw error;
+      if (!data?.ok) {
+        if (data?.ja_votou) setMeusVotos((v) => ({ ...v, [eq.id]: v[eq.id] ?? -1 }));
+        throw new Error(data?.erro || "Não consegui registrar seu voto.");
+      }
+      setMeusVotos((v) => ({ ...v, [eq.id]: opcao }));
+      setLista((l) => l.map((x) => (x.id === eq.id ? { ...x, opcoes: data.opcoes } : x)));
+    } catch (err) {
+      setErros((v) => ({ ...v, [eq.id]: err.message || "Não consegui registrar seu voto. Tente de novo." }));
+    } finally {
+      setVotando(null);
+    }
+  };
+
+  const compartilhar = (eq) => {
+    const url = `${window.location.origin}/#/votacao-${eq.id}`;
+    const texto = `🗳️ Vote em "${eq.pergunta}" no Conecta Comércio: ${url}`;
+    if (navigator.share) navigator.share({ title: eq.pergunta, text: texto, url }).catch(() => {});
+    else window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+  };
+
+  const ativas = (lista || []).filter((e) => !encerrada(e));
+  const fechadas = (lista || []).filter((e) => encerrada(e));
+  const visiveis = aberta ? (lista || []).filter((e) => e.id === aberta) : [...ativas, ...fechadas];
+
+  const Cartao = ({ eq }) => {
+    const fim = encerrada(eq);
+    const votou = meusVotos[eq.id] !== undefined;
+    const mostrarResultado = fim || votou;
+    const total = (eq.opcoes || []).reduce((s, o) => s + (o.votos || 0), 0);
+    const temFoto = (eq.opcoes || []).some((o) => o.foto_url);
+    const maior = Math.max(0, ...(eq.opcoes || []).map((o) => o.votos || 0));
+    return (
+      <div className="rounded-3xl border overflow-hidden bg-white shadow-sm" style={{ borderColor: C.line }}>
+        <div className="px-5 py-5 text-white relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.blueDeep}, ${C.blue})` }}>
+          <div className="absolute -right-6 -top-6 w-32 h-32 rounded-full opacity-20" style={{ background: C.amber, filter: "blur(30px)" }} />
+          <span className="font-body text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full" style={{ background: fim ? "rgba(255,255,255,.15)" : C.amber, color: fim ? "#fff" : C.ink }}>
+            {fim ? "Encerrada · resultado final" : "Votação aberta"}
+          </span>
+          <h3 className="font-display text-xl md:text-2xl font-extrabold mt-3 relative">{eq.pergunta}</h3>
+          {eq.descricao && <p className="font-body text-sm text-white/80 mt-1.5 relative">{eq.descricao}</p>}
+          <div className="flex flex-wrap items-center gap-3 mt-3 font-body text-[11px] text-white/75 relative">
+            <span>{total} {total === 1 ? "voto" : "votos"}</span>
+            {eq.exigir_localizacao && <span className="flex items-center gap-1"><MapPin size={11} /> Só para quem está em {nomeCidade}</span>}
+            {eq.encerra_em && !fim && <span>Até {new Date(eq.encerra_em).toLocaleDateString("pt-BR")}</span>}
+            <button onClick={() => compartilhar(eq)} className="flex items-center gap-1 font-bold text-white"><Share2 size={11} /> Compartilhar</button>
+          </div>
+        </div>
+
+        <div className="p-4 md:p-5">
+          {votou && !fim && (
+            <p className="font-body text-sm font-semibold flex items-center gap-1.5 mb-4" style={{ color: "#1E8E5A" }}>
+              <CheckCircle2 size={16} /> Seu voto foi registrado! Obrigado por participar.
+            </p>
+          )}
+
+          <div className={temFoto ? "grid grid-cols-2 md:grid-cols-3 gap-3" : "flex flex-col gap-2.5"}>
+            {(eq.opcoes || []).map((o, i) => {
+              const pct = total ? Math.round(((o.votos || 0) / total) * 100) : 0;
+              const selecionada = escolha[eq.id] === i;
+              const meu = meusVotos[eq.id] === i;
+              const lider = mostrarResultado && total > 0 && (o.votos || 0) === maior;
+              return (
+                <button key={i} type="button" disabled={mostrarResultado}
+                  onClick={() => setEscolha((v) => ({ ...v, [eq.id]: i }))}
+                  className="text-left rounded-2xl border-2 overflow-hidden transition-all relative"
+                  style={{ borderColor: selecionada || meu ? C.blue : C.line, background: selecionada ? C.blueTint2 : "#fff", cursor: mostrarResultado ? "default" : "pointer" }}>
+                  {temFoto && (
+                    <div className="aspect-[4/3] w-full" style={{ background: C.blueTint }}>
+                      {o.foto_url && <img src={o.foto_url} alt={o.texto} loading="lazy" className="w-full h-full object-cover" />}
+                    </div>
+                  )}
+                  <div className="p-3">
+                    <div className="flex items-start gap-2">
+                      {!mostrarResultado && (
+                        <span className="mt-0.5 w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center" style={{ borderColor: selecionada ? C.blue : "#B8C7D6" }}>
+                          {selecionada && <span className="w-2 h-2 rounded-full" style={{ background: C.blue }} />}
+                        </span>
+                      )}
+                      <p className="font-body text-sm font-semibold leading-snug" style={{ color: C.ink }}>
+                        {lider && "🏆 "}{o.texto}
+                      </p>
+                    </div>
+                    {meu && <p className="font-body text-[10px] font-bold mt-1" style={{ color: C.blue }}>Seu voto</p>}
+                    {mostrarResultado && (
+                      <div className="mt-2">
+                        <div className="flex justify-between font-body text-[11px] mb-1" style={{ color: "#425A70" }}>
+                          <span>{o.votos || 0} {(o.votos || 0) === 1 ? "voto" : "votos"}</span>
+                          <span className="font-bold">{pct}%</span>
+                        </div>
+                        <div className="h-2 rounded-full overflow-hidden" style={{ background: C.blueTint }}>
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: lider ? C.amber : C.blue, transition: "width .6s ease" }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {!mostrarResultado && (
+            <div className="mt-4">
+              {erros[eq.id] && <p className="font-body text-xs mb-2" style={{ color: "#B4462F" }}>{erros[eq.id]}</p>}
+              <button onClick={() => votar(eq)} disabled={votando === eq.id}
+                className="glow-btn w-full font-body text-sm font-bold text-white rounded-xl py-3 flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: C.blue }}>
+                <Vote size={16} /> {votando === eq.id ? (eq.exigir_localizacao ? "Confirmando localização..." : "Registrando voto...") : "Confirmar meu voto"}
+              </button>
+              <p className="font-body text-[11px] text-center mt-2" style={{ color: "#8896A6" }}>
+                Sem cadastro · 1 voto por aparelho{eq.exigir_localizacao ? " · pede sua localização só para confirmar que você está na cidade" : ""}
+              </p>
+            </div>
+          )}
+          {mostrarResultado && erros[eq.id] && <p className="font-body text-xs mt-3" style={{ color: "#B4462F" }}>{erros[eq.id]}</p>}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 md:px-6 py-10">
+      <SectionHeader eyebrow="Sua voz" title="Votação pública" sub="Escolha sua opção e acompanhe o resultado em tempo real — sem cadastro" />
+      {aberta && (
+        <button onClick={() => { setAberta(null); window.history.replaceState(null, "", "#/votacao"); }} className="font-body text-xs font-bold mb-4" style={{ color: C.blue }}>
+          ← Ver todas as votações
+        </button>
+      )}
+      {lista === null && <Skeleton className="h-64 w-full rounded-3xl" />}
+      {lista && visiveis.length === 0 && (
+        <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma votação no momento. Volte em breve!</p>
+      )}
+      <div className="flex flex-col gap-6">
+        {visiveis.map((eq) => <React.Fragment key={eq.id}>{Cartao({ eq })}</React.Fragment>)}
       </div>
     </div>
   );
@@ -15742,6 +16111,7 @@ export default function ConectaComercio() {
   const modos = [
     { id: "site", label: "Site", icon: Store },
     ...(siteConfig?.turismo_ativo ? [{ id: "turismo", label: "Turismo", icon: MapPinned }] : []),
+    { id: "votacao", label: "Votação", icon: Vote },
     ...(siteConfig?.mural_ativo ? [{ id: "mural", label: "Mural", icon: Users }] : []),
     ...(siteConfig?.utilidade_ativo ? [{ id: "utilidade", label: "Utilidade pública", icon: Phone }] : []),
     ...(siteConfig?.ouvidoria_ativo ? [{ id: "ouvidoria", label: "Ouvidoria", icon: MessageCircle }] : []),
@@ -15821,6 +16191,7 @@ export default function ConectaComercio() {
   // so um estado interno.
   useEffect(() => {
     if (window.location.hash.startsWith("#/credencial-")) return; // link de credencial digital — não mexe na URL
+    if (window.location.hash.startsWith("#/votacao-")) return; // link direto de uma votação
     const alvo = ROTA_HASH[modo] || "#/";
     if (window.location.hash !== alvo) window.history.replaceState(null, "", alvo);
   }, [modo]);
@@ -15868,6 +16239,7 @@ export default function ConectaComercio() {
       {modo === "estatisticas" && <EstatisticasPublicas />}
       {modo === "turismo" && <PaginaTurismo siteConfig={siteConfig} />}
       {modo === "mural" && <PaginaMural perfil={perfil} />}
+      {modo === "votacao" && <PaginaVotacao />}
       {modo === "utilidade" && <PaginaUtilidadePublica />}
       {modo === "ouvidoria" && <PaginaOuvidoria />}
       {modo === "classificados" && <PaginaClassificados />}
