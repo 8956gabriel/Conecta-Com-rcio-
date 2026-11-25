@@ -251,3 +251,187 @@ export const ESTRATEGIAS_SEGMENTO = [
 ];
 
 export const SEGMENTOS = ESTRATEGIAS_SEGMENTO.map((e) => e.segmento);
+
+// =============================================================================
+// COMO ORIENTAR O EMPREENDEDOR — roteiro do atendimento
+// Geral (vale para todos) + específico de cada segmento: perguntas para
+// entender o negócio, como explicar em palavras simples, um exemplo com
+// números, a tarefa para casa e o retorno combinado.
+// =============================================================================
+export const ROTEIRO_GERAL = [
+  { etapa: "1. Acolher", texto: "Chame pelo nome, ofereça água ou café e pergunte: 'Me conta do seu negócio: o que você vende, há quanto tempo, quem são seus clientes?'. Deixe a pessoa falar sem interromper." },
+  { etapa: "2. Entender antes de orientar", texto: "Faça as perguntas do segmento (abaixo) e anote. Descubra a dor principal: falta de cliente, falta de dinheiro no caixa, preço errado, bagunça nas contas ou dívida do MEI." },
+  { etapa: "3. Escolher no máximo 3 pontos", texto: "Não despeje tudo de uma vez. Escolha as 3 orientações que mais ajudam agora e diga: 'Vamos focar nessas três coisas neste mês'." },
+  { etapa: "4. Explicar simples, com exemplo", texto: "Use as frases 'Diga assim' e o exemplo com números do segmento. Troque os números pelos da pessoa. Evite palavras difíceis (margem, fluxo de caixa) sem explicar." },
+  { etapa: "5. Fazer junto", texto: "Sempre que der, faça na hora: cadastrar no Conecta Comércio, criar o catálogo do WhatsApp Business, emitir o DAS, calcular o preço de um produto. O que é feito junto acontece; o que fica 'para depois' quase nunca." },
+  { etapa: "6. Combinar a tarefa e o retorno", texto: "Entregue o PDF do segmento, combine a tarefa para casa e marque a data de retorno (15 a 30 dias). Registre o atendimento na ficha com a situação 'Pendente' e a data de retorno." },
+  { etapa: "7. Voltar a falar", texto: "No dia do retorno, chame no WhatsApp: 'Oi, fulano! Conseguiu fazer o que combinamos? Como estão as vendas?'. Comemore cada avanço — isso mantém o empreendedor motivado." },
+];
+
+export const ORIENTACAO_SEGMENTO = {
+  "seg-mercado": {
+    perguntas: ["Quanto você vende num dia bom e num dia fraco?", "Você sabe quanto ganha de verdade em cada produto?", "Joga muita coisa fora por vencer?", "Seus clientes pedem entrega ou compram pelo WhatsApp?"],
+    explicar: [
+      "Diga assim: 'Mercado pequeno não ganha do atacadão no preço — ganha na conveniência: está perto, conhece o cliente e entrega rápido.'",
+      "Diga assim: 'O dinheiro do caixa não é seu salário. Separe uma retirada fixa por semana; o resto é do mercado, para repor mercadoria.'",
+      "Diga assim: 'Produto vencido é dinheiro no lixo. Toda segunda, olhe o que vence na semana e faça promoção antes.'",
+    ],
+    exemplo: "Um pacote de café custa R$ 15 e você vende por R$ 18: sobram R$ 3 (20% em cima do custo). Se jogar fora 1 pacote vencido, perde o lucro de 5 vendidos.",
+    tarefa: ["Anotar por 15 dias tudo que entra e sai do caixa", "Listar os 20 produtos que mais vendem com custo e preço", "Postar a oferta do dia no Status do WhatsApp por 1 semana"],
+    retorno: "Em 15 dias: olhar juntos o caderno de caixa e ajustar os preços dos produtos que estão sem lucro.",
+  },
+  "seg-padaria": {
+    perguntas: ["Você sabe quanto custa para fazer cada pão, bolo ou salgado?", "Sobra muita coisa no fim do dia?", "Trabalha com encomenda? Pede sinal?", "Em quais datas vende mais?"],
+    explicar: [
+      "Diga assim: 'Preço não é o que o vizinho cobra. Preço é o custo da receita mais a embalagem, o gás e o seu trabalho — e ainda tem que sobrar lucro.'",
+      "Diga assim: 'Sobra todo dia é prejuízo escondido. Anote o que sobra e produza um pouco menos daquilo.'",
+      "Diga assim: 'Encomenda sem sinal é risco. Peça 50% na hora de fechar; se a pessoa desistir, você não perde o material.'",
+    ],
+    exemplo: "Um bolo usa R$ 22 de ingredientes, R$ 3 de embalagem e R$ 2 de gás = R$ 27. Vendendo a R$ 45, sobram R$ 18 para pagar seu trabalho e o lucro. Vendendo a R$ 30, você trabalha quase de graça.",
+    tarefa: ["Fazer a ficha de custo dos 5 produtos que mais vendem", "Anotar a sobra diária por 2 semanas", "Abrir a lista de encomendas da próxima data forte"],
+    retorno: "Em 15 dias: revisar juntos os preços com base nas fichas de custo.",
+  },
+  "seg-alimentacao": {
+    perguntas: ["Quais são os 5 pratos ou lanches que mais saem?", "Você sabe o custo de cada prato?", "Faz entrega? Quanto cobra e até onde vai?", "Qual é o dia mais fraco da semana?"],
+    explicar: [
+      "Diga assim: 'Cardápio grande parece bom, mas aumenta desperdício e compra. Fique com os campeões de venda.'",
+      "Diga assim: 'Cada prato tem que pagar os ingredientes, a embalagem, o gás e ainda sobrar. Se não sobra, ou aumenta o preço ou tira do cardápio.'",
+      "Diga assim: 'Marmita por assinatura é venda garantida: o cliente paga a semana e você já sabe quanto produzir.'",
+    ],
+    exemplo: "Marmita com custo de R$ 11 (comida R$ 9 + embalagem R$ 1,20 + gás R$ 0,80) vendida a R$ 18 deixa R$ 7. Com 20 marmitas por dia em 22 dias, são R$ 3.080 para pagar as despesas e o seu trabalho.",
+    tarefa: ["Calcular o custo dos 5 pratos campeões", "Montar o cardápio no catálogo do WhatsApp Business com fotos", "Oferecer a marmita semanal para 3 empresas da cidade"],
+    retorno: "Em 20 dias: ver quantos clientes de assinatura fechou e ajustar o cardápio.",
+  },
+  "seg-beleza": {
+    perguntas: ["Quantos horários ficam vagos na semana?", "Você confirma o horário com o cliente no dia anterior?", "Sabe quanto gasta de produto em cada serviço?", "Vende algum produto no balcão?"],
+    explicar: [
+      "Diga assim: 'Horário vago é dinheiro que não volta. Uma promoção para o horário fraco é melhor do que a cadeira vazia.'",
+      "Diga assim: 'Confirmar no dia anterior evita falta. Uma mensagem simples resolve.'",
+      "Diga assim: 'Pacote mensal garante cliente fixo e dinheiro certo no começo do mês.'",
+    ],
+    exemplo: "Se você tem 8 horários vagos por semana a R$ 35, deixa de ganhar R$ 280 por semana — mais de R$ 1.100 por mês. Lotar só metade já paga a conta de luz e o aluguel.",
+    tarefa: ["Organizar a agenda e confirmar todos os horários no dia anterior por 2 semanas", "Criar um pacote mensal e oferecer para 5 clientes fiéis", "Postar 3 fotos de antes e depois (com autorização)"],
+    retorno: "Em 30 dias: contar quantos horários vagos sobraram e quantos pacotes vendeu.",
+  },
+  "seg-moda": {
+    perguntas: ["Tem peça parada há mais de 3 meses?", "Como você decide o que comprar na coleção?", "Vende fiado? Quanto tem para receber?", "Seus clientes te acham no celular?"],
+    explicar: [
+      "Diga assim: 'Peça parada na arara é dinheiro parado. Melhor vender com desconto e comprar o que gira.'",
+      "Diga assim: 'Compre olhando o que vendeu na mesma época do ano passado, não só o que é bonito.'",
+      "Diga assim: 'Fiado sem controle quebra loja. Se for vender a prazo, tenha limite por cliente e anote tudo.'",
+    ],
+    exemplo: "R$ 3.000 em roupas paradas há 6 meses: vendendo com 30% de desconto você recebe R$ 2.100 e pode comprar peças novas que giram em 30 dias. Parado, vale cada vez menos.",
+    tarefa: ["Separar as peças paradas e montar uma liquidação", "Criar o catálogo no WhatsApp Business com tamanhos e preços", "Fazer a lista de quem deve e cobrar com educação"],
+    retorno: "Em 30 dias: ver quanto vendeu da liquidação e planejar a compra da próxima data.",
+  },
+  "seg-presentes": {
+    perguntas: ["Quais datas vendem mais na sua loja?", "Com quanto tempo de antecedência você compra para cada data?", "Tem kits prontos por faixa de preço?", "Faz lista de material escolar?"],
+    explicar: [
+      "Diga assim: 'Loja de presente vive de datas. Quem compra 60 dias antes tem o produto certo e o melhor preço.'",
+      "Diga assim: 'Cliente indeciso compra mais rápido quando vê kits prontos por preço: até R$ 30, R$ 50, R$ 100.'",
+      "Diga assim: 'Embrulho caprichado é propaganda: o presente sai da sua loja e é aberto na frente de várias pessoas.'",
+    ],
+    exemplo: "Um kit com 3 itens que custam R$ 18 no total, vendido a R$ 39,90, deixa quase R$ 22. Vender 30 kits no Dia das Mães rende cerca de R$ 650 a mais.",
+    tarefa: ["Montar o calendário de compras das próximas 3 datas", "Criar 3 kits por faixa de preço e fotografar", "Divulgar 'ideias de presente' nos grupos da cidade"],
+    retorno: "Depois da próxima data forte: comparar as vendas com o ano anterior.",
+  },
+  "seg-construcao": {
+    perguntas: ["Em quanto tempo você responde um orçamento?", "Já falta material básico (cimento, ferro, areia)?", "Tem parceria com pedreiros e eletricistas?", "Vende para a prefeitura?"],
+    explicar: [
+      "Diga assim: 'Em material de construção, quem responde o orçamento primeiro geralmente vende. Responda no mesmo dia.'",
+      "Diga assim: 'O pedreiro é quem indica a loja. Trate bem, ofereça condição especial e ele traz o cliente.'",
+      "Diga assim: 'A prefeitura também compra material. Com as certidões em dia, você pode participar.'",
+    ],
+    exemplo: "Se de 10 orçamentos por semana você fecha 3, responder no mesmo dia pode virar 5 fechados. Com ticket médio de R$ 800, são R$ 1.600 a mais por semana.",
+    tarefa: ["Responder todos os orçamentos no mesmo dia por 2 semanas e anotar quantos fechou", "Conversar com 5 profissionais da cidade sobre parceria", "Separar as certidões para compras públicas"],
+    retorno: "Em 30 dias: ver a taxa de orçamentos fechados e as parcerias feitas.",
+  },
+  "seg-automotivo": {
+    perguntas: ["Você dá orçamento por escrito antes de começar?", "Anota o serviço feito em cada carro?", "O cliente volta para a próxima revisão?", "Sua oficina aparece no Google?"],
+    explicar: [
+      "Diga assim: 'Confiança é o que faz o cliente voltar. Orçamento por escrito e a peça velha na mão do cliente mostram honestidade.'",
+      "Diga assim: 'Se você anota a quilometragem, sabe quando chamar o cliente para a próxima troca de óleo — e ele volta para você, não para outro.'",
+      "Diga assim: 'Muita gente procura oficina pelo mapa do celular. Se você não aparece, o cliente vai em quem aparece.'",
+    ],
+    exemplo: "Com 40 clientes cadastrados, lembrar a troca de óleo a cada 6 meses traz cerca de 7 serviços garantidos por mês, sem gastar com propaganda.",
+    tarefa: ["Começar um caderno ou planilha com placa, km e serviço", "Criar ou corrigir o perfil no Google com endereço e horário", "Mandar o lembrete de revisão para os clientes do semestre passado"],
+    retorno: "Em 30 dias: contar quantos clientes voltaram pelo lembrete.",
+  },
+  "seg-agro": {
+    perguntas: ["Você sabe quanto gastou na última safra ou produção?", "Para quem vende hoje? Atravessador?", "Tem produto que poderia embalar ou transformar (queijo, geleia, conserva)?", "Já pensou em vender para a merenda escolar?"],
+    explicar: [
+      "Diga assim: 'Sem anotar o custo, você não sabe se a safra deu lucro ou só pagou as contas.'",
+      "Diga assim: 'Vender direto ao consumidor (feira, cesta da semana) paga melhor do que vender tudo para o atravessador.'",
+      "Diga assim: 'Produto lavado, embalado e com rótulo vale mais. O mesmo pé de alface pode render o dobro bem apresentado.'",
+    ],
+    exemplo: "Uma dúzia de ovos vendida ao atravessador por R$ 7 pode sair a R$ 12 na cesta da semana. Com 30 dúzias por semana, são R$ 150 a mais — R$ 600 por mês.",
+    tarefa: ["Anotar os custos da produção atual", "Montar uma cesta da semana e oferecer para 10 famílias", "Participar da próxima Feira do Empreendedor"],
+    retorno: "Em 30 dias: ver quantas cestas fixas fechou e se vale ampliar.",
+  },
+  "seg-pet": {
+    perguntas: ["Seus clientes compram ração sempre com você?", "Sabe quando a ração de cada cliente vai acabar?", "Tem banho e tosa com horário fixo?", "Faz entrega ou leva e traz?"],
+    explicar: [
+      "Diga assim: 'Ração é compra que se repete. Se você avisar antes de acabar, o cliente compra de você e não no mercado.'",
+      "Diga assim: 'Pacote mensal de banho garante agenda cheia e dinheiro certo.'",
+      "Diga assim: 'Leva e traz resolve a vida de quem trabalha o dia todo — e cobra-se à parte.'",
+    ],
+    exemplo: "Saco de 15 kg dura cerca de 30 dias para um cão médio. Com 50 clientes avisados no dia 25, são 50 vendas recorrentes por mês.",
+    tarefa: ["Anotar a data da compra de ração de cada cliente", "Criar o pacote mensal de banho e tosa", "Postar as fotos dos pets depois do banho (com autorização)"],
+    retorno: "Em 30 dias: contar quantos clientes recompraram pelo aviso.",
+  },
+  "seg-servicos-casa": {
+    perguntas: ["Como você define o preço da diária ou do serviço?", "Dá orçamento por escrito?", "Pede sinal para comprar material?", "Tem CNPJ? Contribui para o INSS?"],
+    explicar: [
+      "Diga assim: 'Seu preço precisa pagar a gasolina, as ferramentas, os dias sem serviço e ainda o seu sustento. Não é só a hora trabalhada.'",
+      "Diga assim: 'Orçamento por escrito evita briga no final: está tudo combinado — prazo, material e pagamento.'",
+      "Diga assim: 'Como MEI, você paga um valor pequeno por mês e tem direito a aposentadoria, auxílio-doença e pode dar nota para empresas e prefeitura.'",
+    ],
+    exemplo: "Se você quer ganhar R$ 3.000 por mês e trabalha 20 dias, precisa de R$ 150 por dia livres. Somando R$ 30 de transporte e desgaste das ferramentas, a diária fica em R$ 180.",
+    tarefa: ["Calcular a sua diária com a conta acima", "Cadastrar-se como Prestador de Serviços no Conecta Comércio com fotos dos trabalhos", "Pedir avaliação ou indicação aos últimos 5 clientes"],
+    retorno: "Em 30 dias: conferir se a agenda aumentou e, se ainda não for MEI, fazer a formalização.",
+  },
+  "seg-caseiros": {
+    perguntas: ["Você sabe quanto custa cada unidade do que produz?", "O dinheiro do negócio fica misturado com o da casa?", "Trabalha com encomenda e sinal?", "Seu produto tem etiqueta com seu nome e WhatsApp?"],
+    explicar: [
+      "Diga assim: 'Seu tempo também é custo. Se você não cobra pelo seu trabalho, está pagando para trabalhar.'",
+      "Diga assim: 'Separe o dinheiro do negócio, nem que seja numa caixinha ou numa conta só para ele. Assim você enxerga se está dando lucro.'",
+      "Diga assim: 'A etiqueta com seu nome e WhatsApp transforma cada produto vendido em propaganda.'",
+    ],
+    exemplo: "Cento de brigadeiros: R$ 32 de ingredientes + R$ 8 de forminhas e embalagem + R$ 5 de gás = R$ 45. Com 3 horas de trabalho a R$ 20, o custo real é R$ 105. Vender a R$ 90 dá prejuízo; o preço justo fica em torno de R$ 130.",
+    tarefa: ["Fazer a conta de custo dos 3 produtos principais", "Criar etiqueta simples com nome e WhatsApp", "Montar o catálogo no WhatsApp Business"],
+    retorno: "Em 20 dias: revisar os preços e falar sobre a formalização como MEI.",
+  },
+  "seg-saude": {
+    perguntas: ["Você tem clientes de uso contínuo ou alunos fixos?", "Trabalha com plano mensal ou pagamento por vez?", "Faz entrega ou atendimento em casa?", "Publica conteúdo útil nas redes?"],
+    explicar: [
+      "Diga assim: 'Cliente que volta todo mês é a base do negócio. Cadastre e lembre ele na hora certa.'",
+      "Diga assim: 'Plano mensal ou trimestral dá previsibilidade: você sabe quanto vai entrar.'",
+      "Diga assim: 'Dica de saúde nas redes gera confiança — a pessoa lembra de você quando precisar.'",
+    ],
+    exemplo: "Uma academia com 60 alunos a R$ 90 fatura R$ 5.400 por mês. Se 10 saem por mês e entram só 6, em um ano ela perde quase metade dos alunos. Plano trimestral e aula experimental ajudam a segurar e trazer gente nova.",
+    tarefa: ["Fazer o cadastro dos clientes de uso contínuo ou dos alunos", "Criar uma opção de plano mensal ou trimestral", "Planejar uma ação para a próxima campanha de saúde do mês"],
+    retorno: "Em 30 dias: ver quantos clientes renovaram e quantos novos vieram.",
+  },
+  "seg-tecnologia": {
+    perguntas: ["Você dá ordem de serviço com garantia por escrito?", "Oferece acessórios em todo atendimento?", "Avisa o cliente quando o aparelho fica pronto?", "Compra peças com antecedência?"],
+    explicar: [
+      "Diga assim: 'Garantia por escrito passa segurança e evita discussão.'",
+      "Diga assim: 'Película e capinha em todo conserto aumentam o lucro sem gastar com cliente novo.'",
+      "Diga assim: 'Avisar com foto que o aparelho está pronto mostra organização e o cliente indica você.'",
+    ],
+    exemplo: "Se de 40 consertos por mês você vende película e capinha para 15 clientes, com lucro de R$ 25 cada, são R$ 375 a mais por mês.",
+    tarefa: ["Criar um modelo simples de ordem de serviço com garantia", "Oferecer acessórios em todos os atendimentos por 2 semanas", "Gravar 2 vídeos curtos de dicas"],
+    retorno: "Em 30 dias: ver quanto aumentou a venda de acessórios.",
+  },
+  "seg-transporte": {
+    perguntas: ["Você sabe quanto gasta por quilômetro rodado?", "Tem tabela de preços?", "Tem clientes fixos, como comércios?", "É MEI? Contribui para o INSS?"],
+    explicar: [
+      "Diga assim: 'O preço da corrida tem que pagar combustível, manutenção, pneu e seguro — e sobrar o seu ganho.'",
+      "Diga assim: 'Comércio parceiro (mercado, farmácia, restaurante) traz entrega todo dia, não só de vez em quando.'",
+      "Diga assim: 'Como MEI você tem INSS e pode emitir nota para as empresas que atende.'",
+    ],
+    exemplo: "Carro que faz 10 km por litro com gasolina a R$ 6 gasta R$ 0,60 por km. Somando cerca de R$ 0,30 de manutenção e pneu, são R$ 0,90 por km. Uma corrida de 10 km (ida e volta) custa R$ 9 só para rodar.",
+    tarefa: ["Calcular o seu custo por km", "Montar uma tabela de preços por bairro ou distância", "Oferecer parceria de entregas para 3 comércios"],
+    retorno: "Em 30 dias: conferir se a tabela cobre os custos e quantas parcerias fechou.",
+  },
+};

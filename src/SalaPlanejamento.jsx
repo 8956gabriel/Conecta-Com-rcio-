@@ -6,8 +6,8 @@
 // (ver supabase-sala-planejamento.sql).
 // =============================================================================
 import React, { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Copy, Download, Eye, EyeOff, Pencil, PlusCircle, Trash2, CheckCircle2, Target, Sparkles } from "lucide-react";
-import { ESTRATEGIAS_SEGMENTO } from "./SalaSegmentos.js";
+import { CalendarDays, ChevronLeft, ChevronRight, Copy, Download, Eye, EyeOff, Pencil, PlusCircle, Trash2, CheckCircle2, Target, Sparkles, MessageSquare, ChevronDown } from "lucide-react";
+import { ESTRATEGIAS_SEGMENTO, ROTEIRO_GERAL, ORIENTACAO_SEGMENTO } from "./SalaSegmentos.js";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { exportarPDF } from "./central/motor.js";
 
@@ -158,6 +158,32 @@ function textoItens(titulo, itens) {
   return [`📅 ${titulo} — Sala do Empreendedor · Ivatuba`, "", ...itens.map((i) => `${dataBR(i.data)} — ${i.titulo}${i.descricao ? `: ${i.descricao}` : ""}`)].join("\n");
 }
 
+// Roteiro de orientação (para o atendente usar no atendimento)
+function textoRoteiro(m) {
+  const o = ORIENTACAO_SEGMENTO[m.k] || {};
+  return [
+    `🗣️ Como orientar — ${m.segmento}`,
+    `Perguntas para entender o negócio:\n${(o.perguntas || []).map((t) => `• ${t}`).join("\n")}`,
+    `Como explicar:\n${(o.explicar || []).map((t) => `• ${t}`).join("\n")}`,
+    o.exemplo && `Exemplo com números:\n${o.exemplo}`,
+    `Tarefa para casa:\n${(o.tarefa || []).map((t, i) => `${i + 1}. ${t}`).join("\n")}`,
+    o.retorno && `Retorno: ${o.retorno}`,
+    `Roteiro do atendimento:\n${ROTEIRO_GERAL.map((r) => `${r.etapa} — ${r.texto}`).join("\n")}`,
+    "— Sala do Empreendedor · Ivatuba",
+  ].filter(Boolean).join("\n\n");
+}
+async function pdfRoteiro(m) {
+  const o = ORIENTACAO_SEGMENTO[m.k] || {};
+  await exportarPDF(`roteiro-orientacao-${m.k.replace("seg-", "")}`, `Como orientar — ${m.segmento}`, [
+    { titulo: "1. Perguntas para entender o negócio", cabecalho: ["Pergunte"], linhas: (o.perguntas || []).map((t) => [t]) },
+    { titulo: "2. Como explicar (em palavras simples)", cabecalho: ["Diga assim"], linhas: (o.explicar || []).map((t) => [t.replace(/^Diga assim:\s*/, "")]) },
+    { titulo: "3. Exemplo com números", cabecalho: ["Troque pelos números do empreendedor"], linhas: [[o.exemplo || ""]] },
+    { titulo: "4. O que a Sala recomenda", cabecalho: ["Área", "Orientação"], linhas: m.passos.map((p) => { const i = p.indexOf(":"); return [p.slice(0, i), p.slice(i + 1).trim()]; }) },
+    { titulo: "5. Tarefa para casa e retorno", cabecalho: ["Combinado"], linhas: [...(o.tarefa || []).map((t) => [t]), [`Retorno: ${o.retorno || ""}`]] },
+    { titulo: "Roteiro do atendimento (vale para todos)", cabecalho: ["Etapa", "Como fazer"], linhas: ROTEIRO_GERAL.map((r) => [r.etapa, r.texto]) },
+  ], "Registre o atendimento na ficha com a data de retorno.", "Sala do Empreendedor · Ivatuba");
+}
+
 async function pdfEstrategia(e) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF();
@@ -281,6 +307,7 @@ export function AbaEstrategias({ ctx }) {
   const [apagando, setApagando] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [segmento, setSegmento] = useState(ESTRATEGIAS_SEGMENTO[0].k);
+  const [verRoteiro, setVerRoteiro] = useState(false);
 
   const abrirModelo = (m) => {
     setEditId(null);
@@ -405,6 +432,53 @@ export function AbaEstrategias({ ctx }) {
                 );
               })}
             </div>
+            {(() => {
+              const o = ORIENTACAO_SEGMENTO[m.k];
+              if (!o) return null;
+              return (
+                <div className="rounded-xl border-2 p-3 md:p-4 mt-3" style={{ borderColor: P.amber, background: "#FFFBF2" }}>
+                  <p className="font-display font-bold text-sm flex items-center gap-1.5" style={{ color: P.ink }}><MessageSquare size={15} color={P.amber} /> Como orientar o empreendedor</p>
+                  <p className="font-body text-[11px] mb-3" style={{ color: P.muted }}>Para o atendente: o que perguntar, como explicar em palavras simples, um exemplo com números e o que combinar.</p>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <div>
+                      <p className="font-display font-bold text-xs mb-1" style={{ color: P.ink }}>1. Pergunte para entender o negócio</p>
+                      <ul className="font-body text-xs space-y-1 list-disc pl-4" style={{ color: "#425A70" }}>{o.perguntas.map((t) => <li key={t}>{t}</li>)}</ul>
+                    </div>
+                    <div>
+                      <p className="font-display font-bold text-xs mb-1" style={{ color: P.ink }}>2. Explique assim</p>
+                      <ul className="font-body text-xs space-y-1.5 pl-0" style={{ color: "#425A70" }}>{o.explicar.map((t) => <li key={t} className="rounded-lg bg-white border px-2 py-1.5" style={{ borderColor: P.line }}>💬 {t.replace(/^Diga assim:\s*/, "")}</li>)}</ul>
+                    </div>
+                    <div>
+                      <p className="font-display font-bold text-xs mb-1" style={{ color: P.ink }}>3. Mostre com números</p>
+                      <p className="font-body text-xs rounded-lg bg-white border px-2 py-1.5" style={{ color: "#425A70", borderColor: P.line }}>🧮 {o.exemplo}</p>
+                      <p className="font-body text-[10px] mt-1" style={{ color: P.soft }}>Troque pelos números do próprio empreendedor.</p>
+                    </div>
+                    <div>
+                      <p className="font-display font-bold text-xs mb-1" style={{ color: P.ink }}>4. Combine a tarefa e o retorno</p>
+                      <ol className="font-body text-xs space-y-1 list-decimal pl-4" style={{ color: "#425A70" }}>{o.tarefa.map((t) => <li key={t}>{t}</li>)}</ol>
+                      <p className="font-body text-xs mt-1.5" style={{ color: P.ink }}>📅 <b>Retorno:</b> {o.retorno}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setVerRoteiro((v) => !v)} className="font-body text-xs font-bold mt-3 inline-flex items-center gap-1" style={{ color: P.blueHex }}>
+                    <ChevronDown size={14} style={{ transform: verRoteiro ? "rotate(180deg)" : "none" }} /> Roteiro do atendimento passo a passo (vale para todos)
+                  </button>
+                  {verRoteiro && (
+                    <div className="mt-2 space-y-1.5">
+                      {ROTEIRO_GERAL.map((r) => (
+                        <div key={r.etapa} className="rounded-lg bg-white border px-3 py-2" style={{ borderColor: P.line }}>
+                          <p className="font-display font-bold text-xs" style={{ color: P.ink }}>{r.etapa}</p>
+                          <p className="font-body text-xs" style={{ color: "#425A70" }}>{r.texto}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    <Bt contorno onClick={() => pdfRoteiro(m)}><Download size={13} /> PDF do roteiro (atendente)</Bt>
+                    <Bt contorno onClick={() => { copiarTexto(textoRoteiro(m)); ctx.avisar("Roteiro copiado."); }}><Copy size={13} /> Copiar roteiro</Bt>
+                  </div>
+                </div>
+              );
+            })()}
             <div className="rounded-xl border p-3 mt-3" style={{ borderColor: P.line }}>
               <p className="font-display font-bold text-xs mb-1" style={{ color: P.ink }}>💬 Mensagem pronta para divulgar</p>
               <p className="font-body text-xs" style={{ color: "#425A70" }}>{m.mensagem}</p>
