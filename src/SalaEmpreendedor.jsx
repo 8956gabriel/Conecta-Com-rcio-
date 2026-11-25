@@ -18,6 +18,8 @@ import {
   ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge, Building2,
 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
+import { ImportarGise } from "./SalaImportarGise.jsx";
+import { exportarPDF } from "./central/motor.js";
 import { AbaEstrategias, AbaCalendario, AgendaPublicaSala } from "./SalaPlanejamento.jsx";
 import { AbaBaseEmpresas } from "./SalaEmpresas.jsx";
 import { AbaSelo, AbaGestao, AbaOrientacoes, AbaEmpreendedores, AbaIndicadores, OrientacoesPublicas, DocProtegido } from "./SalaGestao.jsx";
@@ -125,6 +127,12 @@ function exportarCSV(nome, cabecalho, linhas) {
   a.download = nome;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+async function exportarExcel(nome, abas) {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.utils.book_new();
+  abas.forEach(({ titulo, cabecalho, linhas }) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cabecalho, ...linhas]), titulo.slice(0, 31)));
+  XLSX.writeFile(wb, `${nome}.xlsx`);
 }
 function copiar(texto) { try { navigator.clipboard?.writeText(texto); } catch { /* */ } }
 const linkCompleto = (caminho) => `${window.location.origin}${caminho}`;
@@ -844,6 +852,7 @@ function AbaAtendimentos({ ctx }) {
   const [busca, setBusca] = useState("");
   const [cat, setCat] = useState("");
   const [apagando, setApagando] = useState(null);
+  const [importar, setImportar] = useState(false);
 
   // Abriu vindo de "Registrar atendimento" / "Novo atendimento"
   useEffect(() => {
@@ -917,10 +926,22 @@ function AbaAtendimentos({ ctx }) {
     return !b || `${a.nome} ${a.documento || ""} ${a.empresa || ""} ${a.observacoes || ""}`.toLowerCase().includes(b);
   });
 
+  const linhasExport = {
+    cab: ["Data", "Nome", "CPF/CNPJ", "Empresa", "Tipo", "Canal", "Situação", "Atendente", "Observações"],
+    linhas: lista.map((a) => [dataBR(a.data), a.nome, a.documento || "", a.empresa || "", a.categoria, CANAIS[a.canal] || a.canal, (SITUACOES[a.situacao] || {}).r || a.situacao, a.atendente_nome || "", a.observacoes || ""]),
+  };
+
   return (
     <div>
       <Titulo eyebrow="Ficha de atendimento" title="Atendimentos" sub="Tudo o que é registrado aqui entra no relatório mensal automaticamente."
-        direita={!form && <Botao onClick={() => { setForm({ ...ATENDIMENTO_VAZIO, data: hojeISO() }); setEditandoId(null); }}><PlusCircle size={14} /> Novo atendimento</Botao>} />
+        direita={!form && (
+          <div className="flex flex-wrap gap-2">
+            <Botao contorno onClick={() => setImportar((x) => !x)}><Upload size={14} /> Importar do GISE</Botao>
+            <Botao onClick={() => { setForm({ ...ATENDIMENTO_VAZIO, data: hojeISO() }); setEditandoId(null); }}><PlusCircle size={14} /> Novo atendimento</Botao>
+          </div>
+        )} />
+
+      {importar && !form && <ImportarGise ctx={ctx} categorias={CATEGORIAS_SALA} onFechar={() => setImportar(false)} />}
 
       {form && (
         <form onSubmit={salvar} className="rounded-2xl border p-4 md:p-5 bg-white grid md:grid-cols-3 gap-3 mb-6" style={{ borderColor: S.blue }}>
@@ -970,6 +991,12 @@ function AbaAtendimentos({ ctx }) {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" color={S.soft} />
           <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar nome, CPF/CNPJ..." className="font-body text-sm border rounded-lg pl-8 pr-3 py-2 outline-none" style={inputStyle} />
         </div>
+        {lista.length > 0 && (
+          <>
+            <Botao contorno onClick={() => exportarExcel(`atendimentos-sala-${mes || "todos"}`, [{ titulo: "Atendimentos", cabecalho: linhasExport.cab, linhas: linhasExport.linhas }])}><Download size={14} /> Excel</Botao>
+            <Botao contorno onClick={() => exportarPDF(`atendimentos-sala-${mes || "todos"}`, `Atendimentos — Sala do Empreendedor${mes ? ` · ${mes.split("-").reverse().join("/")}` : ""}`, [{ titulo: `${lista.length} atendimento(s)`, cabecalho: linhasExport.cab, linhas: linhasExport.linhas }], "", "Sala do Empreendedor · Ivatuba-PR")}><Download size={14} /> PDF</Botao>
+          </>
+        )}
         <span className="font-body text-xs ml-auto" style={{ color: S.muted }}>{lista.length} com ficha{totHistorico ? ` + ${totHistorico} lançado(s) por total = ${lista.length + totHistorico}` : ""}</span>
       </div>
 
@@ -1063,6 +1090,10 @@ function AbaRelatorio({ ctx }) {
   const csv = () => exportarCSV(`sala-do-empreendedor-${ano}.csv`, ["Categoria", ...MESES, "Total"],
     [...CATEGORIAS_SALA.map((c) => [c, ...grade[c], grade[c].reduce((s, v) => s + v, 0)]), ["TOTAL", ...totMes, totGeral]]);
 
+  const tabela = [...CATEGORIAS_SALA.map((c) => [c, ...grade[c], grade[c].reduce((s, v) => s + v, 0)]), ["TOTAL", ...totMes, totGeral]];
+  const excel = () => exportarExcel(`relatorio-sala-do-empreendedor-${ano}`, [{ titulo: `Relatório ${ano}`, cabecalho: ["Categoria", ...MESES, "Total"], linhas: tabela }]);
+  const pdf = () => exportarPDF(`relatorio-sala-do-empreendedor-${ano}`, `Relatório de atendimentos ${ano}`, [{ titulo: "Atendimentos por tipo e mês", cabecalho: ["Categoria", ...MESES, "Total"], linhas: tabela }], "Fichas registradas + totais lançados (GISE).", "Sala do Empreendedor · Ivatuba-PR");
+
   const publicar = async () => {
     if (!supabaseConfigurado) { ctx.avisar("Modo demonstração: conecte o Supabase para publicar."); return; }
     setPublicando(true);
@@ -1080,7 +1111,9 @@ function AbaRelatorio({ ctx }) {
             <select value={ano} onChange={(e) => setAno(Number(e.target.value))} className="font-body text-sm border rounded-lg px-2 py-2 outline-none" style={inputStyle}>
               {anosComDados.map((a) => <option key={a}>{a}</option>)}
             </select>
-            <Botao contorno onClick={csv}><Download size={14} /> Planilha (CSV)</Botao>
+            <Botao contorno onClick={excel}><Download size={14} /> Excel</Botao>
+            <Botao contorno onClick={pdf}><Download size={14} /> PDF</Botao>
+            <Botao contorno onClick={csv}><Download size={14} /> CSV</Botao>
             {ctx.gerir && <Botao onClick={publicar} disabled={publicando}><Upload size={14} /> {publicando ? "Publicando..." : "Publicar números no site"}</Botao>}
           </div>
         } />
