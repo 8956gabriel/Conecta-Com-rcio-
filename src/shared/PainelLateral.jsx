@@ -13,6 +13,7 @@ import { ChevronsLeft, ChevronsRight, Menu, X } from "lucide-react";
 
 export default function PainelLateral({
   logo,           // url da logomarca do ambiente
+  marca = null,   // alternativa quando não há logo: { icone, nome, sub }
   logoAlt = "",
   ambiente,       // ex.: "Área do atendente"
   cor = "#0A5AA8",
@@ -71,9 +72,15 @@ export default function PainelLateral({
 
   const Cabeca = ({ compacto }) => (
     <div className={`border-b ${compacto ? "px-2 py-3" : "px-4 py-4"}`} style={{ borderColor: "#E3EBF4" }}>
-      {logo && <img src={logo} alt={logoAlt} className={compacto ? "h-7 w-full object-contain" : "h-10 w-auto object-contain"} />}
+      {logo ? <img src={logo} alt={logoAlt} className={compacto ? "h-7 w-full object-contain" : "h-10 w-auto object-contain"} />
+        : marca && (
+          <div className={`flex items-center gap-2 ${compacto ? "justify-center" : ""}`}>
+            {marca.icone && <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: corProfunda }}><marca.icone size={18} color="#fff" /></span>}
+            {!compacto && <span className="leading-tight min-w-0"><span className="block font-display font-extrabold text-[15px] truncate" style={{ color: corProfunda }}>{marca.nome}</span>{marca.sub && <span className="block font-body text-[11px] font-semibold truncate" style={{ color: "#8A9BAE" }}>{marca.sub}</span>}</span>}
+          </div>
+        )}
       {!compacto && ambiente && (
-        <span className="inline-block mt-2 font-body text-[10px] font-extrabold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full" style={{ background: `${cor}14`, color: cor }}>{ambiente}</span>
+        <span className="inline-block mt-2 font-body text-[10px] font-extrabold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full" style={{ background: `color-mix(in srgb, ${cor} 9%, transparent)`, color: cor }}>{ambiente}</span>
       )}
     </div>
   );
