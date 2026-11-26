@@ -8,7 +8,7 @@
 // =============================================================================
 import React, { useEffect, useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { Store, Briefcase, Tag, ClipboardList, Users, HandCoins, Inbox, ArrowLeftRight, ExternalLink } from "lucide-react";
+import { Store, Briefcase, Tag, ClipboardList, Users, HandCoins, Inbox, ArrowLeftRight, ExternalLink, FileText, FileSpreadsheet } from "lucide-react";
 import { supabase, supabaseConfigurado } from "../supabaseClient";
 
 const AZUL = "var(--cor-principal, #0A5AA8)";
@@ -24,6 +24,79 @@ async function buscar(tabela, colunas, filtro) {
   if (filtro) q = filtro(q);
   const { data, error } = await q;
   return error ? null : data || []; // null = sem permissão ou tabela indisponível
+}
+
+// ---------------------------------------------------------------------------
+// Relatório consolidado (Projeto Master · seção 18): o mesmo conteúdo da tela,
+// em PDF e Excel. Só números — nenhum dado pessoal sai daqui.
+// ---------------------------------------------------------------------------
+function secoesRelatorio(r, ano) {
+  const n = (v) => (v == null ? "—" : v);
+  const secoes = [{
+    titulo: "Resumo", aba: "Resumo", cor: [10, 90, 168], cabecalho: ["Setor", "Indicador", "Valor"],
+    linhas: [
+      ["Comércio", "Empresas ativas", n(r.empresas)],
+      ["Comércio", `Novas empresas em ${ano}`, n(r.empresas != null ? r.novasAno : null)],
+      ["Comércio", "Vagas abertas", n(r.vagas)],
+      ["Comércio", "Promoções válidas", n(r.promocoes)],
+      ...(r.salaOk ? [
+        ["Sala do Empreendedor", `Atendimentos em ${ano}`, r.salaTotal],
+        ["Sala do Empreendedor", "Atendimentos de MEI (fichas)", r.meis],
+        ["Sala do Empreendedor", "Pedidos pelo site", r.pedidos],
+      ] : [["Sala do Empreendedor", "Sem permissão para ver", "—"]]),
+      ...(r.fomentoOk ? [
+        ["Fomento Paraná", `Propostas em ${ano}`, r.propostas],
+        ["Fomento Paraná", "Créditos concedidos", r.concedidas],
+        ["Fomento Paraná", "Valor concedido", moeda(r.valorConcedido)],
+        ["Fomento Paraná", "Interessados pelo site", r.interesses],
+      ] : [["Fomento Paraná", "Sem permissão para ver", "—"]]),
+      ...(r.salaOk && r.fomentoOk ? [
+        ["Integração", "Sala para Fomento (atendimentos encaminhados)", r.salaParaFomento],
+        ["Integração", "Fomento para Sala (pedidos encaminhados)", r.fomentoParaSala],
+        ["Integração", "Pré-cadastros vindos da Sala", r.vindosDaSala],
+      ] : []),
+    ],
+  }];
+  if (r.segmentos.length) secoes.push({ titulo: "Empresas por segmento", aba: "Segmentos", cor: [10, 90, 168], cabecalho: ["Segmento", "Empresas"], linhas: r.segmentos.map((x) => [x.nome, x.valor]) });
+  if (r.salaOk) secoes.push({ titulo: `Sala — atendimentos por mês (${ano})`, aba: "Sala por mês", cor: [241, 159, 116], cabecalho: ["Mês", "Atendimentos"], linhas: [...r.salaMes.map((x) => [x.mes, x.valor]), ["Total", r.salaTotal]] });
+  if (r.fomentoOk) secoes.push({ titulo: `Fomento — propostas por situação (${ano})`, aba: "Fomento por situação", cor: [30, 142, 90], cabecalho: ["Situação", "Propostas"], linhas: r.porStatus.map((x) => [x.nome, x.valor]) });
+  return secoes;
+}
+
+async function baixarExcel(r, ano) {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.utils.book_new();
+  secoesRelatorio(r, ano).forEach((s) => {
+    const nome = (s.aba || s.titulo).replace(/[\\/?*[\]:]/g, "-").slice(0, 31);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([s.cabecalho, ...s.linhas]), nome);
+  });
+  XLSX.writeFile(wb, `desenvolvimento-economico-ivatuba-${ano}.xlsx`);
+}
+
+async function baixarPDF(r, ano) {
+  const { jsPDF } = await import("jspdf");
+  const autoTable = (await import("jspdf-autotable")).default;
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  doc.setFillColor(10, 90, 168); doc.rect(0, 0, 210, 26, "F");
+  doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(15);
+  doc.text("Desenvolvimento Econômico — Ivatuba-PR", 12, 12);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+  doc.text(`Conecta Comércio | Sala do Empreendedor | Fomento Paraná — ano ${ano} | gerado em ${new Date().toLocaleString("pt-BR")}`, 12, 19.5);
+  let y = 34;
+  secoesRelatorio(r, ano).forEach((s) => {
+    if (y > 260) { doc.addPage(); y = 16; }
+    doc.setTextColor(14, 34, 51); doc.setFont("helvetica", "bold"); doc.setFontSize(11.5);
+    doc.text(s.titulo, 12, y);
+    autoTable(doc, { startY: y + 2.5, head: [s.cabecalho], body: s.linhas.map((l) => l.map(String)), styles: { fontSize: 9 }, headStyles: { fillColor: s.cor }, alternateRowStyles: { fillColor: [245, 249, 253] }, margin: { left: 12, right: 12 } });
+    y = doc.lastAutoTable.finalY + 9;
+  });
+  const paginas = doc.getNumberOfPages();
+  for (let i = 1; i <= paginas; i++) {
+    doc.setPage(i); doc.setFontSize(8); doc.setTextColor(110);
+    doc.text("Só números consolidados — dados pessoais ficam reservados em cada setor.  |  Desenvolvedor: Gabriel Oliveira", 12, 290);
+    doc.text(`${i}/${paginas}`, 198, 290, { align: "right" });
+  }
+  doc.save(`desenvolvimento-economico-ivatuba-${ano}.pdf`);
 }
 
 export default function DesenvolvimentoEconomico() {
@@ -94,7 +167,10 @@ export default function DesenvolvimentoEconomico() {
           <h2 className="font-display font-extrabold text-xl" style={{ color: INK }}>Desenvolvimento econômico</h2>
           <p className="font-body text-xs mt-1" style={{ color: MUTED }}>Só números consolidados. Dados pessoais e históricos ficam reservados em cada setor.</p>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button disabled={!r} onClick={() => baixarPDF(r, ano)} className="font-body text-xs font-bold px-3 py-1.5 rounded-full border inline-flex items-center gap-1 disabled:opacity-50" style={{ borderColor: LINHA, color: INK, background: "#fff" }}><FileText size={13} /> PDF</button>
+          <button disabled={!r} onClick={() => baixarExcel(r, ano)} className="font-body text-xs font-bold px-3 py-1.5 rounded-full border inline-flex items-center gap-1 disabled:opacity-50" style={{ borderColor: LINHA, color: INK, background: "#fff" }}><FileSpreadsheet size={13} /> Excel</button>
+          <span className="w-px h-5 mx-1" style={{ background: LINHA }} />
           {[anoAtual - 1, anoAtual].map((a) => (
             <button key={a} onClick={() => setAno(a)} className="font-body text-xs font-bold px-3 py-1.5 rounded-full border"
               style={ano === a ? { background: AZUL, color: "#fff", borderColor: "transparent" } : { borderColor: LINHA, color: "#425A70", background: "#fff" }}>{a}</button>

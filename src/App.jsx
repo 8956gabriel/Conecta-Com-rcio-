@@ -20,6 +20,7 @@ import { FomentoPublico, FomentoAdmin, useFomentoAcesso } from "./FomentoParana.
 import { SalaPublico, SalaPainel, useSalaAcesso } from "./SalaEmpreendedor.jsx";
 import DesenvolvimentoEconomico from "./central/DesenvolvimentoEconomico.jsx";
 import Permissoes from "./central/Permissoes.jsx";
+import CentralAvisos, { useAvisosCentral } from "./central/Avisos.jsx";
 import { PortalAcesso } from "./SalaGestao.jsx";
 
 // ---------------------------------------------------------------------------
@@ -1973,7 +1974,7 @@ const meusProdutos = [
 // Categorias do menu do Painel Admin (Projeto Master · seção 8). Item que não
 // estiver em nenhum grupo cai automaticamente em "Outros", para nada sumir.
 const GRUPOS_MENU_ADMIN_BASE = [
-  { titulo: "Início", ids: ["dashboard", "desenvolvimento", "acessos"] },
+  { titulo: "Início", ids: ["avisos", "dashboard", "desenvolvimento", "acessos"] },
   { titulo: "Comércio", ids: ["empresas", "categorias", "criterios", "prestadores", "agenda", "produtos", "promocoes", "combos", "cupons", "fidelidade", "avaliacoes"] },
   { titulo: "Comunidade", ids: ["turismo", "mural", "classificados", "ouvidoria", "utilidade", "enquetes", "depoimentos", "faq"] },
   { titulo: "Conteúdo e divulgação", ids: ["noticias", "vagas", "banners", "notificacoes", "feira", "calendario", "credenciais", "cursos", "licitacoes"] },
@@ -1983,6 +1984,7 @@ const GRUPOS_MENU_ADMIN_BASE = [
 
 function AdminPanel() {
   const [tab, setTab] = useState("dashboard");
+  const avisosCentral = useAvisosCentral(); // Projeto Master · seção 19
   const [menuAdminAberto, setMenuAdminAberto] = useState(false);
   const categoriasReaisAdmin = useCategoriasReais();
 
@@ -5394,6 +5396,7 @@ function AdminPanel() {
   }, [empresasPend]);
 
   const items = [
+    { id: "avisos", label: "Central de avisos", icon: Bell, badge: avisosCentral.pendencias },
     { id: "dashboard", label: "Estatísticas", icon: LayoutDashboard },
     { id: "desenvolvimento", label: "Desenvolvimento econômico", icon: TrendingUp },
     { id: "usuarios", label: "Cadastrar usuário", icon: UserCircle2 },
@@ -5485,7 +5488,8 @@ function AdminPanel() {
                   <button key={it.id} onClick={() => { if (it.href) { window.location.hash = it.href; } else { setTab(it.id); setMenuAdminAberto(false); } }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-body font-semibold text-left"
                     style={{ background: active ? C.blueTint : "transparent", color: active ? C.blue : "#425A70" }}>
-                    <Icon size={16} /> <span className="truncate">{it.label}</span>
+                    <Icon size={16} /> <span className="truncate flex-1">{it.label}</span>
+                    {it.badge > 0 && <span className="font-body text-[10px] font-extrabold px-1.5 rounded-full text-white" style={{ background: "#D9480F" }}>{it.badge}</span>}
                   </button>
                 );
               })}
@@ -9142,6 +9146,8 @@ function AdminPanel() {
         {tab === "desenvolvimento" && <DesenvolvimentoEconomico />}
 
         {tab === "permissoes" && <Permissoes notificar={notificar} />}
+
+        {tab === "avisos" && <CentralAvisos avisos={avisosCentral.avisos} recarregar={avisosCentral.recarregar} irPara={setTab} />}
 
         {tab === "modulos" && (
           <div className="max-w-3xl">
