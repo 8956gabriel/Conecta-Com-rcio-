@@ -9,7 +9,8 @@ import {
   Pencil, Trash2, Tag, UserCircle2, ChevronLeft, ShieldCheck, BarChart3, Vote, Sparkles,
   FileText, Receipt, ClipboardList, HandCoins, ExternalLink,
   Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
-  Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw, Zap, Activity
+  Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw, Zap, Activity,
+  EyeOff, Layers,
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -1975,7 +1976,7 @@ const GRUPOS_MENU_ADMIN_BASE = [
   { titulo: "Comunidade", ids: ["turismo", "mural", "classificados", "ouvidoria", "utilidade", "enquetes", "depoimentos", "faq"] },
   { titulo: "Conteúdo e divulgação", ids: ["noticias", "vagas", "banners", "notificacoes", "feira", "calendario", "credenciais", "cursos", "licitacoes"] },
   { titulo: "Sala e Fomento", ids: ["servicos", "sala-empreendedor", "fomento-parana"] },
-  { titulo: "Administração", ids: ["usuarios", "todos-usuarios", "identidade"] },
+  { titulo: "Administração", ids: ["modulos", "usuarios", "todos-usuarios", "identidade"] },
 ];
 
 function AdminPanel() {
@@ -3546,6 +3547,19 @@ function AdminPanel() {
       const { data: pub } = supabase.storage.from("logos").getPublicUrl(caminho);
       setSiteConfigAdmin((v) => ({ ...v, logo_url: pub.publicUrl }));
     });
+  };
+
+  // Gerenciamento de módulos — liga/desliga um módulo público na hora (só a chave dele).
+  const [salvandoModulo, setSalvandoModulo] = useState("");
+  const alternarModulo = async (mod, valor) => {
+    const anterior = siteConfigAdmin?.[mod.chave];
+    setSiteConfigAdmin((v) => ({ ...(v || {}), [mod.chave]: valor }));
+    if (!supabaseConfigurado) return;
+    setSalvandoModulo(mod.id);
+    const { error } = await supabase.from("site_config").update({ [mod.chave]: valor }).eq("id", 1);
+    setSalvandoModulo("");
+    if (error) { setSiteConfigAdmin((v) => ({ ...(v || {}), [mod.chave]: anterior })); notificar(`Não foi possível salvar: ${error.message}`, "erro"); }
+    else notificar(`${mod.nome} ${valor ? "publicado" : "ocultado"} no site.`);
   };
 
   const salvarIdentidade = async (e) => {
@@ -5414,6 +5428,7 @@ function AdminPanel() {
     { id: "banners", label: "Banners", icon: ImageIcon },
     { id: "notificacoes", label: "Notificações", icon: Bell },
     { id: "identidade", label: "Identidade do site", icon: Palette },
+    { id: "modulos", label: "Módulos do site", icon: Layers },
   ];
 
   const itemAtivo = items.find((it) => it.id === tab);
@@ -9117,6 +9132,40 @@ function AdminPanel() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {tab === "modulos" && (
+          <div className="max-w-3xl">
+            <p className="font-body text-sm mb-4" style={{ color: "#5C7186" }}>
+              Escolha o que aparece no site público. Ocultar não apaga nada: os dados continuam aqui no painel e você pode publicar de novo quando quiser.
+              Módulo oculto também não abre pelo link direto para o público.
+            </p>
+            {siteConfigAdmin === null && supabaseConfigurado ? (
+              <p className="font-body text-sm" style={{ color: "#5C7186" }}>Carregando...</p>
+            ) : (
+              <div className="rounded-2xl border divide-y bg-white" style={{ borderColor: C.line }}>
+                {MODULOS_PUBLICOS.map((mod) => {
+                  const ativo = !!siteConfigAdmin?.[mod.chave];
+                  return (
+                    <div key={mod.id} className="flex items-center gap-3 px-4 py-3.5" style={{ borderColor: C.line }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{mod.nome}</p>
+                        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{mod.descricao} · <a href={`#/${mod.id}`} className="underline" target="_blank" rel="noopener">abrir</a></p>
+                      </div>
+                      <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={ativo ? { background: "#E6F5EC", color: "#1E8E5A" } : { background: "#F1F4F8", color: "#5C7186" }}>{ativo ? "Publicado" : "Oculto"}</span>
+                      <button disabled={salvandoModulo === mod.id} onClick={() => alternarModulo(mod, !ativo)}
+                        className="font-body text-xs font-bold rounded-lg px-3 py-2 border min-w-[92px]" style={{ borderColor: ativo ? C.line : C.blue, color: ativo ? "#425A70" : "#fff", background: ativo ? "#fff" : C.blue, opacity: salvandoModulo === mod.id ? 0.6 : 1 }}>
+                        {salvandoModulo === mod.id ? "Salvando..." : ativo ? "Ocultar" : "Publicar"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <p className="font-body text-xs mt-4" style={{ color: "#8A9BAE" }}>
+              Próxima etapa: estender para os demais módulos (vagas, cupons, combos, FAQ...) e incluir os estados "Em preparação" e "Desativado".
+            </p>
           </div>
         )}
 
@@ -16243,6 +16292,50 @@ function CredencialDigital({ codigo }) {
 // Cada painel e acessado por um link proprio (ver ROTA_HASH acima); o site
 // publico em si nunca exige cadastro para ser visitado.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Gerenciamento de módulos (Projeto Master · Fase 10). Usa as chaves que já
+// existem em site_config (turismo_ativo, mural_ativo...). Módulo desligado:
+//   • some do menu público (já acontecia)
+//   • o link direto (#/turismo etc.) mostra "indisponível" para o público
+//   • o administrador continua vendo a página, com um aviso de que está oculta
+// Nenhum dado é apagado ao ocultar.
+// ---------------------------------------------------------------------------
+const MODULOS_PUBLICOS = [
+  { id: "turismo", chave: "turismo_ativo", nome: "Turismo", descricao: "Pontos turísticos, roteiros e história da cidade" },
+  { id: "mural", chave: "mural_ativo", nome: "Mural da comunidade", descricao: "Sugestões, elogios, reclamações e avisos" },
+  { id: "utilidade", chave: "utilidade_ativo", nome: "Utilidade pública", descricao: "Telefones úteis, serviços e emergências" },
+  { id: "ouvidoria", chave: "ouvidoria_ativo", nome: "Ouvidoria", descricao: "Manifestações com protocolo e acompanhamento" },
+  { id: "classificados", chave: "classificados_ativo", nome: "Classificados", descricao: "Compra e venda entre moradores" },
+  { id: "estatisticas", chave: "estatisticas_ativo", nome: "Números da cidade", descricao: "Estatísticas públicas da plataforma" },
+];
+
+function ModuloProtegido({ id, siteConfig, carregado, perfil, children }) {
+  const mod = MODULOS_PUBLICOS.find((m) => m.id === id);
+  if (!mod || !supabaseConfigurado) return children;
+  if (!carregado) return <LoadingBrand />;
+  const ativo = !!siteConfig?.[mod.chave];
+  if (ativo) return children;
+  if (perfil?.tipo === "admin") {
+    return (
+      <div>
+        <div className="max-w-3xl mx-auto px-4 pt-4">
+          <div className="rounded-xl border px-4 py-2.5 font-body text-xs font-semibold flex items-center gap-2" style={{ background: "#FFF6E9", borderColor: "#F3D9A8", color: "#8A5A12" }}>
+            <EyeOff size={14} /> {mod.nome} está oculto: só administradores veem esta página. Para publicar, use Painel Admin → Módulos do site.
+          </div>
+        </div>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <div className="max-w-md mx-auto px-4 py-24 text-center">
+      <p className="font-display font-bold text-lg" style={{ color: C.ink }}>{mod.nome} não está disponível no momento</p>
+      <p className="font-body text-sm mt-2" style={{ color: "#5C7186" }}>Esta seção foi temporariamente retirada do site.</p>
+      <a href="#/" className="inline-block font-body text-sm font-bold mt-6 px-5 py-2.5 rounded-xl text-white" style={{ background: C.blue }}>Voltar ao início</a>
+    </div>
+  );
+}
+
 export default function ConectaComercio() {
   const [modo, setModo] = useState("site");
   const [abaConta, setAbaConta] = useState("cadastro");
@@ -16252,6 +16345,7 @@ export default function ConectaComercio() {
   // Identidade visual do site (cor, logo, frase) — editada pelo admin na aba
   // "Identidade" e aplicada aqui globalmente assim que a página carrega.
   const [siteConfig, setSiteConfig] = useState(null);
+  const [siteConfigCarregado, setSiteConfigCarregado] = useState(!supabaseConfigurado);
   useEffect(() => {
     if (!supabaseConfigurado) return;
     supabase.from("site_config").select("*").eq("id", 1).single().then(({ data }) => {
@@ -16259,7 +16353,8 @@ export default function ConectaComercio() {
         setSiteConfig(data);
         if (data.cor_principal) aplicarCorPrincipal(data.cor_principal);
       }
-    });
+      setSiteConfigCarregado(true);
+    }, () => setSiteConfigCarregado(true));
   }, []);
 
   const [sessao, setSessao] = useState(undefined); // undefined = carregando, null = sem sessão
@@ -16456,13 +16551,13 @@ export default function ConectaComercio() {
 
       <div key={modo} className="page-transition">
       {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} siteConfig={siteConfig} sessao={sessao} perfil={perfil} irParaModo={setModo} />}
-      {modo === "estatisticas" && <EstatisticasPublicas />}
-      {modo === "turismo" && <PaginaTurismo siteConfig={siteConfig} />}
-      {modo === "mural" && <PaginaMural perfil={perfil} />}
+      {modo === "estatisticas" && <ModuloProtegido id="estatisticas" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><EstatisticasPublicas /></ModuloProtegido>}
+      {modo === "turismo" && <ModuloProtegido id="turismo" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><PaginaTurismo siteConfig={siteConfig} /></ModuloProtegido>}
+      {modo === "mural" && <ModuloProtegido id="mural" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><PaginaMural perfil={perfil} /></ModuloProtegido>}
       {modo === "votacao" && <PaginaVotacao />}
-      {modo === "utilidade" && <PaginaUtilidadePublica />}
-      {modo === "ouvidoria" && <PaginaOuvidoria />}
-      {modo === "classificados" && <PaginaClassificados />}
+      {modo === "utilidade" && <ModuloProtegido id="utilidade" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><PaginaUtilidadePublica /></ModuloProtegido>}
+      {modo === "ouvidoria" && <ModuloProtegido id="ouvidoria" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><PaginaOuvidoria /></ModuloProtegido>}
+      {modo === "classificados" && <ModuloProtegido id="classificados" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><PaginaClassificados /></ModuloProtegido>}
       {modo === "fomento" && <FomentoPublico siteConfig={siteConfig} />}
       {modo === "sala" && <SalaPublico />}
       {modo === "acesso" && <PortalAcesso />}
