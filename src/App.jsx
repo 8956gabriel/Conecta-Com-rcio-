@@ -11,7 +11,7 @@ import {
   Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
   Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw, Zap, Activity,
   EyeOff, Layers,
-  DatabaseBackup,
+  DatabaseBackup, Fingerprint,
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -22,6 +22,7 @@ import { SalaPublico, SalaPainel, useSalaAcesso } from "./SalaEmpreendedor.jsx";
 import DesenvolvimentoEconomico from "./central/DesenvolvimentoEconomico.jsx";
 import Permissoes from "./central/Permissoes.jsx";
 import Backup from "./central/Backup.jsx";
+import CadastroUnico from "./central/CadastroUnico.jsx";
 import CentralAvisos, { useAvisosCentral } from "./central/Avisos.jsx";
 import { PortalAcesso } from "./SalaGestao.jsx";
 
@@ -1980,7 +1981,7 @@ const GRUPOS_MENU_ADMIN_BASE = [
   { titulo: "Comércio", ids: ["empresas", "categorias", "criterios", "prestadores", "agenda", "produtos", "promocoes", "combos", "cupons", "fidelidade", "avaliacoes"] },
   { titulo: "Comunidade", ids: ["turismo", "mural", "classificados", "ouvidoria", "utilidade", "enquetes", "depoimentos", "faq"] },
   { titulo: "Conteúdo e divulgação", ids: ["noticias", "vagas", "banners", "notificacoes", "feira", "calendario", "credenciais", "cursos", "licitacoes"] },
-  { titulo: "Sala e Fomento", ids: ["servicos", "sala-empreendedor", "fomento-parana"] },
+  { titulo: "Sala e Fomento", ids: ["cadastro-unico", "servicos", "sala-empreendedor", "fomento-parana"] },
   { titulo: "Administração", ids: ["modulos", "permissoes", "usuarios", "todos-usuarios", "identidade", "backup"] },
 ];
 
@@ -5418,6 +5419,7 @@ function AdminPanel() {
     { id: "credenciais", label: "Credenciamento", icon: BadgeCheck },
     { id: "cursos", label: "Cursos", icon: GraduationCap },
     { id: "servicos", label: "Serviços do Empreendedor", icon: Landmark },
+    { id: "cadastro-unico", label: "Cadastro único", icon: Fingerprint },
     { id: "sala-empreendedor", label: "Sala do Empreendedor - Atendimentos", icon: ClipboardList },
     { id: "fomento-parana", label: "FOMENTO PARANÁ", icon: Landmark, href: "#/fomento-admin" },
     { id: "licitacoes", label: "Editais e Licitações", icon: FileText },
@@ -9151,6 +9153,8 @@ function AdminPanel() {
         {tab === "permissoes" && <Permissoes notificar={notificar} />}
 
         {tab === "backup" && <Backup />}
+
+        {tab === "cadastro-unico" && <CadastroUnico />}
 
         {tab === "avisos" && <CentralAvisos avisos={avisosCentral.avisos} recarregar={avisosCentral.recarregar} irPara={setTab} />}
 
