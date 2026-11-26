@@ -18,6 +18,7 @@ import { supabase, supabaseConfigurado } from "./supabaseClient";
 // Módulo Fomento Paraná (acrescentado — ver src/FomentoParana.jsx e supabase-fomento-parana.sql)
 import { FomentoPublico, FomentoAdmin, useFomentoAcesso } from "./FomentoParana.jsx";
 import { SalaPublico, SalaPainel, useSalaAcesso } from "./SalaEmpreendedor.jsx";
+import DesenvolvimentoEconomico from "./central/DesenvolvimentoEconomico.jsx";
 import { PortalAcesso } from "./SalaGestao.jsx";
 
 // ---------------------------------------------------------------------------
@@ -1971,7 +1972,7 @@ const meusProdutos = [
 // Categorias do menu do Painel Admin (Projeto Master · seção 8). Item que não
 // estiver em nenhum grupo cai automaticamente em "Outros", para nada sumir.
 const GRUPOS_MENU_ADMIN_BASE = [
-  { titulo: "Início", ids: ["dashboard", "acessos"] },
+  { titulo: "Início", ids: ["dashboard", "desenvolvimento", "acessos"] },
   { titulo: "Comércio", ids: ["empresas", "categorias", "criterios", "prestadores", "agenda", "produtos", "promocoes", "combos", "cupons", "fidelidade", "avaliacoes"] },
   { titulo: "Comunidade", ids: ["turismo", "mural", "classificados", "ouvidoria", "utilidade", "enquetes", "depoimentos", "faq"] },
   { titulo: "Conteúdo e divulgação", ids: ["noticias", "vagas", "banners", "notificacoes", "feira", "calendario", "credenciais", "cursos", "licitacoes"] },
@@ -5393,6 +5394,7 @@ function AdminPanel() {
 
   const items = [
     { id: "dashboard", label: "Estatísticas", icon: LayoutDashboard },
+    { id: "desenvolvimento", label: "Desenvolvimento econômico", icon: TrendingUp },
     { id: "usuarios", label: "Cadastrar usuário", icon: UserCircle2 },
     { id: "todos-usuarios", label: "Usuários cadastrados", icon: Users },
     { id: "acessos", label: "Relatório de acessos", icon: TrendingUp },
@@ -9134,6 +9136,8 @@ function AdminPanel() {
             </div>
           </div>
         )}
+
+        {tab === "desenvolvimento" && <DesenvolvimentoEconomico />}
 
         {tab === "modulos" && (
           <div className="max-w-3xl">
