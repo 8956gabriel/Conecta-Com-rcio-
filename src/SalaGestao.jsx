@@ -281,6 +281,16 @@ export function AbaSelo({ ctx }) {
   const nConcl = (itens || []).filter((i) => i.status === "concluido").length;
   const atrasados = (itens || []).filter((i) => i.prazo && i.prazo < hojeISO() && i.status !== "concluido").length;
 
+  const [gerandoDossie, setGerandoDossie] = useState(false);
+  const dossie = async () => {
+    setGerandoDossie(true);
+    try {
+      const { gerarDossieSelo } = await import("./SalaDossieSelo.js");
+      await gerarDossieSelo({ ciclo, itens, statusRotulo: STATUS_SELO, faixa: faixaSelo });
+    } catch (e) { ctx.avisar("Não consegui gerar o dossiê: " + (e?.message || e), "erro"); }
+    setGerandoDossie(false);
+  };
+
   const pdf = () => exportarPDF(`selo-sebrae-${ciclo}`, `Selo Sebrae de Referência em Atendimento — Ciclo ${ciclo}`, [{
     titulo: "Checklist de acompanhamento", cabecalho: ["Nº", "Critério", "Pts", "Evidência necessária", "Responsável", "Prazo", "Status", "Anexos"],
     linhas: (itens || []).map((i) => [i.numero ?? "", `${i.criterio}\n(${i.pilar || ""})`, i.pontos ?? "", i.evidencia || "", i.responsavel || "", dataBR(i.prazo), STATUS_SELO[i.status]?.r, (i.anexos || []).length]),
@@ -295,6 +305,7 @@ export function AbaSelo({ ctx }) {
               {[2026, 2027].map((a) => <option key={a} value={a}>Ciclo {a}</option>)}
             </select>
             {itens?.length > 0 && <Bt contorno onClick={pdf}><Download size={14} /> PDF do checklist</Bt>}
+            {itens?.length > 0 && <Bt onClick={dossie} disabled={gerandoDossie}><Download size={14} /> {gerandoDossie ? "Gerando dossiê..." : "Dossiê de evidências"}</Bt>}
             <a href={REGULAMENTO_SELO_URL} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-bold inline-flex items-center gap-1 px-3 py-2 rounded-lg border bg-white" style={{ borderColor: G.line, color: G.blue }}>Regulamento oficial <ExternalLink size={12} /></a>
           </div>
         } />
