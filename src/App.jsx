@@ -13,6 +13,7 @@ import {
   EyeOff, Layers,
   DatabaseBackup, Fingerprint, ScrollText,
   Globe, MousePointerClick,
+  LogIn,
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -14078,8 +14079,8 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
           <div>
             <p className="font-display font-bold text-sm mb-3">Acesso</p>
             <ul className="font-body text-white/60 text-xs space-y-2">
-              <li><a href="#/empresa" className="hover:text-white">Sou empresário</a></li>
-              <li><a href="#/admin" className="hover:text-white">Acesso do administrador</a></li>
+              <li><a href="#/portal" className="hover:text-white">Entrar (Conecta, Sala e Fomento)</a></li>
+              <li><a href="#/conta" className="hover:text-white">Criar conta</a></li>
             </ul>
           </div>
           <div>
@@ -14394,6 +14395,9 @@ function PortalPlataforma({ siteConfig }) {
       <div className="text-center max-w-2xl mx-auto mb-10">
         <h1 className="font-display font-extrabold text-3xl md:text-4xl" style={{ color: C.ink }}>Como você quer entrar?</h1>
         <p className="font-body text-sm mt-2" style={{ color: "#5C7186" }}>Uma plataforma, três ambientes. Escolha o ambiente e a área de acordo com o seu perfil.</p>
+        <div className="flex justify-center gap-2 mt-4 flex-wrap">
+          <a href="#/conta" className="inline-flex items-center gap-1.5 font-body text-xs font-bold rounded-full px-4 py-2 border" style={{ borderColor: C.line, color: C.blue }}><UserCircle2 size={14} /> Minha conta · entrar ou criar conta</a>
+        </div>
       </div>
       <div className="flex flex-col gap-10">
         {secoes.map((sec) => (
@@ -15163,7 +15167,7 @@ function AcessoRestrito({ tipo, onEntrar }) {
 // "/" ou "#/", sem nenhum cadastro. A rota e refletida na URL (hash), entao
 // esses links podem ser copiados e compartilhados de verdade.
 // ---------------------------------------------------------------------------
-const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", prestador: "#/prestador", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", votacao: "#/votacao", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados", fomento: "#/fomento", "fomento-admin": "#/fomento-admin", "fomento-agente": "#/fomento-agente", sala: "#/sala", "sala-agente": "#/sala-agente", "sala-admin": "#/sala-admin", acesso: "#/acesso" };
+const ROTA_HASH = { site: "#/", conta: "#/entrar", admin: "#/admin", empresario: "#/empresa", prestador: "#/prestador", estatisticas: "#/estatisticas", turismo: "#/turismo", mural: "#/mural", votacao: "#/votacao", termos: "#/termos", privacidade: "#/privacidade", utilidade: "#/utilidade", ouvidoria: "#/ouvidoria", classificados: "#/classificados", fomento: "#/fomento", "fomento-admin": "#/fomento-admin", "fomento-agente": "#/fomento-agente", sala: "#/sala", "sala-agente": "#/sala-agente", "sala-admin": "#/sala-admin", acesso: "#/acesso", portal: "#/portal" };
 
 function modoDaHash(hash) {
   const h = (hash || "").toLowerCase();
@@ -16652,19 +16656,22 @@ export default function ConectaComercio() {
     { id: "fomento", label: "Fomento Paraná", icon: Landmark },
     { id: "sala", label: "Sala do Empreendedor", icon: Store },
     { id: "acesso", label: "Acesso", icon: Store, oculto: true },
-    { id: "portal", label: "Portal", icon: LayoutDashboard, oculto: true },
+    // Um botão só para todas as áreas com login (Conecta, Sala e Fomento): leva ao Portal
+    { id: "portal", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]} · Minhas áreas` : "Minhas áreas") : "Entrar", icon: sessao && perfil ? LayoutDashboard : LogIn },
     { id: "termos", label: "Termos de uso", icon: FileText, oculto: true },
     { id: "privacidade", label: "Política de privacidade", icon: FileText, oculto: true },
-    { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
-    { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
-    { id: "empresario", label: "Painel Empresário", icon: Briefcase, restrito: "empresario" },
-    { id: "prestador", label: "Painel Prestador", icon: Wrench, restrito: "prestador" },
+    // Painéis e conta: fora da barra de cima (menu enxuto) — entram pelo Portal.
+    // Os endereços continuam os mesmos (#/admin, #/empresa, #/sala-agente...).
+    { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2, oculto: true },
+    { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin", oculto: true },
+    { id: "empresario", label: "Painel Empresário", icon: Briefcase, restrito: "empresario", oculto: true },
+    { id: "prestador", label: "Painel Prestador", icon: Wrench, restrito: "prestador", oculto: true },
     // Painel do Agente de Crédito — o botão só aparece para admin ou agente liberado,
     // mas o link #/fomento-admin funciona sempre (pede login se precisar).
-    { id: "fomento-agente", label: "Fomento · Agente", icon: HandCoins, restrito: "fomento", oculto: !podeFomento },
-    { id: "fomento-admin", label: "Fomento · Admin", icon: ShieldCheck, restrito: "fomento", oculto: !podeFomento },
-    { id: "sala-agente", label: "Sala · Atendente", icon: Store, restrito: "sala", oculto: !acessoSala?.pode },
-    { id: "sala-admin", label: "Sala · Admin", icon: ShieldCheck, restrito: "sala", oculto: !acessoSala?.gerir },
+    { id: "fomento-agente", label: "Fomento · Agente", icon: HandCoins, restrito: "fomento", oculto: true },
+    { id: "fomento-admin", label: "Fomento · Admin", icon: ShieldCheck, restrito: "fomento", oculto: true },
+    { id: "sala-agente", label: "Sala · Atendente", icon: Store, restrito: "sala", oculto: true },
+    { id: "sala-admin", label: "Sala · Admin", icon: ShieldCheck, restrito: "sala", oculto: true },
   ];
 
   // Link direto de acesso: le o hash da URL (#/admin, #/empresa, #/entrar,
