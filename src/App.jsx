@@ -1967,8 +1967,20 @@ const meusProdutos = [
 // ---------------------------------------------------------------------------
 // Painel administrativo
 // ---------------------------------------------------------------------------
+// Categorias do menu do Painel Admin (Projeto Master · seção 8). Item que não
+// estiver em nenhum grupo cai automaticamente em "Outros", para nada sumir.
+const GRUPOS_MENU_ADMIN_BASE = [
+  { titulo: "Início", ids: ["dashboard", "acessos"] },
+  { titulo: "Comércio", ids: ["empresas", "categorias", "criterios", "prestadores", "agenda", "produtos", "promocoes", "combos", "cupons", "fidelidade", "avaliacoes"] },
+  { titulo: "Comunidade", ids: ["turismo", "mural", "classificados", "ouvidoria", "utilidade", "enquetes", "depoimentos", "faq"] },
+  { titulo: "Conteúdo e divulgação", ids: ["noticias", "vagas", "banners", "notificacoes", "feira", "calendario", "credenciais", "cursos", "licitacoes"] },
+  { titulo: "Sala e Fomento", ids: ["servicos", "sala-empreendedor", "fomento-parana"] },
+  { titulo: "Administração", ids: ["usuarios", "todos-usuarios", "identidade"] },
+];
+
 function AdminPanel() {
   const [tab, setTab] = useState("dashboard");
+  const [menuAdminAberto, setMenuAdminAberto] = useState(false);
   const categoriasReaisAdmin = useCategoriasReais();
 
   // Toasts (avisos rápidos) e confirmação antes de excluir — FASE 21.
@@ -5405,6 +5417,8 @@ function AdminPanel() {
   ];
 
   const itemAtivo = items.find((it) => it.id === tab);
+  const semGrupo = items.filter((it) => !GRUPOS_MENU_ADMIN_BASE.some((g) => g.ids.includes(it.id))).map((it) => it.id);
+  const GRUPOS_MENU_ADMIN = semGrupo.length ? [...GRUPOS_MENU_ADMIN_BASE, { titulo: "Outros", ids: semGrupo }] : GRUPOS_MENU_ADMIN_BASE;
 
   return (
     <div>
@@ -5431,20 +5445,35 @@ function AdminPanel() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-[220px_1fr] gap-6">
-      <aside className="rounded-2xl border p-3 h-fit" style={{ borderColor: C.line }}>
-        <p className="font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2" style={{ color: "#5C7186" }}>Painel do administrador</p>
-        {items.map((it) => {
-          const Icon = it.icon;
-          const active = tab === it.id;
+      <div className="grid md:grid-cols-[240px_1fr] gap-6">
+      {/* Menu lateral por categorias (Projeto Master · Fase 5): mesmos itens de antes, agrupados. */}
+      <aside className="md:sticky md:top-20 h-fit md:max-h-[calc(100vh-6rem)] md:overflow-y-auto no-scrollbar rounded-2xl border bg-white p-3" style={{ borderColor: C.line }}>
+        <button onClick={() => setMenuAdminAberto((v) => !v)} className="md:hidden w-full flex items-center gap-2 px-2 py-1.5 font-body text-sm font-bold" style={{ color: C.blueDeep }}>
+          <LayoutDashboard size={16} color={C.blue} /> <span className="flex-1 text-left truncate">{itemAtivo?.label || "Menu"}</span>
+          <span className="font-body text-[11px] font-semibold" style={{ color: "#8A9BAE" }}>{menuAdminAberto ? "Fechar" : "Menu"}</span>
+        </button>
+        <div className={`${menuAdminAberto ? "block mt-2" : "hidden"} md:block`}>
+        {GRUPOS_MENU_ADMIN.map((g) => {
+          const doGrupo = g.ids.map((id) => items.find((it) => it.id === id)).filter(Boolean);
+          if (!doGrupo.length) return null;
           return (
-            <button key={it.id} onClick={() => (it.href ? (window.location.hash = it.href) : setTab(it.id))}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-body font-semibold text-left"
-              style={{ background: active ? C.blueTint : "transparent", color: active ? C.blue : "#425A70" }}>
-              <Icon size={16} /> {it.label}
-            </button>
+            <div key={g.titulo} className="mb-3">
+              <p className="font-body text-[10px] font-extrabold uppercase tracking-[0.14em] px-2 mb-1" style={{ color: "#8A9BAE" }}>{g.titulo}</p>
+              {doGrupo.map((it) => {
+                const Icon = it.icon;
+                const active = tab === it.id;
+                return (
+                  <button key={it.id} onClick={() => { if (it.href) { window.location.hash = it.href; } else { setTab(it.id); setMenuAdminAberto(false); } }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-body font-semibold text-left"
+                    style={{ background: active ? C.blueTint : "transparent", color: active ? C.blue : "#425A70" }}>
+                    <Icon size={16} /> <span className="truncate">{it.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           );
         })}
+        </div>
       </aside>
 
       <div className="min-w-0">
