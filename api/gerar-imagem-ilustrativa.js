@@ -1,3 +1,5 @@
+import { exigirLogin } from "./_auth.js";
+
 // Gera uma imagem ILUSTRATIVA opcional para o produto, usando a API de
 // imagens da OpenAI (a Anthropic/Claude não gera imagens). Esta imagem NUNCA
 // deve ser apresentada como a foto real do produto — o frontend sempre marca
@@ -8,6 +10,8 @@ export default async function handler(req, res) {
     res.status(405).json({ error: "Método não permitido" });
     return;
   }
+
+  if (!(await exigirLogin(req, res))) return;
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {

@@ -1,3 +1,5 @@
+import { exigirLogin } from "./_auth.js";
+
 // Gera uma descrição de vendas curta e persuasiva para um produto, a partir
 // do nome, categoria e algumas palavras-chave que o comerciante já sabe.
 
@@ -6,6 +8,8 @@ export default async function handler(req, res) {
     res.status(405).json({ error: "Método não permitido" });
     return;
   }
+
+  if (!(await exigirLogin(req, res))) return;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
