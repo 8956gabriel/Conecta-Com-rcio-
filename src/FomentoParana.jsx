@@ -21,6 +21,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { supabase, supabaseConfigurado, emDemonstracao } from "./supabaseClient";
 import { Radar as RadarCentral, Store as StoreSala } from "lucide-react";
+import PainelLateral from "./shared/PainelLateral.jsx";
 const CentralProspeccao = lazy(() => import("./central/Central.jsx"));
 
 // ---------------------------------------------------------------------------
@@ -966,8 +967,19 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos",
 
   const ctx = { rankingOficial, setRankingOficial, config, setConfig, linhas, setLinhas, materiais, setMateriais, propostas, setPropostas, interesses, setInteresses, lembretes, setLembretes, agentes, setAgentes, avisar, nomeLinha, nomeAgente, podeGerir, setAba };
 
-  return (
-    <div className={embutido ? "" : "max-w-6xl mx-auto px-4 md:px-6 py-8"}>
+  // Menu lateral estilo app (Projeto Master · Fase 5): as mesmas abas de antes,
+  // agrupadas por categoria. Rotas e links continuam iguais.
+  const GRUPOS = [
+    ["Início", ["central", "painel"]],
+    ["Crédito", ["propostas", "contratos", "interesses", "simulacao"]],
+    ["Acompanhamento", ["lembretes", "pontuacao", "ranking"]],
+    ["Conteúdo", ["linhas", "materiais"]],
+    ["Administração", ["config", "demo"]],
+  ];
+  const grupos = GRUPOS.map(([titulo, ids]) => ({ titulo, itens: ids.map((id) => itens.find((i) => i.id === id)).filter(Boolean) })).filter((g) => g.itens.length);
+
+  const conteudo = (
+    <div className={embutido ? "" : "max-w-6xl mx-auto px-4 md:px-6 py-6"}>
       {toast && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[70] rounded-xl px-4 py-2.5 font-body text-sm font-semibold shadow-lg text-white" style={{ background: toast.tipo === "erro" ? F.danger : F.green }}>{toast.m}</div>
       )}
@@ -991,37 +1003,33 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos",
       {!supabaseConfigurado && <div className="mb-4"><Aviso>Modo demonstração: conecte o Supabase para salvar os dados de verdade.</Aviso></div>}
       {emDemonstracao && <div className="mb-4"><Aviso>Demonstração somente para visualização: nomes aparecem só com a inicial e documentos, contatos e observações ficam ocultos. Nenhuma alteração é salva.</Aviso></div>}
 
-      <div className={aba === "central" ? "grid gap-4" : "grid md:grid-cols-[220px_1fr] gap-6"}>
-        <aside className={`rounded-2xl border p-2 h-fit flex gap-1 overflow-x-auto no-scrollbar ${aba === "central" ? "" : "md:flex-col"}`} style={{ borderColor: F.line }}>
-          {itens.map((it) => {
-            const Icon = it.icon;
-            const ativo = aba === it.id;
-            return (
-              <button key={it.id} onClick={() => setAba(it.id)} className={`shrink-0 ${aba === "central" ? "" : "md:w-full"} flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-body font-semibold text-left`}
-                style={{ background: ativo ? F.blueTint : it.destaque ? "#FFF7DB" : "transparent", color: ativo ? F.blue : it.destaque ? "#7A5800" : "#425A70" }}>
-                <Icon size={16} /> <span className="whitespace-nowrap">{it.label}</span>
-                {it.badge > 0 && <span className="ml-auto font-body text-[10px] font-bold px-1.5 rounded-full text-white" style={{ background: F.greenBright }}>{it.badge}</span>}
-              </button>
-            );
-          })}
-        </aside>
-        <div className="min-w-0">
-          {aba === "central" && <Suspense fallback={<p className="font-body text-sm py-10 text-center" style={{ color: F.muted }}>Carregando a Central de Prospecção...</p>}><CentralProspeccao {...ctx} sessao={sessao} /></Suspense>}
-          {aba === "painel" && <AbaPainel {...ctx} />}
-          {aba === "propostas" && <AbaPropostas {...ctx} />}
-          {aba === "contratos" && <AbaContratos {...ctx} />}
-          {aba === "interesses" && <AbaInteresses {...ctx} />}
-          {aba === "simulacao" && <div><Titulo eyebrow="Simulação" title="Simulador de crédito" sub="Use durante o atendimento. Valores são estimativas." /><Simulador linhas={linhas} config={config} modoAdmin /></div>}
-          {aba === "pontuacao" && <AbaPontuacao {...ctx} sessao={sessao} />}
-          {aba === "ranking" && <AbaRanking {...ctx} />}
-          {aba === "linhas" && <AbaLinhas {...ctx} />}
-          {aba === "materiais" && <AbaMateriais {...ctx} />}
-          {aba === "lembretes" && <AbaLembretes {...ctx} />}
-          {aba === "config" && <AbaConfig {...ctx} />}
-          {aba === "demo" && !emDemonstracao && <AbaVisitasDemo {...ctx} />}
-        </div>
+      <div className="min-w-0">
+        {aba === "central" && <Suspense fallback={<p className="font-body text-sm py-10 text-center" style={{ color: F.muted }}>Carregando a Central de Prospecção...</p>}><CentralProspeccao {...ctx} sessao={sessao} /></Suspense>}
+        {aba === "painel" && <AbaPainel {...ctx} />}
+        {aba === "propostas" && <AbaPropostas {...ctx} />}
+        {aba === "contratos" && <AbaContratos {...ctx} />}
+        {aba === "interesses" && <AbaInteresses {...ctx} />}
+        {aba === "simulacao" && <div><Titulo eyebrow="Simulação" title="Simulador de crédito" sub="Use durante o atendimento. Valores são estimativas." /><Simulador linhas={linhas} config={config} modoAdmin /></div>}
+        {aba === "pontuacao" && <AbaPontuacao {...ctx} sessao={sessao} />}
+        {aba === "ranking" && <AbaRanking {...ctx} />}
+        {aba === "linhas" && <AbaLinhas {...ctx} />}
+        {aba === "materiais" && <AbaMateriais {...ctx} />}
+        {aba === "lembretes" && <AbaLembretes {...ctx} />}
+        {aba === "config" && <AbaConfig {...ctx} />}
+        {aba === "demo" && !emDemonstracao && <AbaVisitasDemo {...ctx} />}
       </div>
     </div>
+  );
+
+  if (embutido) return conteudo;
+  return (
+    <PainelLateral logo={config?.logo_url || ""} logoAlt="Fomento Paraná"
+      marca={{ icone: Landmark, nome: "Fomento Paraná", sub: "Agente de Crédito · Ivatuba-PR" }}
+      ambiente={area === "admin" ? "Administração" : "Área do agente"}
+      cor={F.blue} corProfunda={F.blueDeep} destaque={F.greenBright}
+      grupos={grupos} atual={aba} onSelecionar={setAba} chave={`fomento-${area}`}>
+      {conteudo}
+    </PainelLateral>
   );
 }
 
