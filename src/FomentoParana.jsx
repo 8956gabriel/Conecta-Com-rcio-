@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { supabase, supabaseConfigurado, emDemonstracao } from "./supabaseClient";
-import { Radar as RadarCentral } from "lucide-react";
+import { Radar as RadarCentral, Store as StoreSala } from "lucide-react";
 const CentralProspeccao = lazy(() => import("./central/Central.jsx"));
 
 // ---------------------------------------------------------------------------
@@ -1632,6 +1632,27 @@ function AbaInteresses(ctx) {
   const acoes = useAcoesProposta(ctx);
   const [filtro, setFiltro] = useState("novo");
   const [convertendo, setConvertendo] = useState(null);
+  // Encaminhamento Fomento → Sala do Empreendedor (Projeto Master · seção 13)
+  const [encSala, setEncSala] = useState(null); // { i, motivo, autorizou }
+  const [enviandoSala, setEnviandoSala] = useState(false);
+  const enviarParaSala = async () => {
+    const { i, motivo, autorizou } = encSala;
+    if (!motivo.trim()) { ctx.avisar("Escreva em que a Sala pode ajudar.", "erro"); return; }
+    if (!autorizou) { ctx.avisar("Marque a autorização do empreendedor para enviar os dados à Sala.", "erro"); return; }
+    const registro = {
+      nome: i.nome, whatsapp: String(i.whatsapp || "").replace(/\D/g, ""), servico: "Orientação empresarial (encaminhado pela Fomento)",
+      mensagem: `Encaminhado pela Fomento Paraná (Agente de Crédito${ctx.config?.agente_nome ? ` ${ctx.config.agente_nome}` : ""}) em ${dataBR(new Date().toISOString())}. ${motivo.trim()}`,
+      status: "novo", origem: "site",
+    };
+    if (supabaseConfigurado) {
+      setEnviandoSala(true);
+      const { error } = await supabase.from("sala_pedidos").insert(registro);
+      setEnviandoSala(false);
+      if (error) { ctx.avisar("Não consegui enviar à Sala: " + error.message, "erro"); return; }
+    }
+    setEncSala(null);
+    ctx.avisar("Encaminhado à Sala do Empreendedor — aparece em 'Pedidos do site' da Sala.");
+  };
   const lista = (ctx.interesses || []).filter((i) => !filtro || i.status === filtro);
   const rotulos = { novo: "Novos", contatado: "Contatados", convertido: "Viraram proposta", descartado: "Descartados" };
 
@@ -1661,7 +1682,10 @@ function AbaInteresses(ctx) {
                 <p className="font-display font-bold text-sm" style={{ color: F.ink }}>{i.nome} <span className="font-body text-[11px] font-semibold" style={{ color: F.muted }}>· {i.cidade || "—"}</span></p>
                 <p className="font-body text-xs" style={{ color: F.muted }}>{TIPOS_CONTATO[i.tipo_contato]} · {ctx.nomeLinha(i.linha_id)}{i.valor_desejado ? ` · ${moeda(i.valor_desejado)}` : ""}{i.prazo_meses ? ` em ${i.prazo_meses}x` : ""} · {dataHoraBR(i.criado_em)}</p>
               </div>
-              <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: F.blueTint, color: F.blue }}>{rotulos[i.status]}</span>
+              <span className="flex items-center gap-1.5">
+                {String(i.mensagem || "").startsWith("Encaminhado pela Sala do Empreendedor") && <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: "#FDEBDD", color: "#B4602F" }}><StoreSala size={11} /> Veio da Sala</span>}
+                <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: F.blueTint, color: F.blue }}>{rotulos[i.status]}</span>
+              </span>
             </div>
             {i.mensagem && <p className="font-body text-sm mt-2" style={{ color: F.ink }}>“{i.mensagem}”</p>}
             <div className="flex flex-wrap gap-1.5 mt-3">
@@ -1669,12 +1693,33 @@ function AbaInteresses(ctx) {
                 onClick={() => i.status === "novo" && mudar(i, "contatado")} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg text-white flex items-center gap-1" style={{ background: F.greenBright }}><MessageCircle size={12} /> {i.whatsapp}</a>
               {i.status !== "convertido" && <button onClick={() => setConvertendo(i)} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg text-white flex items-center gap-1" style={{ background: F.blue }}><PlusCircle size={12} /> Converter em proposta</button>}
               {i.status === "novo" && <button onClick={() => mudar(i, "contatado")} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg border" style={{ borderColor: F.line, color: "#425A70" }}>Marcar contatado</button>}
+              <button onClick={() => setEncSala({ i, motivo: "", autorizou: false })} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg border flex items-center gap-1" style={{ borderColor: F.line, color: "#425A70" }}><StoreSala size={12} /> Encaminhar à Sala</button>
               {!["descartado", "convertido"].includes(i.status) && <button onClick={() => mudar(i, "descartado")} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg border" style={{ borderColor: F.line, color: F.danger }}>Descartar</button>}
             </div>
           </div>
         ))}
         {!lista.length && <p className="font-body text-sm py-6 text-center" style={{ color: F.soft }}>Nenhum pré-cadastro aqui.</p>}
       </div>
+      <Modal aberto={!!encSala} onFechar={() => setEncSala(null)} titulo="Encaminhar à Sala do Empreendedor">
+        {encSala && (
+          <div className="flex flex-col gap-3">
+            <p className="font-body text-sm" style={{ color: F.muted }}>
+              <b style={{ color: F.ink }}>{encSala.i.nome}</b> vai aparecer em "Pedidos do site" da Sala, com nome, WhatsApp e o motivo abaixo. Valores, linha de crédito e histórico da Fomento não são enviados.
+            </p>
+            <label className="font-body text-xs font-bold" style={{ color: F.ink }}>Em que a Sala pode ajudar?
+              <textarea rows={3} value={encSala.motivo} onChange={(e) => setEncSala({ ...encSala, motivo: e.target.value })} placeholder="Ex.: precisa formalizar o MEI antes de pedir o crédito; regularizar DAS em atraso" className="mt-1 w-full border rounded-xl px-3 py-2 font-body text-sm font-normal outline-none" style={{ borderColor: F.line }} />
+            </label>
+            <label className="flex items-start gap-2 font-body text-xs font-semibold" style={{ color: F.ink }}>
+              <input type="checkbox" className="mt-0.5" checked={encSala.autorizou} onChange={(e) => setEncSala({ ...encSala, autorizou: e.target.checked })} />
+              O empreendedor autorizou enviar esses dados à Sala do Empreendedor (LGPD).
+            </label>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setEncSala(null)} className="font-body text-sm font-bold px-4 py-2 rounded-xl border" style={{ borderColor: F.line, color: "#425A70" }}>Cancelar</button>
+              <button disabled={enviandoSala} onClick={enviarParaSala} className="font-body text-sm font-bold px-4 py-2 rounded-xl text-white" style={{ background: F.blue, opacity: enviandoSala ? 0.6 : 1 }}>{enviandoSala ? "Enviando..." : "Encaminhar"}</button>
+            </div>
+          </div>
+        )}
+      </Modal>
       <Modal aberto={!!convertendo} onFechar={() => setConvertendo(null)} titulo="Converter em proposta oficial" largura="max-w-3xl">
         {convertendo && (
           <FormProposta inicial={{ nome: convertendo.nome, whatsapp: convertendo.whatsapp, linha_id: convertendo.linha_id || "", valor_solicitado: convertendo.valor_desejado ?? "", prazo_meses: convertendo.prazo_meses ?? "", observacoes: convertendo.mensagem || "", status: "em_contato", interesse_id: convertendo.id }}
