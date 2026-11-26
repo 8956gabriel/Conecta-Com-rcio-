@@ -12,6 +12,7 @@ import {
   Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw, Zap, Activity,
   EyeOff, Layers,
   DatabaseBackup, Fingerprint, ScrollText,
+  Globe,
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -24,6 +25,7 @@ import Permissoes from "./central/Permissoes.jsx";
 import Backup from "./central/Backup.jsx";
 import CadastroUnico from "./central/CadastroUnico.jsx";
 import Auditoria from "./central/Auditoria.jsx";
+import PortalEntrada from "./shared/PortalEntrada.jsx";
 import CentralAvisos, { useAvisosCentral } from "./central/Avisos.jsx";
 import { PortalAcesso } from "./SalaGestao.jsx";
 
@@ -14333,6 +14335,58 @@ function NovaSenhaModal({ onFechar }) {
 }
 
 // -----------------------------------------------------------------------------
+// PORTAL DA PLATAFORMA (#/portal) — os três ambientes, separados e organizados,
+// cada um com a sua marca e as suas três entradas (público, equipe, admin).
+// -----------------------------------------------------------------------------
+function PortalPlataforma({ siteConfig }) {
+  useEffect(() => { document.title = "Portal · Conecta Comércio, Sala do Empreendedor e Fomento Paraná"; }, []);
+  const secoes = [
+    {
+      chave: "conecta",
+      marca: <span className="flex items-center gap-2.5"><LogoMark size={44} url={siteConfig?.logo_url} /><span className="text-left leading-tight"><span className="block font-display font-extrabold text-xl" style={{ color: C.blueDeep }}>Conecta Comércio</span><span className="block font-body text-[11px] font-semibold" style={{ color: "#5C7186" }}>Comércio local de Ivatuba</span></span></span>,
+      opcoes: [
+        { chave: "c-pub", icon: Globe, titulo: "Área pública", texto: "Empresas, produtos, promoções, vagas, turismo e notícias da cidade. Sem login.", cor: C.blue, href: "#/" },
+        { chave: "c-emp", icon: Briefcase, titulo: "Área do comerciante", texto: "Perfil da empresa, produtos, promoções e vagas. Com login.", cor: "#0E7C86", href: "#/empresa" },
+        { chave: "c-adm", icon: ShieldCheck, titulo: "Área do administrador", texto: "Comerciantes, conteúdo, módulos, usuários, relatórios e auditoria.", cor: "#7E5BEF", href: "#/admin" },
+      ],
+    },
+    {
+      chave: "sala",
+      marca: <img src="/sala-do-empreendedor-logo.png" alt="Sala do Empreendedor" className="h-14 w-auto object-contain mix-blend-multiply" />,
+      opcoes: [
+        { chave: "s-pub", icon: Globe, titulo: "Área pública", texto: "Serviços online, agendamento, calendário, dicas e orientações. Sem login.", cor: "#0A5AA8", href: "#/sala" },
+        { chave: "s-ate", icon: Users, titulo: "Área do atendente", texto: "Atendimentos, agenda, empreendedores, orientações e Selo Sebrae. Com login.", cor: "#1E8E5A", href: "#/sala-agente" },
+        { chave: "s-adm", icon: ShieldCheck, titulo: "Área do administrador", texto: "Indicadores, equipe, página pública, planejamento e relatórios.", cor: "#7E5BEF", href: "#/sala-admin" },
+      ],
+    },
+    {
+      chave: "fomento",
+      marca: <span className="flex items-center gap-2.5"><span className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "#F5B700" }}><Landmark size={22} color="#052A4D" /></span><span className="text-left leading-tight"><span className="block font-display font-extrabold text-xl" style={{ color: "#052A4D" }}>Fomento Paraná</span><span className="block font-body text-[11px] font-bold" style={{ color: "#B98900" }}>Agente de Crédito · Ivatuba-PR</span></span></span>,
+      opcoes: [
+        { chave: "f-pub", icon: Globe, titulo: "Área pública", texto: "Linhas de crédito, documentos e contato do agente. Sem login.", cor: "#0A5AA8", href: "#/fomento" },
+        { chave: "f-age", icon: HandCoins, titulo: "Área do agente", texto: "Central de Prospecção, propostas, contratos e lembretes. Com login.", cor: "#1E8E5A", href: "#/fomento-agente" },
+        { chave: "f-adm", icon: ShieldCheck, titulo: "Área do administrador", texto: "Linhas de crédito, materiais, configurações e relatórios.", cor: "#7E5BEF", href: "#/fomento-admin" },
+      ],
+    },
+  ];
+  return (
+    <div className="max-w-6xl mx-auto px-4 md:px-6 py-10">
+      <div className="text-center max-w-2xl mx-auto mb-10">
+        <h1 className="font-display font-extrabold text-3xl md:text-4xl" style={{ color: C.ink }}>Como você quer entrar?</h1>
+        <p className="font-body text-sm mt-2" style={{ color: "#5C7186" }}>Uma plataforma, três ambientes. Escolha o ambiente e a área de acordo com o seu perfil.</p>
+      </div>
+      <div className="flex flex-col gap-10">
+        {secoes.map((sec) => (
+          <section key={sec.chave} className="rounded-3xl border bg-white p-5 md:p-7" style={{ borderColor: C.line }}>
+            <PortalEntrada compacto marca={sec.marca} titulo="" sub="" opcoes={sec.opcoes} />
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
 // LOGIN ÚNICO CONECTA → FOMENTO (Projeto Master · seção 15)
 // O servidor (api/sso-fomento.js) gera um código de uso único; o site da
 // Fomento troca esse código por um login próprio. Destino fixo: só o site
@@ -15102,6 +15156,7 @@ function modoDaHash(hash) {
   if (h.startsWith("#/sala-agente") || h.startsWith("#/sala-atendente")) return "sala-agente";
   if (h.startsWith("#/sala")) return "sala";
   if (h.startsWith("#/acesso")) return "acesso";
+  if (h.startsWith("#/portal")) return "portal";
   if (h.startsWith("#/estatisticas") || h.startsWith("#/numeros")) return "estatisticas";
   if (h.startsWith("#/turismo")) return "turismo";
   if (h.startsWith("#/mural")) return "mural";
@@ -16577,6 +16632,7 @@ export default function ConectaComercio() {
     { id: "fomento", label: "Fomento Paraná", icon: Landmark },
     { id: "sala", label: "Sala do Empreendedor", icon: Store },
     { id: "acesso", label: "Acesso", icon: Store, oculto: true },
+    { id: "portal", label: "Portal", icon: LayoutDashboard, oculto: true },
     { id: "termos", label: "Termos de uso", icon: FileText, oculto: true },
     { id: "privacidade", label: "Política de privacidade", icon: FileText, oculto: true },
     { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
@@ -16719,6 +16775,7 @@ export default function ConectaComercio() {
       {modo === "fomento" && <FomentoPublico siteConfig={siteConfig} />}
       {modo === "sala" && <SalaPublico />}
       {modo === "acesso" && <PortalAcesso />}
+      {modo === "portal" && <PortalPlataforma siteConfig={siteConfig} />}
       {modo === "sala-agente" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <SalaPainel key="sala-agente" area="agente" sessao={sessao} perfil={perfil} />)}
       {modo === "sala-admin" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <SalaPainel key="sala-admin" area="admin" sessao={sessao} perfil={perfil} />)}
       {modo === "fomento-admin" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <FomentoAdmin key="admin" area="admin" sessao={sessao} perfil={perfil} />)}

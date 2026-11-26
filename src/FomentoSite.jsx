@@ -2,20 +2,22 @@
 // SITE PRÓPRIO DO FOMENTO PARANÁ · IVATUBA
 // Mesma base de dados e mesmo login do Conecta Comércio, mas sem o menu e a
 // marca do Conecta. Gerado com VITE_SITE=fomento (projeto fomento-ivatuba).
-//   /         → página pública
+//   /         → tela de entrada com as 3 opções (como a Sala)
+//   /publico  → página pública
 //   /agente   → área do agente de crédito (Central de Prospecção)
 //   /admin    → administração do módulo
 //   /entrar   → login
 //   /demo     → demonstração somente leitura (pede nome e cidade; dados mascarados)
 // =============================================================================
 import React, { useEffect, useState } from "react";
-import { Landmark, LogIn, LogOut, Radar, ShieldCheck, Home, Eye, EyeOff, MonitorPlay, Lock } from "lucide-react";
+import { Landmark, LogIn, LogOut, Radar, ShieldCheck, Home, Eye, EyeOff, MonitorPlay, Lock, Globe } from "lucide-react";
+import PortalEntrada from "./shared/PortalEntrada.jsx";
 import { supabase, supabaseReal, supabaseConfigurado, usarClienteDemonstracao } from "./supabaseClient";
 import { criarClienteDemonstracao, lerPasse, salvarPasse, apagarPasse, marcarPagina } from "./fomentoDemo";
 import { FomentoPublico, FomentoAdmin } from "./FomentoParana.jsx";
 
 const AZUL = "#0A5AA8", AZUL_ESC = "#052A4D", AMARELO = "#F5B700", LINHA = "#DCE7F2", MUTED = "#5C7186", INK = "#0E2233";
-const ROTAS = { "/": "publico", "/agente": "agente", "/admin": "admin", "/entrar": "entrar" };
+const ROTAS = { "/": "inicio", "/acesso": "inicio", "/publico": "publico", "/agente": "agente", "/admin": "admin", "/entrar": "entrar" };
 // Login único (seção 15): o botão leva ao Conecta, que devolve um código de uso único
 const CONECTA_URL = "https://conectacomercio.app.br";
 const rotaAtual = () => ROTAS[window.location.pathname.replace(/\/+$/, "") || "/"] || "publico";
@@ -86,7 +88,7 @@ function FomentoSiteNormal() {
     if (sessao === null && (rota === "agente" || rota === "admin")) { setDestino(rota); ir("entrar"); }
   }, [sessao, rota]);
 
-  const sair = async () => { await supabase.auth.signOut(); ir("publico"); };
+  const sair = async () => { await supabase.auth.signOut(); ir("inicio"); };
   const nome = perfil?.nome ? perfil.nome.split(" ")[0] : sessao?.user?.email?.split("@")[0];
   const NavBtn = ({ r, icon: I, children }) => (
     <button onClick={() => ir(r)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-body text-sm font-bold whitespace-nowrap"
@@ -97,12 +99,13 @@ function FomentoSiteNormal() {
     <div className="min-h-screen" style={{ background: "#F7FAFD" }}>
       <header className="sticky top-0 z-50 shadow-md" style={{ background: `linear-gradient(110deg, ${AZUL_ESC}, ${AZUL})` }}>
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3 flex-wrap">
-          <button onClick={() => ir("publico")} className="flex items-center gap-2 mr-auto">
+          <button onClick={() => ir("inicio")} className="flex items-center gap-2 mr-auto">
             <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: AMARELO }}><Landmark size={19} color={AZUL_ESC} /></span>
             <span className="text-left leading-tight"><span className="block font-display font-extrabold text-white text-[15px]">Fomento Paraná</span><span className="block font-body text-[11px] font-semibold" style={{ color: AMARELO }}>Agente de Crédito · Ivatuba-PR</span></span>
           </button>
           <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-            <NavBtn r="publico" icon={Home}>Início</NavBtn>
+            <NavBtn r="inicio" icon={Home}>Início</NavBtn>
+            <NavBtn r="publico" icon={Globe}>Área pública</NavBtn>
             {sessao && <NavBtn r="agente" icon={Radar}>Área do agente</NavBtn>}
             {sessao && <NavBtn r="admin" icon={ShieldCheck}>Administração</NavBtn>}
             {sessao ? <button onClick={sair} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-body text-sm font-bold text-white/85 whitespace-nowrap" title={sessao.user.email}><LogOut size={15} /> Sair{nome ? ` (${nome})` : ""}</button>
@@ -112,6 +115,17 @@ function FomentoSiteNormal() {
       </header>
 
       <main>
+        {rota === "inicio" && (
+          <div className="max-w-6xl mx-auto px-4 md:px-6 py-10">
+            <PortalEntrada
+              marca={<span className="flex items-center gap-3"><span className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: AMARELO }}><Landmark size={28} color={AZUL_ESC} /></span><span className="text-left leading-tight"><span className="block font-display font-extrabold text-2xl" style={{ color: AZUL_ESC }}>Fomento Paraná</span><span className="block font-body text-xs font-bold" style={{ color: "#B98900" }}>Agente de Crédito · Ivatuba-PR</span></span></span>}
+              opcoes={[
+                { chave: "publico", icon: Globe, titulo: "Área pública", texto: "Linhas de crédito, quem pode pedir, documentos e o contato do agente. Sem login.", cor: AZUL, onClick: () => ir("publico") },
+                { chave: "agente", icon: Radar, titulo: "Área do agente", texto: "Central de Prospecção, propostas, contratos, lembretes e pontuação. Com login.", cor: "#1E8E5A", onClick: () => ir("agente") },
+                { chave: "admin", icon: ShieldCheck, titulo: "Área do administrador", texto: "Linhas de crédito, materiais, configurações e relatórios da Fomento.", cor: "#7E5BEF", onClick: () => ir("admin") },
+              ]} />
+          </div>
+        )}
         {rota === "publico" && <FomentoPublico siteConfig={null} />}
         {rota === "agente" && (sessao ? <FomentoAdmin key="agente" area="agente" sessao={sessao} perfil={perfil} /> : <Carregando />)}
         {rota === "admin" && (sessao ? <FomentoAdmin key="admin" area="admin" sessao={sessao} perfil={perfil} /> : <Carregando />)}
