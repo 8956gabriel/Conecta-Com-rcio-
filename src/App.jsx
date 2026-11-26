@@ -3575,14 +3575,19 @@ export function AdminPanel({ papel = "admin" }) {
   // Gerenciamento de módulos — liga/desliga um módulo público na hora (só a chave dele).
   const [salvandoModulo, setSalvandoModulo] = useState("");
   const alternarModulo = async (mod, valor) => {
-    const anterior = siteConfigAdmin?.[mod.chave];
-    setSiteConfigAdmin((v) => ({ ...(v || {}), [mod.chave]: valor }));
+    // mod.vis (ou seções da home): grava em site_config.visibilidade (jsonb)
+    const chave = mod.vis ? "visibilidade" : mod.chave;
+    const anterior = siteConfigAdmin?.[chave];
+    const novo = mod.vis ? { ...(siteConfigAdmin?.visibilidade || {}), [mod.id]: valor } : valor;
+    setSiteConfigAdmin((v) => ({ ...(v || {}), [chave]: novo }));
     if (!supabaseConfigurado) return;
     setSalvandoModulo(mod.id);
-    const { error } = await supabase.from("site_config").update({ [mod.chave]: valor }).eq("id", 1);
+    const { error } = await supabase.from("site_config").update({ [chave]: novo }).eq("id", 1);
     setSalvandoModulo("");
-    if (error) { setSiteConfigAdmin((v) => ({ ...(v || {}), [mod.chave]: anterior })); notificar(`Não foi possível salvar: ${error.message}`, "erro"); }
-    else notificar(`${mod.nome} ${valor ? "publicado" : "ocultado"} no site.`);
+    if (error) {
+      setSiteConfigAdmin((v) => ({ ...(v || {}), [chave]: anterior }));
+      notificar(/visibilidade/.test(error.message || "") ? "Falta rodar o arquivo supabase-visibilidade-site.sql no Supabase." : `Não foi possível salvar: ${error.message}`, "erro");
+    } else notificar(`${mod.nome} ${valor ? "publicado" : "ocultado"} no site.`);
   };
 
   const salvarIdentidade = async (e) => {
@@ -9198,28 +9203,43 @@ export function AdminPanel({ papel = "admin" }) {
             {siteConfigAdmin === null && supabaseConfigurado ? (
               <p className="font-body text-sm" style={{ color: "#5C7186" }}>Carregando...</p>
             ) : (
-              <div className="rounded-2xl border divide-y bg-white" style={{ borderColor: C.line }}>
-                {MODULOS_PUBLICOS.map((mod) => {
-                  const ativo = !!siteConfigAdmin?.[mod.chave];
-                  return (
-                    <div key={mod.id} className="flex items-center gap-3 px-4 py-3.5" style={{ borderColor: C.line }}>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{mod.nome}</p>
-                        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{mod.descricao} · <a href={`#/${mod.id}`} className="underline" target="_blank" rel="noopener">abrir</a></p>
+              <>
+                {[
+                  ["Páginas e botões do topo", "Cada um some da barra de cima e a página deixa de abrir para o público.", MODULOS_PUBLICOS, (m) => moduloAtivo(siteConfigAdmin, m)],
+                  ["Página inicial: seções, menu e botões", "Ao ocultar uma seção, o item dela também sai do menu do site e da barra do celular.", SECOES_HOME.map((x) => ({ ...x, vis: true })), (m) => visivelNoSite(siteConfigAdmin, m.id)],
+                ].map(([titulo, sub, lista, estaAtivo]) => (
+                  <div key={titulo} className="mb-6">
+                    <div className="flex items-end justify-between gap-2 mb-2">
+                      <div>
+                        <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{titulo}</p>
+                        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{sub}</p>
                       </div>
-                      <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={ativo ? { background: "#E6F5EC", color: "#1E8E5A" } : { background: "#F1F4F8", color: "#5C7186" }}>{ativo ? "Publicado" : "Oculto"}</span>
-                      <button disabled={salvandoModulo === mod.id} onClick={() => alternarModulo(mod, !ativo)}
-                        className="font-body text-xs font-bold rounded-lg px-3 py-2 border min-w-[92px]" style={{ borderColor: ativo ? C.line : C.blue, color: ativo ? "#425A70" : "#fff", background: ativo ? "#fff" : C.blue, opacity: salvandoModulo === mod.id ? 0.6 : 1 }}>
-                        {salvandoModulo === mod.id ? "Salvando..." : ativo ? "Ocultar" : "Publicar"}
-                      </button>
+                      <span className="font-body text-[11px] font-bold shrink-0" style={{ color: "#5C7186" }}>{lista.filter(estaAtivo).length} de {lista.length} publicados</span>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="rounded-2xl border divide-y bg-white" style={{ borderColor: C.line }}>
+                      {lista.map((mod) => {
+                        const ativo = estaAtivo(mod);
+                        const pagina = MODULOS_PUBLICOS.includes(mod);
+                        return (
+                          <div key={mod.id} className="flex items-center gap-3 px-4 py-3" style={{ borderColor: C.line }}>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{mod.nome}</p>
+                              <p className="font-body text-xs" style={{ color: "#5C7186" }}>{mod.descricao}{pagina && <> · <a href={`#/${mod.id}`} className="underline" target="_blank" rel="noopener">abrir</a></>}</p>
+                            </div>
+                            <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={ativo ? { background: "#E6F5EC", color: "#1E8E5A" } : { background: "#F1F4F8", color: "#5C7186" }}>{ativo ? "Publicado" : "Oculto"}</span>
+                            <button disabled={salvandoModulo === mod.id} onClick={() => alternarModulo(mod, !ativo)}
+                              className="font-body text-xs font-bold rounded-lg px-3 py-2 border min-w-[92px] shrink-0" style={{ borderColor: ativo ? C.line : C.blue, color: ativo ? "#425A70" : "#fff", background: ativo ? "#fff" : C.blue, opacity: salvandoModulo === mod.id ? 0.6 : 1 }}>
+                              {salvandoModulo === mod.id ? "Salvando..." : ativo ? "Ocultar" : "Publicar"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </>
             )}
-            <p className="font-body text-xs mt-4" style={{ color: "#8A9BAE" }}>
-              Próxima etapa: estender para os demais módulos (vagas, cupons, combos, FAQ...) e incluir os estados "Em preparação" e "Desativado".
-            </p>
+
           </div>
         )}
 
@@ -11958,7 +11978,7 @@ const ITENS_BOTTOM_NAV = [
   { id: "perfil", label: "Perfil", icon: UserCircle2, secao: "Perfil" },
 ];
 
-function BottomNavMobile({ ativo, onSelect }) {
+function BottomNavMobile({ ativo, onSelect, ocultos }) {
   // Portal direto pro <body>: o wrapper ".page-transition" da página tem uma
   // animação com transform, e qualquer transform em um ancestral quebra o
   // "position: fixed" (o elemento passa a se ancorar nesse ancestral em vez
@@ -11966,7 +11986,7 @@ function BottomNavMobile({ ativo, onSelect }) {
   return createPortal(
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t flex items-stretch"
       style={{ width: "100vw", borderColor: C.line, paddingBottom: "env(safe-area-inset-bottom)", boxShadow: "0 -8px 24px -12px rgba(10,34,58,0.18)" }}>
-      {ITENS_BOTTOM_NAV.map((it) => {
+      {ITENS_BOTTOM_NAV.filter((it) => !ocultos?.has(it.secao)).map((it) => {
         const Icon = it.icon;
         const estaAtivo = ativo === it.id;
         return (
@@ -12855,14 +12875,19 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
   useEffect(() => { setQtdProdutosVisiveis(PAGINA_PRODUTOS); }, [queryProdutos, ordenacaoProdutos]);
   useEffect(() => { setQtdVagasVisiveis(PAGINA_VAGAS); }, [queryVagas, filtroTipoVaga]);
 
+  // Liga/desliga pelo Painel Admin → Módulos do site (site_config.visibilidade)
+  const vis = (k) => visivelNoSite(siteConfig, k);
+  const oc = (k) => (vis(k) ? undefined : "1");
+  const menuOculto = new Set(SECOES_HOME.filter((x) => x.menu && !vis(x.id)).map((x) => x.menu));
   const nav = [
     "Home", "Empresas", "Serviços", "Promoções", "Feira do Empreendedor",
     "Calendário", "Produtos", "Vagas", "Cursos", "Notícias",
     "Depoimentos", "FAQ", "Contato",
-  ];
+  ].filter((n) => !menuOculto.has(n));
 
   return (
     <div className="font-body min-h-screen pb-16 md:pb-0" style={{ background: "#fff", color: C.ink }}>
+      <style>{`[data-oculto="1"]{display:none!important}`}</style>
       {/* Barra institucional */}
       <div className="text-white text-[11px] font-body" style={{ background: `linear-gradient(90deg, ${C.blueDeep}, ${C.blue})` }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6 py-1.5 flex items-center justify-between">
@@ -12937,10 +12962,10 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
             </div>
 
             <div className="hidden md:flex items-center gap-3">
-              <button onClick={() => onAuth?.("entrar")} className="glow-btn font-body text-sm font-semibold px-4 py-2 rounded-lg border" style={{ borderColor: C.blue, color: C.blue }}>
+              <button data-oculto={oc("botao_entrar")} onClick={() => onAuth?.("entrar")} className="glow-btn font-body text-sm font-semibold px-4 py-2 rounded-lg border" style={{ borderColor: C.blue, color: C.blue }}>
                 Entrar
               </button>
-              <button onClick={() => onAuth?.("cadastro")} className="glow-btn font-body text-sm font-bold px-4 py-2 rounded-lg text-white" style={{ background: C.blue }}>
+              <button data-oculto={oc("botao_cadastrar")} onClick={() => onAuth?.("cadastro")} className="glow-btn font-body text-sm font-bold px-4 py-2 rounded-lg text-white" style={{ background: C.blue }}>
                 Cadastrar empresa
               </button>
             </div>
@@ -12956,7 +12981,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
             {nav.map((n) => (
               <a key={n} href="#" onClick={(e) => { e.preventDefault(); irParaSecaoNav(n); }} className="nav-link font-body text-sm font-semibold cursor-pointer" style={{ color: "#425A70" }}>{n}</a>
             ))}
-            <button onClick={() => onAuth?.("cadastro")} className="font-body text-sm font-bold px-4 py-2 rounded-lg text-white text-center" style={{ background: C.blue }}>
+            <button data-oculto={oc("botao_cadastrar")} onClick={() => onAuth?.("cadastro")} className="font-body text-sm font-bold px-4 py-2 rounded-lg text-white text-center" style={{ background: C.blue }}>
               Cadastrar empresa
             </button>
           </div>
@@ -13050,7 +13075,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
         </div>
 
         {/* Ticker de atividade ao vivo */}
-        <div className="relative border-t border-white/10 bg-black/10 overflow-hidden py-2.5">
+        <div data-oculto={oc("ticker")} className="relative border-t border-white/10 bg-black/10 overflow-hidden py-2.5">
           <div className="flex items-center">
             <span className="flex items-center gap-1.5 font-display text-[10px] font-bold tracking-widest uppercase text-white shrink-0 pl-4 pr-3 z-10"
               style={{ background: C.blueDeep }}>
@@ -13072,7 +13097,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       </section>
 
       {/* Como funciona — timeline */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 py-14">
+      <section data-oculto={oc("como_funciona")} className="max-w-6xl mx-auto px-4 md:px-6 py-14">
         <Reveal>
           <SectionHeader eyebrow="Passo a passo" title="Como funciona o Conecta Comércio" sub="Do cadastro até aparecer pra cidade toda, em poucos minutos" />
         </Reveal>
@@ -13103,14 +13128,14 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
         </div>
       </section>
 
-      <PublicidadeBanners />
-      <div ref={promocoesSecaoRef}><BannerPromocoes /></div>
-      <CapaComercianteDestaque empresas={listaBase} onAbrir={abrirEmpresa} />
+      {vis("publicidade") && <PublicidadeBanners />}
+      <div ref={promocoesSecaoRef} data-oculto={oc("promocoes")}><BannerPromocoes /></div>
+      {vis("destaque") && <CapaComercianteDestaque empresas={listaBase} onAbrir={abrirEmpresa} />}
       <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="apos_destaques" compacto /></div>
 
       {/* O que abriu essa semana — empresas e prestadores aprovados nos últimos 7 dias */}
       {novidadesSemana.length > 0 && (
-        <section className="max-w-6xl mx-auto px-4 md:px-6 py-10">
+        <section data-oculto={oc("novidades")} className="max-w-6xl mx-auto px-4 md:px-6 py-10">
           <Reveal><SectionHeader eyebrow="Novidades" title="O que abriu essa semana" sub="Comércios e prestadores recém-chegados na plataforma" /></Reveal>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {novidadesSemana.slice(0, 6).map((item, i) => (
@@ -13130,7 +13155,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       )}
 
       {/* Empresas em destaque */}
-      <section ref={empresasSecaoRef} className="py-12" style={{ background: C.blueTint2 }}>
+      <section ref={empresasSecaoRef} data-oculto={oc("empresas")} className="py-12" style={{ background: C.blueTint2 }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="flex items-end justify-between gap-3 flex-wrap">
             <Reveal><SectionHeader eyebrow="Vitrine local" title="Empresas em destaque" linkLabel="Ver mapa de empresas" onLinkClick={() => window.open("https://www.google.com/maps/search/com%C3%A9rcio+Ivatuba+PR", "_blank")} /></Reveal>
@@ -13166,7 +13191,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="entre_empresas" compacto /></div>
 
       {/* Produtos em destaque */}
-      <section ref={produtosSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section ref={produtosSecaoRef} data-oculto={oc("produtos")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <Reveal><SectionHeader eyebrow="Ofertas" title="Produtos em destaque" linkLabel="Ver todos" onLinkClick={() => setQtdProdutosVisiveis(produtosFiltrados.length)} /></Reveal>
           {(produtosReais ?? []).length > 0 && (
@@ -13208,7 +13233,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       </section>
 
       {/* Categorias */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section data-oculto={oc("categorias")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
         <Reveal>
           <SectionHeader eyebrow="Explorar" title="Categorias de empresas" sub="Tudo que Ivatuba tem para oferecer, organizado por perto de você" />
         </Reveal>
@@ -13221,7 +13246,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="entre_categorias" compacto /></div>
 
       {/* Serviços do Empreendedor — em destaque */}
-      <section ref={servicosSecaoRef} className="relative overflow-hidden py-14" style={{ background: `linear-gradient(155deg, ${C.blueDeep} 0%, ${C.blue} 100%)` }}>
+      <section ref={servicosSecaoRef} data-oculto={oc("servicos")} className="relative overflow-hidden py-14" style={{ background: `linear-gradient(155deg, ${C.blueDeep} 0%, ${C.blue} 100%)` }}>
         <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="blob absolute -top-16 right-[-4rem] w-72 h-72 rounded-full" style={{ background: C.amber, opacity: 0.25 }} />
         </div>
@@ -13271,7 +13296,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Fomento Paraná — linhas de crédito */}
       {siteConfig?.fomento_ativo && (
-        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("fomento_home")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
           <Reveal>
             <div className="rounded-3xl overflow-hidden relative border" style={{ borderColor: C.line }}>
               <div className="grid md:grid-cols-[1fr_1.1fr]">
@@ -13389,7 +13414,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Agência do Trabalhador */}
       {siteConfig?.agencia_ativo && (
-        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("agencia")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
           <Reveal>
             <div className="rounded-3xl overflow-hidden relative border" style={{ borderColor: C.line }}>
               <div className="grid md:grid-cols-[1fr_1.1fr]">
@@ -13434,7 +13459,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Editais e Licitações */}
       {licitacoesAbertasPublicas.length > 0 && (
-        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("licitacoes")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
           <Reveal><SectionHeader eyebrow="Compras públicas" title="Editais e Licitações" sub="Oportunidades abertas pra empresas locais participarem" /></Reveal>
           <div className="grid sm:grid-cols-2 gap-4 mt-4">
             {licitacoesAbertasPublicas.map((l) => {
@@ -13494,7 +13519,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Resultados de editais e licitações já divulgados */}
       {licitacoesComResultadoPublicas.length > 0 && (
-        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("licitacoes")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
           <Reveal><SectionHeader eyebrow="Compras públicas" title="Resultados de editais" sub="Resultados já divulgados de editais e licitações anteriores" /></Reveal>
           <div className="grid sm:grid-cols-2 gap-4 mt-4">
             {licitacoesComResultadoPublicas.map((l) => (
@@ -13522,7 +13547,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Sala do Empreendedor — dashboard tecnológico */}
       {relatorioSalaPublico.linhas.length > 0 && (
-        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("sala_numeros")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
           <Reveal>
             <div className="flex items-end justify-between flex-wrap gap-3">
               <SectionHeader eyebrow="Empreendedorismo · dados em tempo real" title="Sala do Empreendedor" sub={`Atendimentos prestados em ${anoSalaPublico} — números oficiais (fonte: Sebrae)`} />
@@ -13602,7 +13627,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       )}
 
       {/* Feira do Empreendedor — em destaque */}
-      <section ref={feiraSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section ref={feiraSecaoRef} data-oculto={oc("feira")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
         <Reveal>
           <div className="rounded-3xl overflow-hidden relative" style={{ background: `linear-gradient(120deg, ${C.amber}, ${C.amberDark})` }}>
             <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -13701,7 +13726,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       {feiranteAberto && <ModalDetalheFeirante f={feiranteAberto} onFechar={() => setFeiranteAberto(null)} />}
 
       {/* Calendário de eventos — só o administrador edita, todo mundo vê */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 pb-12">
+      <section data-oculto={oc("calendario")} className="max-w-6xl mx-auto px-4 md:px-6 pb-12">
         <Reveal><SectionHeader eyebrow="Agenda da cidade" title="Calendário de eventos" sub="Feiras, cursos e eventos do comércio local — atualizado pelo administrador" /></Reveal>
         <div ref={calendarioSecaoRef} className="max-w-md">
           <CalendarioEventos />
@@ -13709,7 +13734,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       </section>
 
       {/* Vagas */}
-      <section ref={vagasSecaoRef} className="py-12" style={{ background: C.blueTint2 }}>
+      <section ref={vagasSecaoRef} data-oculto={oc("vagas")} className="py-12" style={{ background: C.blueTint2 }}>
         <div className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="flex items-end justify-between gap-3 flex-wrap">
             <Reveal><SectionHeader eyebrow="Trabalhe em Ivatuba" title="Vagas de emprego" linkLabel="Ver todas as vagas" onLinkClick={() => setQtdVagasVisiveis(vagasFiltradas.length)} /></Reveal>
@@ -13750,14 +13775,14 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       </section>
 
       {/* Cursos e Notícias */}
-      <section ref={cursosNoticiasSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12 grid grid-cols-1 md:grid-cols-2 gap-10">
-        <div>
+      <section ref={cursosNoticiasSecaoRef} data-oculto={!vis("cursos") && !vis("noticias") ? "1" : undefined} className={`max-w-6xl mx-auto px-4 md:px-6 py-12 grid grid-cols-1 ${vis("cursos") && vis("noticias") ? "md:grid-cols-2" : ""} gap-10`}>
+        <div data-oculto={oc("cursos")}>
           <SectionHeader eyebrow="Sala do Empreendedor" title="Cursos e eventos" />
           <div className="flex flex-col gap-3">
             {(cursosReais ?? cursos).map((c) => <CursoCard key={c.id || c.titulo} c={c} />)}
           </div>
         </div>
-        <div>
+        <div data-oculto={oc("noticias")}>
           <SectionHeader eyebrow="Fique por dentro" title="Notícias" />
           <div className="flex flex-col">
             {(noticiasReais ?? noticias).map((n, i) => {
@@ -13830,7 +13855,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Prestadores de serviço */}
       {(prestadoresReais ?? []).length > 0 && (
-        <section className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("prestadores")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
           <Reveal>
             <SectionHeader eyebrow="Autônomos e informais" title="Prestadores de serviço" sub="Encontre quem faz de tudo um pouco aqui em Ivatuba" />
           </Reveal>
@@ -13845,7 +13870,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       )}
 
       {/* Depoimentos */}
-      <section ref={depoimentosSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section ref={depoimentosSecaoRef} data-oculto={oc("depoimentos")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
         <Reveal>
           <SectionHeader eyebrow="Quem já usa" title="O que dizem sobre o Conecta Comércio" />
         </Reveal>
@@ -13934,7 +13959,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       </section>
 
       {/* FAQ */}
-      <section ref={faqSecaoRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section ref={faqSecaoRef} data-oculto={oc("faq")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
         <Reveal>
           <SectionHeader eyebrow="Dúvidas" title="Perguntas frequentes" />
         </Reveal>
@@ -13969,7 +13994,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       </section>
 
       {/* CTA PWA / Cartão do Servidor */}
-      <section className="max-w-6xl mx-auto px-4 md:px-6 pb-4">
+      <section data-oculto={oc("app")} className="max-w-6xl mx-auto px-4 md:px-6 pb-4">
         <div className="rounded-3xl p-8 md:p-10 grid md:grid-cols-[1fr_auto] gap-6 items-center"
           style={{ background: `linear-gradient(120deg, ${C.blueDeep}, ${C.blue})` }}>
           <div>
@@ -14211,7 +14236,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
         </div>
       )}
 
-      <BottomNavMobile ativo={bottomNavAtivo} onSelect={irBottomNav} />
+      <BottomNavMobile ativo={bottomNavAtivo} onSelect={irBottomNav} ocultos={menuOculto} />
     </div>
   );
 }
@@ -16528,8 +16553,46 @@ function CredencialDigital({ codigo }) {
 //   • o administrador continua vendo a página, com um aviso de que está oculta
 // Nenhum dado é apagado ao ocultar.
 // ---------------------------------------------------------------------------
+// Visibilidade no site público. Os módulos antigos usam uma coluna própria
+// (turismo_ativo...); os novos ficam em site_config.visibilidade (jsonb):
+// { votacao: false, faq: false... } — o que não estiver lá aparece normalmente.
+const visivelNoSite = (cfg, chave) => cfg?.visibilidade?.[chave] !== false;
+const moduloAtivo = (cfg, mod) => (mod.vis ? visivelNoSite(cfg, mod.id) : !!cfg?.[mod.chave]);
+
+// Seções e botões da página inicial (todos ligados por padrão)
+const SECOES_HOME = [
+  { id: "ticker", nome: "Faixa \"ao vivo\"", descricao: "Atividade recente passando no topo" },
+  { id: "botao_cadastrar", nome: "Botão \"Cadastrar empresa\"", descricao: "No cabeçalho e no menu do celular" },
+  { id: "botao_entrar", nome: "Botão \"Entrar\" do cabeçalho", descricao: "O botão Entrar da barra de cima continua" },
+  { id: "como_funciona", nome: "Como funciona", descricao: "Passo a passo do cadastro" },
+  { id: "publicidade", nome: "Banners de publicidade", descricao: "Banners do painel" },
+  { id: "promocoes", nome: "Promoções", descricao: "Faixa de promoções e item do menu", menu: "Promoções" },
+  { id: "destaque", nome: "Comerciante em destaque", descricao: "Capa com uma empresa" },
+  { id: "novidades", nome: "O que abriu essa semana", descricao: "Empresas e prestadores novos" },
+  { id: "empresas", nome: "Empresas", descricao: "Lista de empresas e item do menu", menu: "Empresas" },
+  { id: "produtos", nome: "Produtos", descricao: "Produtos em destaque e item do menu", menu: "Produtos" },
+  { id: "categorias", nome: "Categorias", descricao: "Atalhos por categoria" },
+  { id: "servicos", nome: "Serviços do Empreendedor", descricao: "Atalhos de serviços e item do menu", menu: "Serviços" },
+  { id: "fomento_home", nome: "Fomento Paraná na página inicial", descricao: "Linhas de crédito" },
+  { id: "agencia", nome: "Agência do Trabalhador", descricao: "Bloco da Agência" },
+  { id: "licitacoes", nome: "Editais e licitações", descricao: "Abertos e resultados" },
+  { id: "sala_numeros", nome: "Sala do Empreendedor em números", descricao: "Painel de atendimentos" },
+  { id: "feira", nome: "Feira do Empreendedor", descricao: "Feira regular e item do menu", menu: "Feira do Empreendedor" },
+  { id: "calendario", nome: "Calendário de eventos", descricao: "Agenda da cidade e item do menu", menu: "Calendário" },
+  { id: "vagas", nome: "Vagas de emprego", descricao: "Vagas e item do menu", menu: "Vagas" },
+  { id: "cursos", nome: "Cursos", descricao: "Cursos e item do menu", menu: "Cursos" },
+  { id: "noticias", nome: "Notícias", descricao: "Notícias e item do menu", menu: "Notícias" },
+  { id: "prestadores", nome: "Prestadores de serviço", descricao: "Lista de prestadores" },
+  { id: "depoimentos", nome: "Depoimentos", descricao: "Depoimentos e item do menu", menu: "Depoimentos" },
+  { id: "faq", nome: "Perguntas frequentes (FAQ)", descricao: "FAQ e item do menu", menu: "FAQ" },
+  { id: "app", nome: "Instalar o app / Cartão do Servidor", descricao: "Chamada no fim da página" },
+];
+
 const MODULOS_PUBLICOS = [
   { id: "turismo", chave: "turismo_ativo", nome: "Turismo", descricao: "Pontos turísticos, roteiros e história da cidade" },
+  { id: "votacao", vis: true, nome: "Votação", descricao: "Enquetes abertas à população (botão no topo e página)" },
+  { id: "fomento", vis: true, nome: "Fomento Paraná", descricao: "Botão no topo e página pública da Fomento" },
+  { id: "sala", vis: true, nome: "Sala do Empreendedor", descricao: "Botão no topo e página pública da Sala" },
   { id: "mural", chave: "mural_ativo", nome: "Mural da comunidade", descricao: "Sugestões, elogios, reclamações e avisos" },
   { id: "utilidade", chave: "utilidade_ativo", nome: "Utilidade pública", descricao: "Telefones úteis, serviços e emergências" },
   { id: "ouvidoria", chave: "ouvidoria_ativo", nome: "Ouvidoria", descricao: "Manifestações com protocolo e acompanhamento" },
@@ -16541,7 +16604,7 @@ function ModuloProtegido({ id, siteConfig, carregado, perfil, children }) {
   const mod = MODULOS_PUBLICOS.find((m) => m.id === id);
   if (!mod || !supabaseConfigurado) return children;
   if (!carregado) return <LoadingBrand />;
-  const ativo = !!siteConfig?.[mod.chave];
+  const ativo = moduloAtivo(siteConfig, mod);
   if (ativo) return children;
   if (perfil?.tipo === "admin") {
     return (
@@ -16650,14 +16713,14 @@ export default function ConectaComercio() {
   const modos = [
     { id: "site", label: "Site", icon: Store },
     { id: "turismo", label: "Turismo", icon: MapPinned, oculto: !siteConfig?.turismo_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
-    { id: "votacao", label: "Votação", icon: Vote },
+    { id: "votacao", label: "Votação", icon: Vote, oculto: !visivelNoSite(siteConfig, "votacao") },
     { id: "mural", label: "Mural", icon: Users, oculto: !siteConfig?.mural_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
     { id: "utilidade", label: "Utilidade pública", icon: Phone, oculto: !siteConfig?.utilidade_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
     { id: "ouvidoria", label: "Ouvidoria", icon: MessageCircle, oculto: !siteConfig?.ouvidoria_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
     { id: "classificados", label: "Classificados", icon: Repeat, oculto: !siteConfig?.classificados_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
     { id: "estatisticas", label: "Números", icon: TrendingUp, oculto: !siteConfig?.estatisticas_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
-    { id: "fomento", label: "Fomento Paraná", icon: Landmark },
-    { id: "sala", label: "Sala do Empreendedor", icon: Store },
+    { id: "fomento", label: "Fomento Paraná", icon: Landmark, oculto: !visivelNoSite(siteConfig, "fomento") },
+    { id: "sala", label: "Sala do Empreendedor", icon: Store, oculto: !visivelNoSite(siteConfig, "sala") },
     { id: "acesso", label: "Acesso", icon: Store, oculto: true },
     // Um botão só para todas as áreas com login (Conecta, Sala e Fomento): leva ao Portal
     { id: "portal", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]} · Minhas áreas` : "Minhas áreas") : "Entrar", icon: sessao && perfil ? LayoutDashboard : LogIn },
@@ -16814,12 +16877,12 @@ export default function ConectaComercio() {
       {modo === "estatisticas" && <ModuloProtegido id="estatisticas" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><EstatisticasPublicas /></ModuloProtegido>}
       {modo === "turismo" && <ModuloProtegido id="turismo" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><PaginaTurismo siteConfig={siteConfig} /></ModuloProtegido>}
       {modo === "mural" && <ModuloProtegido id="mural" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><PaginaMural perfil={perfil} /></ModuloProtegido>}
-      {modo === "votacao" && <PaginaVotacao />}
+      {modo === "votacao" && <ModuloProtegido id="votacao" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><PaginaVotacao /></ModuloProtegido>}
       {modo === "utilidade" && <ModuloProtegido id="utilidade" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><PaginaUtilidadePublica /></ModuloProtegido>}
       {modo === "ouvidoria" && <ModuloProtegido id="ouvidoria" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><PaginaOuvidoria /></ModuloProtegido>}
       {modo === "classificados" && <ModuloProtegido id="classificados" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><PaginaClassificados /></ModuloProtegido>}
-      {modo === "fomento" && <FomentoPublico siteConfig={siteConfig} />}
-      {modo === "sala" && <SalaPublico />}
+      {modo === "fomento" && <ModuloProtegido id="fomento" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><FomentoPublico siteConfig={siteConfig} /></ModuloProtegido>}
+      {modo === "sala" && <ModuloProtegido id="sala" siteConfig={siteConfig} carregado={siteConfigCarregado} perfil={perfil}><SalaPublico /></ModuloProtegido>}
       {modo === "acesso" && <PortalAcesso />}
       {modo === "portal" && <PortalPlataforma siteConfig={siteConfig} />}
       {modo === "sala-agente" && (sessao === undefined ? <LoadingBrand texto="Verificando seu acesso..." /> : <SalaPainel key="sala-agente" area="agente" sessao={sessao} perfil={perfil} />)}
