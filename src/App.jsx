@@ -12,7 +12,7 @@ import {
   Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw, Zap, Activity,
   EyeOff, Layers,
   DatabaseBackup, Fingerprint, ScrollText,
-  Globe,
+  Globe, MousePointerClick,
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -26,7 +26,9 @@ import Backup from "./central/Backup.jsx";
 import CadastroUnico from "./central/CadastroUnico.jsx";
 import Auditoria from "./central/Auditoria.jsx";
 import Relatorios from "./central/Relatorios.jsx";
+import VisitasCliques from "./central/VisitasCliques.jsx";
 import PortalEntrada from "./shared/PortalEntrada.jsx";
+import { registrar as registrarVisita, instalarRastreioCliques, ignorarRastreio, definirAlvoAtual } from "./shared/rastreio.js";
 import CentralAvisos, { useAvisosCentral } from "./central/Avisos.jsx";
 import { PortalAcesso } from "./SalaGestao.jsx";
 
@@ -1981,7 +1983,7 @@ const meusProdutos = [
 // Categorias do menu do Painel Admin (Projeto Master · seção 8). Item que não
 // estiver em nenhum grupo cai automaticamente em "Outros", para nada sumir.
 const GRUPOS_MENU_ADMIN_BASE = [
-  { titulo: "Início", ids: ["avisos", "dashboard", "desenvolvimento", "relatorios", "acessos"] },
+  { titulo: "Início", ids: ["avisos", "dashboard", "visitas", "desenvolvimento", "relatorios", "acessos"] },
   { titulo: "Comércio", ids: ["empresas", "categorias", "criterios", "prestadores", "agenda", "produtos", "promocoes", "combos", "cupons", "fidelidade", "avaliacoes"] },
   { titulo: "Comunidade", ids: ["turismo", "mural", "classificados", "ouvidoria", "utilidade", "enquetes", "depoimentos", "faq"] },
   { titulo: "Conteúdo e divulgação", ids: ["noticias", "vagas", "banners", "notificacoes", "feira", "calendario", "credenciais", "cursos", "licitacoes"] },
@@ -1992,8 +1994,8 @@ const GRUPOS_MENU_ADMIN_BASE = [
 // Projeto Master · seção 16: o que cada perfil vê no Painel Admin.
 // (O banco também confere — supabase-perfis-editor-visualizador.sql.)
 const ABAS_POR_PAPEL = {
-  editor: ["dashboard", "noticias", "banners", "vagas", "calendario", "cursos", "turismo", "utilidade", "enquetes", "depoimentos", "faq", "mural", "classificados"],
-  visualizador: ["dashboard", "desenvolvimento", "acessos"],
+  editor: ["dashboard", "visitas", "noticias", "banners", "vagas", "calendario", "cursos", "turismo", "utilidade", "enquetes", "depoimentos", "faq", "mural", "classificados"],
+  visualizador: ["dashboard", "visitas", "desenvolvimento", "acessos"],
 };
 const NOME_PAPEL_ADMIN = { editor: "Editor", visualizador: "Visualizador" };
 
@@ -2382,7 +2384,7 @@ export function AdminPanel({ papel = "admin" }) {
     });
 
     // Acessos ao site — conta visitas reais registradas na tabela page_views.
-    supabase.from("page_views").select("criado_em").gte("criado_em", new Date(Date.now() - 7 * 86400000).toISOString())
+    supabase.from("page_views").select("criado_em").eq("tipo", "entrada").gte("criado_em", new Date(Date.now() - 7 * 86400000).toISOString())
       .then(({ data, error }) => {
         if (error || !data) { setAcessosSemanaReais([]); return; }
         const dias = [];
@@ -5419,6 +5421,7 @@ export function AdminPanel({ papel = "admin" }) {
     { id: "permissoes", label: "Usuários e permissões", icon: ShieldCheck },
     { id: "auditoria", label: "Auditoria", icon: ScrollText },
     { id: "relatorios", label: "Relatórios por tema", icon: FileText },
+    { id: "visitas", label: "Visitas e cliques", icon: MousePointerClick },
     { id: "backup", label: "Backup dos dados", icon: DatabaseBackup },
     { id: "acessos", label: "Relatório de acessos", icon: TrendingUp },
     { id: "categorias", label: "Categorias", icon: Tag },
@@ -9178,6 +9181,8 @@ export function AdminPanel({ papel = "admin" }) {
 
         {tab === "relatorios" && <Relatorios />}
 
+        {tab === "visitas" && <VisitasCliques />}
+
         {tab === "avisos" && <CentralAvisos avisos={avisosCentral.avisos} recarregar={avisosCentral.recarregar} irPara={setTab} />}
 
         {tab === "modulos" && (
@@ -12249,12 +12254,8 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
     }
   };
 
-  // Registra uma visita real (sem dado pessoal nenhum, só a hora) pra
-  // alimentar o gráfico de "Acessos ao site" no dashboard do admin.
-  useEffect(() => {
-    if (!supabaseConfigurado) return;
-    supabase.from("page_views").insert({}).then(() => {});
-  }, []);
+  // A visita ("entrada") agora é registrada uma vez por acesso no App, junto
+  // com as páginas e os cliques (src/shared/rastreio.js).
 
   // Instalação como app (PWA) — captura o prompt nativo do navegador (Android/
   // desktop Chrome) e mostra um passo a passo manual pra quem usa iPhone
@@ -12312,10 +12313,13 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
   // WhatsApp e que o Google consegue indexar como página própria da empresa.
   const abrirEmpresa = (e) => {
     setEmpresaAberta(e);
+    definirAlvoAtual(e ? { nome: e.nome, id: e.id } : null);
+    if (e?.nome) registrarVisita({ tipo: "perfil", pagina: "loja", alvo: e.nome, alvoId: e.id, alvoTipo: "empresa" });
     if (e?.id) window.history.pushState(null, "", `#/loja-${e.id}`);
   };
   const fecharEmpresa = () => {
     setEmpresaAberta(null);
+    definirAlvoAtual(null);
     if (window.location.hash.startsWith("#/loja-")) window.history.pushState(null, "", "#/");
   };
 
@@ -16734,6 +16738,21 @@ export default function ConectaComercio() {
     const alvo = ROTA_HASH[modo] || "#/";
     if (window.location.hash !== alvo) window.history.replaceState(null, "", alvo);
   }, [modo]);
+
+  // Visitas e cliques (o que é mais visto e procurado). Espera saber quem está
+  // logado: acessos da equipe (admin, editor, visualizador) não contam.
+  const rastreioPronto = sessao !== undefined && (!sessao || !!perfil);
+  const entradaRegistrada = useRef(false);
+  const modoRef = useRef(modo);
+  modoRef.current = modo;
+  const ambienteDoModo = (m) => (String(m).startsWith("sala") ? "sala" : String(m).startsWith("fomento") ? "fomento" : "conecta");
+  useEffect(() => {
+    if (!rastreioPronto) return;
+    ignorarRastreio(["admin", "editor", "visualizador"].includes(perfil?.tipo));
+    if (!entradaRegistrada.current) { entradaRegistrada.current = true; registrarVisita({ tipo: "entrada", ambiente: ambienteDoModo(modo), pagina: modo }); }
+    registrarVisita({ tipo: "pagina", ambiente: ambienteDoModo(modo), pagina: modo });
+  }, [modo, rastreioPronto]);
+  useEffect(() => instalarRastreioCliques(() => ({ ambiente: ambienteDoModo(modoRef.current), pagina: modoRef.current })), []);
 
   // Um painel só é liberado se: Supabase não configurado (modo demo livre),
   // ou há sessão E o perfil tem o tipo exigido.

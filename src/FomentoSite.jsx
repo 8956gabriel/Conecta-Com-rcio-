@@ -9,7 +9,8 @@
 //   /entrar   → login
 //   /demo     → demonstração somente leitura (pede nome e cidade; dados mascarados)
 // =============================================================================
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { registrar as registrarVisita, instalarRastreioCliques, ignorarRastreio } from "./shared/rastreio.js";
 import { Landmark, LogIn, LogOut, Radar, ShieldCheck, Home, Eye, EyeOff, MonitorPlay, Lock, Globe } from "lucide-react";
 import PortalEntrada from "./shared/PortalEntrada.jsx";
 import { supabase, supabaseReal, supabaseConfigurado, usarClienteDemonstracao } from "./supabaseClient";
@@ -87,6 +88,19 @@ function FomentoSiteNormal() {
   useEffect(() => {
     if (sessao === null && (rota === "agente" || rota === "admin")) { setDestino(rota); ir("entrar"); }
   }, [sessao, rota]);
+
+  // Visitas e cliques (o que é mais visto e procurado) — a equipe não conta
+  const rastreioPronto = sessao !== undefined && (!sessao || !!perfil);
+  const entradaRegistrada = useRef(false);
+  const rotaRef = useRef(rota);
+  rotaRef.current = rota;
+  useEffect(() => {
+    if (!rastreioPronto) return;
+    ignorarRastreio(["admin", "editor", "visualizador"].includes(perfil?.tipo) || !!sessao);
+    if (!entradaRegistrada.current) { entradaRegistrada.current = true; registrarVisita({ tipo: "entrada", ambiente: "fomento", pagina: rota }); }
+    registrarVisita({ tipo: "pagina", ambiente: "fomento", pagina: rota });
+  }, [rota, rastreioPronto]);
+  useEffect(() => instalarRastreioCliques(() => ({ ambiente: "fomento", pagina: rotaRef.current })), []);
 
   const sair = async () => { await supabase.auth.signOut(); ir("inicio"); };
   const nome = perfil?.nome ? perfil.nome.split(" ")[0] : sessao?.user?.email?.split("@")[0];
