@@ -11,7 +11,7 @@ import {
   Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
   Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw, Zap, Activity,
   EyeOff, Layers,
-  DatabaseBackup, Fingerprint,
+  DatabaseBackup, Fingerprint, ScrollText,
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -23,6 +23,7 @@ import DesenvolvimentoEconomico from "./central/DesenvolvimentoEconomico.jsx";
 import Permissoes from "./central/Permissoes.jsx";
 import Backup from "./central/Backup.jsx";
 import CadastroUnico from "./central/CadastroUnico.jsx";
+import Auditoria from "./central/Auditoria.jsx";
 import CentralAvisos, { useAvisosCentral } from "./central/Avisos.jsx";
 import { PortalAcesso } from "./SalaGestao.jsx";
 
@@ -1982,7 +1983,7 @@ const GRUPOS_MENU_ADMIN_BASE = [
   { titulo: "Comunidade", ids: ["turismo", "mural", "classificados", "ouvidoria", "utilidade", "enquetes", "depoimentos", "faq"] },
   { titulo: "Conteúdo e divulgação", ids: ["noticias", "vagas", "banners", "notificacoes", "feira", "calendario", "credenciais", "cursos", "licitacoes"] },
   { titulo: "Sala e Fomento", ids: ["cadastro-unico", "servicos", "sala-empreendedor", "fomento-parana"] },
-  { titulo: "Administração", ids: ["modulos", "permissoes", "usuarios", "todos-usuarios", "identidade", "backup"] },
+  { titulo: "Administração", ids: ["modulos", "permissoes", "usuarios", "todos-usuarios", "identidade", "auditoria", "backup"] },
 ];
 
 function AdminPanel() {
@@ -5405,6 +5406,7 @@ function AdminPanel() {
     { id: "usuarios", label: "Cadastrar usuário", icon: UserCircle2 },
     { id: "todos-usuarios", label: "Usuários cadastrados", icon: Users },
     { id: "permissoes", label: "Usuários e permissões", icon: ShieldCheck },
+    { id: "auditoria", label: "Auditoria", icon: ScrollText },
     { id: "backup", label: "Backup dos dados", icon: DatabaseBackup },
     { id: "acessos", label: "Relatório de acessos", icon: TrendingUp },
     { id: "categorias", label: "Categorias", icon: Tag },
@@ -9155,6 +9157,8 @@ function AdminPanel() {
         {tab === "backup" && <Backup />}
 
         {tab === "cadastro-unico" && <CadastroUnico />}
+
+        {tab === "auditoria" && <Auditoria />}
 
         {tab === "avisos" && <CentralAvisos avisos={avisosCentral.avisos} recarregar={avisosCentral.recarregar} irPara={setTab} />}
 
