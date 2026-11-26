@@ -9676,6 +9676,7 @@ function EmpresarioPanel({ siteConfig }) {
     nome: "", whatsapp: "", instagram: "", endereco: "", horario_atendimento: "", horario_funcionamento: null, chave_pix: "",
     logo_url: "", banner_url: "", fotos_urls: [], email: "", facebook: "", site: "",
     cpf: "", cnpj: "", possui_mei: false, possui_cnpj: false, autonomo: false, aceita_cartao_servidor: false, destaque: false,
+    google_maps_url: "",
   });
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [statusPerfil, setStatusPerfil] = useState("");
@@ -9808,10 +9809,11 @@ function EmpresarioPanel({ siteConfig }) {
 
   useEffect(() => {
     if (!supabaseConfigurado) {
-      setPerfilForm({
+      setPerfilForm((f) => ({
+        ...f, // mantém os campos vazios (fotos, logo...) para a tela não quebrar no modo demonstração
         nome: "Padaria Pão Nosso", whatsapp: "(44) 99999-0001", instagram: "@paonosso.ivatuba",
         endereco: "Rua das Flores, 120 - Centro", horario_atendimento: "Seg a Sáb, 6h às 19h",
-      });
+      }));
       return;
     }
     (async () => {
@@ -9836,6 +9838,8 @@ function EmpresarioPanel({ siteConfig }) {
           cpf: data.cpf || "", cnpj: data.cnpj || "", possui_mei: !!data.possui_mei,
           possui_cnpj: !!data.possui_cnpj, autonomo: !!data.autonomo,
           aceita_cartao_servidor: !!data.aceita_cartao_servidor, destaque: !!data.destaque,
+          google_maps_url: data.google_maps_url || "",
+          _temCampoMaps: Object.prototype.hasOwnProperty.call(data, "google_maps_url"), // só grava se a coluna existir no banco
         });
         setVisualizacoesEmpresa(data.visualizacoes ?? 0);
         setPlanoPremiumEmpresa({ ativo: planoPremiumAtivo(data), ate: data.plano_premium_ate || null });
@@ -10197,6 +10201,7 @@ function EmpresarioPanel({ siteConfig }) {
         cpf: perfilForm.cpf || null, cnpj: perfilForm.cnpj || null, possui_mei: perfilForm.possui_mei,
         possui_cnpj: perfilForm.possui_cnpj, autonomo: perfilForm.autonomo,
         aceita_cartao_servidor: perfilForm.aceita_cartao_servidor, destaque: perfilForm.destaque,
+        ...(perfilForm._temCampoMaps ? { google_maps_url: perfilForm.google_maps_url || null } : {}),
       }).eq("id", empresaId);
       if (error) throw error;
       setStatusPerfil("ok");
@@ -10314,9 +10319,15 @@ function EmpresarioPanel({ siteConfig }) {
                 className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
               <input value={perfilForm.horario_atendimento} onChange={(e) => atualizarPerfilForm("horario_atendimento", e.target.value)} placeholder="Horário de atendimento"
                 className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
-              <button type="button" className="font-body text-sm font-bold px-3 py-2.5 rounded-lg border flex items-center justify-center gap-2" style={{ borderColor: C.line, color: "#425A70" }}>
-                <MapPin size={14} /> Ajustar localização no mapa
+              <button type="button" onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([perfilForm.endereco, "Ivatuba - PR"].filter(Boolean).join(", "))}`, "_blank", "noopener")}
+                className="font-body text-sm font-bold px-3 py-2.5 rounded-lg border flex items-center justify-center gap-2" style={{ borderColor: C.line, color: "#425A70" }}
+                title="Abre o Google Maps no seu endereço. Lá, toque em Compartilhar › Copiar link e cole no campo ao lado.">
+                <MapPin size={14} /> Achar no Google Maps
               </button>
+              {(perfilForm._temCampoMaps || !supabaseConfigurado) && (
+                <input value={perfilForm.google_maps_url || ""} onChange={(e) => atualizarPerfilForm("google_maps_url", e.target.value)} placeholder="Link do Google Maps (Compartilhar › Copiar link)"
+                  className="font-body text-sm border rounded-lg px-3 py-2.5 outline-none sm:col-span-2" style={{ borderColor: C.line }} />
+              )}
               <div className="sm:col-span-2">
                 <p className="font-body text-xs font-bold mb-1.5" style={{ color: C.ink }}>Horário de funcionamento (mostra "aberto agora" pro cliente)</p>
                 <EditorHorarioSemana valor={perfilForm.horario_funcionamento} onChange={(novo) => setPerfilForm((f) => ({ ...f, horario_funcionamento: novo }))} />
@@ -14266,6 +14277,48 @@ function MinhaConta({ perfil, sessao }) {
   );
 }
 
+// Tela que abre quando a pessoa chega pelo link "criar nova senha" do e-mail.
+function NovaSenhaModal({ onFechar }) {
+  const [senha, setSenha] = useState("");
+  const [confirma, setConfirma] = useState("");
+  const [ver, setVer] = useState(false);
+  const [estado, setEstado] = useState({ carregando: false, erro: "", ok: false });
+  const salvar = async (e) => {
+    e.preventDefault();
+    if (senha.length < 8) { setEstado({ carregando: false, erro: "A senha precisa ter pelo menos 8 caracteres.", ok: false }); return; }
+    if (senha !== confirma) { setEstado({ carregando: false, erro: "As duas senhas não são iguais.", ok: false }); return; }
+    setEstado({ carregando: true, erro: "", ok: false });
+    const { error } = await supabase.auth.updateUser({ password: senha });
+    setEstado({ carregando: false, erro: error ? error.message || "Não foi possível salvar. Peça um novo link." : "", ok: !error });
+  };
+  const campo = "w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none";
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" style={{ background: "rgba(5,42,77,0.55)" }}>
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6">
+        {estado.ok ? (
+          <div className="text-center py-4">
+            <CheckCircle2 size={32} color={C.blue} className="mx-auto" />
+            <p className="font-display font-extrabold text-lg mt-2" style={{ color: C.ink }}>Senha alterada!</p>
+            <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>Você já está conectado com a senha nova.</p>
+            <button onClick={onFechar} className="mt-5 w-full font-body text-sm font-bold py-3 rounded-xl text-white" style={{ background: C.blue }}>Continuar</button>
+          </div>
+        ) : (
+          <form onSubmit={salvar} className="flex flex-col gap-3">
+            <p className="font-display font-extrabold text-lg" style={{ color: C.ink }}>Criar nova senha</p>
+            <p className="font-body text-sm -mt-1" style={{ color: "#5C7186" }}>Digite a nova senha da sua conta do Conecta Comércio.</p>
+            <input type={ver ? "text" : "password"} autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="Nova senha (mínimo 8 caracteres)" className={campo} style={{ borderColor: C.line }} />
+            <input type={ver ? "text" : "password"} autoComplete="new-password" value={confirma} onChange={(e) => setConfirma(e.target.value)} placeholder="Repita a nova senha" className={campo} style={{ borderColor: C.line }} />
+            <label className="flex items-center gap-2 font-body text-xs" style={{ color: "#5C7186" }}><input type="checkbox" checked={ver} onChange={(e) => setVer(e.target.checked)} /> Mostrar senha</label>
+            {estado.erro && <p className="rounded-xl px-3 py-2 font-body text-xs" style={{ background: "#FBEAE5", color: "#B4462F" }}>{estado.erro}</p>}
+            <button type="submit" disabled={estado.carregando} className="w-full font-body text-sm font-bold py-3 rounded-xl text-white disabled:opacity-60" style={{ background: C.blue }}>{estado.carregando ? "Salvando..." : "Salvar nova senha"}</button>
+            <button type="button" onClick={onFechar} className="font-body text-xs font-semibold" style={{ color: "#8A9BAE" }}>Agora não</button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
   const categoriasReaisConta = useCategoriasReais();
   // tela: "entrar" | "escolha" | "cadastro-cliente" | "cadastro-empresario"
@@ -14273,6 +14326,20 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
   const [enviado, setEnviado] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
+  const [avisoSenha, setAvisoSenha] = useState("");
+
+  // "Esqueci minha senha": manda o link de recuperação para o e-mail digitado.
+  const esqueciSenha = async (e) => {
+    setErro(""); setAvisoSenha("");
+    const email = (e.currentTarget.form?.elements?.email?.value || "").trim();
+    if (!email) { setErro("Digite seu e-mail no campo acima e clique de novo em \"Esqueci minha senha\"."); return; }
+    if (!supabaseConfigurado) { setAvisoSenha("Modo demonstração: nenhum e-mail foi enviado."); return; }
+    setCarregando(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/` });
+    setCarregando(false);
+    if (error) setErro(error.message || "Não foi possível enviar o e-mail agora. Tente de novo em instantes.");
+    else setAvisoSenha(`Pronto! Se ${email} tiver conta, chega um e-mail com o link para criar uma senha nova. Confira também o spam.`);
+  };
 
   const [logoEmpresa, setLogoEmpresa] = useState(null);
   const [fotoPrestador, setFotoPrestador] = useState(null);
@@ -14739,7 +14806,8 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 Senha
                 <input name="senha" required type="password" placeholder="Sua senha" className="mt-1 w-full font-body text-sm border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
               </label>
-              <button type="button" className="font-body text-xs font-semibold text-right w-fit ml-auto" style={{ color: C.blue }}>Esqueci minha senha</button>
+              <button type="button" onClick={esqueciSenha} disabled={carregando} className="font-body text-xs font-semibold text-right w-fit ml-auto disabled:opacity-60" style={{ color: C.blue }}>Esqueci minha senha</button>
+              {avisoSenha && <p className="rounded-xl px-3.5 py-2.5 font-body text-xs" style={{ background: "#E7F6EE", color: "#1E6B45" }}>{avisoSenha}</p>}
               <button type="submit" disabled={carregando} className="glow-btn font-body font-bold text-sm text-white rounded-xl py-3 mt-1 disabled:opacity-60" style={{ background: C.blue }}>
                 {carregando ? "Entrando..." : "Entrar"}
               </button>
@@ -16372,14 +16440,16 @@ export default function ConectaComercio() {
   }, []);
 
   const [sessao, setSessao] = useState(undefined); // undefined = carregando, null = sem sessão
+  const [recuperandoSenha, setRecuperandoSenha] = useState(false);
   const [perfil, setPerfil] = useState(null);
 
   // Observa a sessão de login do Supabase em tempo real.
   useEffect(() => {
     if (!supabaseConfigurado) { setSessao(null); return; }
     supabase.auth.getSession().then(({ data }) => setSessao(data.session ?? null));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((evento, session) => {
       setSessao(session ?? null);
+      if (evento === "PASSWORD_RECOVERY") setRecuperandoSenha(true); // veio do link do e-mail
     });
     return () => listener.subscription.unsubscribe();
   }, []);
@@ -16523,6 +16593,7 @@ export default function ConectaComercio() {
   useEffect(() => {
     if (window.location.hash.startsWith("#/credencial-")) return; // link de credencial digital — não mexe na URL
     if (window.location.hash.startsWith("#/votacao-")) return; // link direto de uma votação
+    if (/access_token|type=recovery|error_description/.test(window.location.hash)) return; // link do e-mail de recuperação — o Supabase lê e limpa
     const alvo = ROTA_HASH[modo] || "#/";
     if (window.location.hash !== alvo) window.history.replaceState(null, "", alvo);
   }, [modo]);
@@ -16627,6 +16698,7 @@ export default function ConectaComercio() {
 
       <BotaoCompartilhar />
       <ChatWidget />
+      {recuperandoSenha && <NovaSenhaModal onFechar={() => setRecuperandoSenha(false)} />}
     </div>
     </CidadeContext.Provider>
   );
