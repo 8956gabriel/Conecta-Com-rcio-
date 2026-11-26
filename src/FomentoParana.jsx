@@ -2652,7 +2652,7 @@ function AbaVisitasDemo({ avisar, podeGerir }) {
   const [lista, setLista] = useState(null);
   const [busca, setBusca] = useState("");
   const link = SITE_FOMENTO ? `${window.location.origin}/demo` : "https://fomento-ivatuba.vercel.app/demo";
-  const carregar = () => supabase.from("fomento_demo_visitas").select("*").order("criado_em", { ascending: false }).limit(2000)
+  const carregar = () => !supabaseConfigurado ? Promise.resolve(setLista([])) : supabase.from("fomento_demo_visitas").select("*").order("criado_em", { ascending: false }).limit(2000)
     .then(({ data, error }) => { if (error) { avisar(/does not exist|schema cache/i.test(error.message) ? "Rode o arquivo supabase-fomento-demo.sql no Supabase." : error.message, "erro"); setLista([]); } else setLista(data || []); });
   useEffect(() => { carregar(); }, []);
   const dataBR = (d) => new Date(d).toLocaleDateString("pt-BR");
