@@ -5,6 +5,7 @@
       "main": true
     }
   },
+  "ignoreCommand": "bash scripts/vercel-pular-build.sh",
   "rewrites": [
     {
       "source": "/ivatuba",
