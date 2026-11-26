@@ -24,6 +24,7 @@ import Permissoes from "./central/Permissoes.jsx";
 import Backup from "./central/Backup.jsx";
 import CadastroUnico from "./central/CadastroUnico.jsx";
 import Auditoria from "./central/Auditoria.jsx";
+import Relatorios from "./central/Relatorios.jsx";
 import CentralAvisos, { useAvisosCentral } from "./central/Avisos.jsx";
 import { PortalAcesso } from "./SalaGestao.jsx";
 
@@ -1978,7 +1979,7 @@ const meusProdutos = [
 // Categorias do menu do Painel Admin (Projeto Master · seção 8). Item que não
 // estiver em nenhum grupo cai automaticamente em "Outros", para nada sumir.
 const GRUPOS_MENU_ADMIN_BASE = [
-  { titulo: "Início", ids: ["avisos", "dashboard", "desenvolvimento", "acessos"] },
+  { titulo: "Início", ids: ["avisos", "dashboard", "desenvolvimento", "relatorios", "acessos"] },
   { titulo: "Comércio", ids: ["empresas", "categorias", "criterios", "prestadores", "agenda", "produtos", "promocoes", "combos", "cupons", "fidelidade", "avaliacoes"] },
   { titulo: "Comunidade", ids: ["turismo", "mural", "classificados", "ouvidoria", "utilidade", "enquetes", "depoimentos", "faq"] },
   { titulo: "Conteúdo e divulgação", ids: ["noticias", "vagas", "banners", "notificacoes", "feira", "calendario", "credenciais", "cursos", "licitacoes"] },
@@ -5415,6 +5416,7 @@ export function AdminPanel({ papel = "admin" }) {
     { id: "todos-usuarios", label: "Usuários cadastrados", icon: Users },
     { id: "permissoes", label: "Usuários e permissões", icon: ShieldCheck },
     { id: "auditoria", label: "Auditoria", icon: ScrollText },
+    { id: "relatorios", label: "Relatórios por tema", icon: FileText },
     { id: "backup", label: "Backup dos dados", icon: DatabaseBackup },
     { id: "acessos", label: "Relatório de acessos", icon: TrendingUp },
     { id: "categorias", label: "Categorias", icon: Tag },
@@ -9171,6 +9173,8 @@ export function AdminPanel({ papel = "admin" }) {
         {tab === "cadastro-unico" && <CadastroUnico />}
 
         {tab === "auditoria" && <Auditoria />}
+
+        {tab === "relatorios" && <Relatorios />}
 
         {tab === "avisos" && <CentralAvisos avisos={avisosCentral.avisos} recarregar={avisosCentral.recarregar} irPara={setTab} />}
 
