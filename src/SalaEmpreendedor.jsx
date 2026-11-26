@@ -876,6 +876,10 @@ function AbaAtendimentos({ ctx }) {
   const salvar = async (e) => {
     e.preventDefault();
     if (!form.nome.trim() || !form.categoria) { ctx.avisar("Preencha o nome e o tipo de atendimento.", "erro"); return; }
+    if (!editandoId && form.enviar_fomento) {
+      if (soDigitos(form.whatsapp).length < 10) { ctx.avisar("Para encaminhar à Fomento, informe o WhatsApp com DDD.", "erro"); return; }
+      if (!form.fomento_consentimento) { ctx.avisar("Marque a autorização do empreendedor para enviar os dados à Fomento.", "erro"); return; }
+    }
     const registro = {
       data: form.data || hojeISO(), nome: form.nome.trim(), documento: soDigitos(form.documento) || null, whatsapp: soDigitos(form.whatsapp) || null,
       empresa: form.empresa?.trim() || null, categoria: form.categoria, canal: form.canal, situacao: form.situacao, observacoes: form.observacoes?.trim() || null,
@@ -894,13 +898,31 @@ function AbaAtendimentos({ ctx }) {
       if (error) { setSalvando(false); ctx.avisar("Não consegui salvar: " + error.message, "erro"); return; }
       salvo = data;
     }
+    // Encaminhamento Sala → Fomento (Projeto Master · seção 13): vira um pré-cadastro na área do agente.
+    let msgFomento = "";
+    if (!editandoId && form.enviar_fomento) {
+      const valor = Number(String(form.fomento_valor || "").replace(/\./g, "").replace(",", ".")) || null;
+      const mensagem = [
+        `Encaminhado pela Sala do Empreendedor em ${dataBR(registro.data)}${ctx.meuNome ? ` por ${ctx.meuNome}` : ""}.`,
+        registro.empresa ? `Empresa: ${registro.empresa}.` : "",
+        form.fomento_motivo?.trim() ? `Finalidade: ${form.fomento_motivo.trim()}.` : "",
+        `Atendimento na Sala: ${registro.categoria}.`,
+      ].filter(Boolean).join(" ");
+      if (supabaseConfigurado) {
+        const { error: eF } = await supabase.from("fomento_interesses").insert({
+          nome: registro.nome, whatsapp: form.whatsapp.trim(), cidade: "Ivatuba", tipo_contato: "atendimento",
+          valor_desejado: valor, mensagem, consentimento_lgpd: true,
+        });
+        msgFomento = eF ? ` Mas o envio à Fomento falhou (${eF.message}) — avise o agente.` : " Encaminhado à Fomento Paraná.";
+      } else msgFomento = " Encaminhado à Fomento Paraná (demonstração).";
+    }
     setSalvando(false);
     ctx.setAtendimentos((l) => (editandoId ? (l || []).map((a) => (a.id === editandoId ? { ...a, ...salvo } : a)) : [salvo, ...(l || [])]));
     if (!editandoId && form.pedido_id) {
       const pedido = (ctx.pedidos || []).find((p) => p.id === form.pedido_id);
       if (pedido) await mudarStatusPedido(ctx, pedido, "atendido");
     }
-    ctx.avisar(editandoId ? "Atendimento atualizado." : "Atendimento registrado.");
+    ctx.avisar((editandoId ? "Atendimento atualizado." : "Atendimento registrado.") + msgFomento, msgFomento.includes("falhou") ? "erro" : "ok");
     setForm(null); setEditandoId(null);
   };
 
@@ -981,6 +1003,26 @@ function AbaAtendimentos({ ctx }) {
               <Campo label={form.situacao === "encaminhado" ? "Encaminhado para" : "O que falta"}><input value={form.encaminhado_para || ""} onChange={(e) => setForm({ ...form, encaminhado_para: e.target.value })} placeholder={form.situacao === "encaminhado" ? "Ex.: Fomento Paraná, contador, prefeitura" : "Ex.: trazer comprovante"} className={inputCls} style={inputStyle} /></Campo>
               <Campo label="Retornar em"><input type="date" value={form.retorno_em || ""} onChange={(e) => setForm({ ...form, retorno_em: e.target.value })} className={inputCls} style={inputStyle} /></Campo>
             </>
+          )}
+          {!editandoId && (
+            <div className="md:col-span-3 rounded-xl border px-3.5 py-3" style={{ borderColor: form.enviar_fomento ? S.blue : S.line, background: form.enviar_fomento ? S.blueTint2 : "#fff" }}>
+              <label className="flex items-start gap-2 font-body text-sm font-bold cursor-pointer" style={{ color: S.ink }}>
+                <input type="checkbox" className="mt-1" checked={!!form.enviar_fomento} onChange={(e) => setForm({ ...form, enviar_fomento: e.target.checked, ...(e.target.checked ? { situacao: "encaminhado", encaminhado_para: "Fomento Paraná (crédito)" } : {}) })} />
+                <span>Encaminhar para a Fomento Paraná (interesse em crédito)
+                  <span className="block font-body text-xs font-medium mt-0.5" style={{ color: S.muted }}>Cria um pré-cadastro direto na área do Agente de Crédito, sem a pessoa precisar preencher de novo. Vai só nome, WhatsApp, empresa e o motivo — CPF/CNPJ e o histórico da Sala ficam aqui.</span>
+                </span>
+              </label>
+              {form.enviar_fomento && (
+                <div className="grid md:grid-cols-2 gap-3 mt-3">
+                  <Campo label="Valor que pretende (opcional)"><input value={form.fomento_valor || ""} onChange={(e) => setForm({ ...form, fomento_valor: e.target.value })} inputMode="decimal" placeholder="Ex.: 15000" className={inputCls} style={inputStyle} /></Campo>
+                  <Campo label="Para que é o crédito"><input value={form.fomento_motivo || ""} onChange={(e) => setForm({ ...form, fomento_motivo: e.target.value })} placeholder="Ex.: capital de giro, comprar máquina" className={inputCls} style={inputStyle} /></Campo>
+                  <label className="md:col-span-2 flex items-start gap-2 font-body text-xs font-semibold" style={{ color: S.ink }}>
+                    <input type="checkbox" className="mt-0.5" checked={!!form.fomento_consentimento} onChange={(e) => setForm({ ...form, fomento_consentimento: e.target.checked })} />
+                    O empreendedor autorizou enviar esses dados ao Agente de Crédito da Fomento Paraná (LGPD).
+                  </label>
+                </div>
+              )}
+            </div>
           )}
           <Campo label="Observações" className="md:col-span-2"><textarea rows={2} value={form.observacoes || ""} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} className={inputCls} style={inputStyle} /></Campo>
           <div className="md:col-span-3 flex gap-2">
