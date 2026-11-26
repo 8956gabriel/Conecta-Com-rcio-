@@ -22,6 +22,7 @@ import { ImportarGise } from "./SalaImportarGise.jsx";
 import { exportarPDF } from "./central/motor.js";
 import { AbaEstrategias, AbaCalendario, AgendaPublicaSala } from "./SalaPlanejamento.jsx";
 import { AbaBaseEmpresas } from "./SalaEmpresas.jsx";
+import PainelLateral from "./shared/PainelLateral.jsx";
 import { AbaSelo, AbaGestao, AbaOrientacoes, AbaEmpreendedores, AbaIndicadores, OrientacoesPublicas, DocProtegido } from "./SalaGestao.jsx";
 
 // As mesmas categorias do relatório oficial do Sebrae (usadas também no
@@ -563,29 +564,46 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
   }
 
   const meuCadastro = (equipe || []).find((m) => m.user_id && m.user_id === sessao?.user?.id);
-  const meuNome = meuCadastro?.nome || perfil?.nome || "Atendente";
+  const meuNome = meuCadastro?.nome || perfil?.nome || (equipe === null ? "" : sessao?.user?.email?.split("@")[0]) || "Atendente";
   const novos = (pedidos || []).filter((p) => p.status === "novo").length;
 
-  const itens = [
-    ...(area === "admin" ? [{ id: "indicadores", label: "Indicadores", icon: Gauge }] : []),
-    { id: "painel", label: "Painel do dia", icon: LayoutDashboard },
-    { id: "pedidos", label: "Pedidos do site", icon: Inbox, badge: novos },
-    { id: "agenda", label: "Agenda", icon: CalendarDays },
-    { id: "atendimentos", label: "Atendimentos", icon: ClipboardList },
-    { id: "empreendedores", label: "Empreendedores", icon: Contact },
-    { id: "empresas", label: "Base de empresas", icon: Building2 },
-    { id: "orientacoes", label: "Orientações", icon: BookOpen },
-    { id: "estrategias", label: "Estratégias", icon: Target },
-    { id: "calendario", label: "Calendário", icon: CalendarRange },
-    { id: "gestao", label: "Gestão da Sala", icon: Briefcase },
-    { id: "selo", label: "Selo Sebrae", icon: Award },
-    { id: "relatorio", label: "Relatório", icon: BarChart3 },
-    ...(area === "admin" ? [{ id: "config", label: "Página pública", icon: Settings }, { id: "equipe", label: "Equipe e permissões", icon: Users }] : []),
+  // Menu lateral (Projeto Master · Fase 5): mesmas abas de antes, agrupadas por categoria.
+  const grupos = [
+    { titulo: "Início", itens: [
+      ...(area === "admin" ? [{ id: "indicadores", label: "Indicadores", icon: Gauge }] : []),
+      { id: "painel", label: "Painel do dia", icon: LayoutDashboard },
+    ] },
+    { titulo: "Atendimento", itens: [
+      { id: "pedidos", label: "Pedidos do site", icon: Inbox, badge: novos },
+      { id: "agenda", label: "Agenda", icon: CalendarDays },
+      { id: "atendimentos", label: "Atendimentos", icon: ClipboardList },
+      { id: "orientacoes", label: "Orientações", icon: BookOpen },
+    ] },
+    { titulo: "Cadastros", itens: [
+      { id: "empreendedores", label: "Empreendedores", icon: Contact },
+      { id: "empresas", label: "Base de empresas", icon: Building2 },
+    ] },
+    { titulo: "Planejamento", itens: [
+      { id: "estrategias", label: "Estratégias", icon: Target },
+      { id: "calendario", label: "Calendário", icon: CalendarRange },
+      { id: "gestao", label: "Gestão da Sala", icon: Briefcase },
+    ] },
+    { titulo: "Selo e relatórios", itens: [
+      { id: "selo", label: "Selo Sebrae", icon: Award },
+      { id: "relatorio", label: "Relatório", icon: BarChart3 },
+    ] },
+    ...(area === "admin" ? [{ titulo: "Administração", itens: [
+      { id: "config", label: "Página pública", icon: Settings },
+      { id: "equipe", label: "Equipe e permissões", icon: Users },
+    ] }] : []),
   ];
+  const itens = grupos.flatMap((g) => g.itens);
   const abaAtual = itens.some((i) => i.id === aba) ? aba : itens[0].id;
   const ctx = { config, setConfig, pedidos, setPedidos, atendimentos, setAtendimentos, totais, equipe, setEquipe, avisar, meuNome, meuCadastro, gerir: acesso.gerir, abrirAtendimento: (ini) => { setFormAtendimento(ini || {}); setAba("atendimentos"); }, formAtendimento, setFormAtendimento, recarregar: carregar };
 
   return (
+    <PainelLateral logo={config?.logo_url || LOGO_SALA} logoAlt="Sala do Empreendedor" ambiente={area === "admin" ? "Administração" : "Área do atendente"}
+      cor={S.blue} corProfunda={S.blueDeep} destaque={S.amber} grupos={grupos} atual={abaAtual} onSelecionar={setAba} chave={`sala-${area}`}>
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
       {toast && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 font-body text-sm font-semibold px-4 py-2.5 rounded-xl text-white shadow-lg" style={{ background: toast.tipo === "erro" ? S.danger : S.green }}>{toast.m}</div>
@@ -594,7 +612,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
         <div aria-hidden className="absolute -right-10 -top-10 w-48 h-48 rounded-full" style={{ background: "rgba(245,183,0,0.18)" }} />
         <span className="inline-flex items-center bg-white rounded-xl px-3 py-1.5 mb-3 relative"><img src={config?.logo_url || LOGO_SALA} alt="Sala do Empreendedor" className="h-8 w-auto object-contain" /></span>
         <p className="font-body text-[11px] font-bold uppercase tracking-[0.16em] text-white/70 relative">{area === "admin" ? "Administração" : "Área do atendente"}</p>
-        <h1 className="font-display font-extrabold text-2xl md:text-3xl mt-1 relative">Olá, {meuNome.split(" ")[0]}!</h1>
+        <h1 className="font-display font-extrabold text-2xl md:text-3xl mt-1 relative">Olá{meuNome ? `, ${meuNome.split(" ")[0]}` : ""}!</h1>
         <div className="flex flex-wrap gap-2 mt-4 relative">
           {[["Página pública", LINKS_SALA.publico], ["Área do atendente", LINKS_SALA.agente], ...(acesso.gerir ? [["Administração", LINKS_SALA.admin]] : [])].map(([r, l]) => (
             <button key={l} onClick={() => { copiar(linkCompleto(l)); avisar(`Link copiado: ${linkCompleto(l)}`); }} className="font-body text-[11px] font-bold rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1" style={{ background: "rgba(255,255,255,0.14)" }}>
@@ -602,16 +620,6 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
             </button>
           ))}
         </div>
-      </div>
-
-      <div className="flex flex-wrap gap-1.5 mt-4">
-        {itens.map((i) => (
-          <button key={i.id} onClick={() => setAba(i.id)} className="font-body text-xs font-bold rounded-xl px-3 py-2 inline-flex items-center gap-1.5 whitespace-nowrap border"
-            style={abaAtual === i.id ? { background: S.blue, color: "#fff", borderColor: S.blue } : { background: "#fff", color: "#425A70", borderColor: S.line }}>
-            <i.icon size={14} /> {i.label}
-            {i.badge > 0 && <span className="ml-0.5 text-[10px] font-extrabold px-1.5 rounded-full" style={{ background: S.amber, color: S.ink }}>{i.badge}</span>}
-          </button>
-        ))}
       </div>
 
       <div className="mt-5">
@@ -632,6 +640,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
         {abaAtual === "equipe" && <AbaEquipe ctx={ctx} />}
       </div>
     </div>
+    </PainelLateral>
   );
 }
 
