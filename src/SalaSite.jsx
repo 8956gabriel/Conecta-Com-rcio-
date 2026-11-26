@@ -14,7 +14,8 @@ import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { SalaPublico, SalaPainel, LOGO_SALA } from "./SalaEmpreendedor.jsx";
 import { PortalAcesso } from "./SalaGestao.jsx";
 
-const AZUL = "#0A5AA8", AZUL_ESC = "#0B2470", LARANJA = "#F19F74", LINHA = "#DCE7F2", MUTED = "#5C7186", INK = "#0E2233";
+// Cores da logomarca da Sala do Empreendedor.
+const AZUL = "#0B2474", AZUL_ESC = "#0B2474", LARANJA = "#F29E72", LINHA = "#E1E5EF", MUTED = "#4A5578", INK = "#14213D";
 const ROTAS = {
   "/": "inicio", "/acesso": "inicio", "/publico": "publico", "/agente": "agente", "/atendente": "agente", "/admin": "admin", "/entrar": "entrar",
   "/sala": "publico", "/sala/publico": "publico", "/sala/agente": "agente", "/sala/admin": "admin", "/sala/acesso": "inicio",

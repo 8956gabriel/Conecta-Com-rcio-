@@ -11,6 +11,7 @@
 //                           (e também dentro do Painel Admin, item "Fomento Paraná")
 //   • useFomentoAcesso()  → diz se o usuário logado pode abrir o painel
 // =============================================================================
+import { MenuLateral } from "./ui/MenuLateral.jsx";
 import React, { useState, useEffect, useMemo, Suspense, lazy } from "react";
 import {
   Landmark, HandCoins, MessageCircle, FileText, Download, Calculator, ClipboardList,
@@ -27,18 +28,25 @@ const CentralProspeccao = lazy(() => import("./central/Central.jsx"));
 // Identidade do módulo — azul + branco com detalhes em verde, no mesmo padrão
 // de tokens do Conecta Comércio (a cor principal do site continua mandando).
 // ---------------------------------------------------------------------------
+// Cores da logomarca da Fomento Paraná (azul, amarelo e verde).
+// O azul dos botões é um tom mais escuro que o da logo (#0080C9) para o texto
+// branco ter contraste suficiente (5,6:1). Fixas: não seguem a cor do Conecta.
 const F = {
-  blue: "var(--cor-principal, #0A5AA8)",
-  blueDeep: "var(--cor-principal-profunda, #052A4D)",
-  blueTint: "#EAF2FB",
-  blueTint2: "#F5F9FD",
+  blue: "#006DAB",
+  blueLogo: "#0080C9",
+  blueDeep: "#003F66",
+  blueTint: "#E6F2FA",
+  blueTint2: "#F4F9FC",
+  amarelo: "#FFDD00",
+  amareloTint: "#FFF8CC",
+  verde: "#879D0E",
   green: "#1E8E5A",
   greenBright: "#25A85B",
   greenTint: "#E7F6EE",
-  ink: "#0E2233",
-  muted: "#5C7186",
-  soft: "#8896A6",
-  line: "#DCE7F2",
+  ink: "#1A1A1A",
+  muted: "#5C5C5C",
+  soft: "#878787",
+  line: "#E2E5D6",
   danger: "#B4462F",
 };
 
@@ -967,12 +975,12 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos",
   const ctx = { rankingOficial, setRankingOficial, config, setConfig, linhas, setLinhas, materiais, setMateriais, propostas, setPropostas, interesses, setInteresses, lembretes, setLembretes, agentes, setAgentes, avisar, nomeLinha, nomeAgente, podeGerir, setAba };
 
   return (
-    <div className={embutido ? "" : "max-w-6xl mx-auto px-4 md:px-6 py-8"}>
+    <div className={embutido ? "" : "max-w-7xl mx-auto px-4 md:px-6 py-8"}>
       {toast && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[70] rounded-xl px-4 py-2.5 font-body text-sm font-semibold shadow-lg text-white" style={{ background: toast.tipo === "erro" ? F.danger : F.green }}>{toast.m}</div>
       )}
       <div className="rounded-2xl p-5 mb-6 flex items-center justify-between gap-4 flex-wrap overflow-hidden relative" style={{ background: `linear-gradient(120deg, ${F.blueDeep}, ${F.blue})` }}>
-        <div aria-hidden className="absolute -right-8 -top-10 w-40 h-40 rounded-full" style={{ background: "rgba(37,168,91,0.25)" }} />
+        <div aria-hidden className="absolute -right-8 -top-10 w-40 h-40 rounded-full" style={{ background: "rgba(255,221,0,0.35)" }} />
         <div className="relative">
           <p className="font-body text-[11px] font-bold uppercase tracking-wider text-white/70 flex items-center gap-1.5"><Landmark size={12} /> Fomento Paraná · {area === "admin" ? "Administração" : "Agente de Crédito"}
             {area !== "todos" && !emDemonstracao && <a href={area === "admin" ? LINKS_FOMENTO.agente : LINKS_FOMENTO.admin} className="ml-2 normal-case tracking-normal underline text-white/80 hover:text-white">ir para {area === "admin" ? "área do agente" : "administração"} ›</a>}</p>
@@ -991,21 +999,16 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos",
       {!supabaseConfigurado && <div className="mb-4"><Aviso>Modo demonstração: conecte o Supabase para salvar os dados de verdade.</Aviso></div>}
       {emDemonstracao && <div className="mb-4"><Aviso>Demonstração somente para visualização: nomes aparecem só com a inicial e documentos, contatos e observações ficam ocultos. Nenhuma alteração é salva.</Aviso></div>}
 
-      <div className={aba === "central" ? "grid gap-4" : "grid md:grid-cols-[220px_1fr] gap-6"}>
-        <aside className={`rounded-2xl border p-2 h-fit flex gap-1 overflow-x-auto no-scrollbar ${aba === "central" ? "" : "md:flex-col"}`} style={{ borderColor: F.line }}>
-          {itens.map((it) => {
-            const Icon = it.icon;
-            const ativo = aba === it.id;
-            return (
-              <button key={it.id} onClick={() => setAba(it.id)} className={`shrink-0 ${aba === "central" ? "" : "md:w-full"} flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-body font-semibold text-left`}
-                style={{ background: ativo ? F.blueTint : it.destaque ? "#FFF7DB" : "transparent", color: ativo ? F.blue : it.destaque ? "#7A5800" : "#425A70" }}>
-                <Icon size={16} /> <span className="whitespace-nowrap">{it.label}</span>
-                {it.badge > 0 && <span className="ml-auto font-body text-[10px] font-bold px-1.5 rounded-full text-white" style={{ background: F.greenBright }}>{it.badge}</span>}
-              </button>
-            );
-          })}
-        </aside>
-        <div className="min-w-0">
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-stretch md:items-start">
+        <MenuLateral chave={`fomento-${area}`} atual={aba} onSelecionar={setAba} rotuloAtual={itens.find((i) => i.id === aba)?.label}
+          grupos={[
+            { titulo: "Prospecção", itens: itens.filter((i) => i.id === "central") },
+            { titulo: "Crédito", itens: itens.filter((i) => ["painel", "propostas", "contratos", "interesses", "simulacao"].includes(i.id)) },
+            { titulo: "Desempenho", itens: itens.filter((i) => ["pontuacao", "ranking", "lembretes"].includes(i.id)) },
+            { titulo: "Gestão", itens: itens.filter((i) => ["linhas", "materiais", "config", "demo"].includes(i.id)) },
+          ]}
+          cores={{ fundo: "#FFFFFF", borda: F.line, texto: "#333333", textoSuave: F.muted, ativoFundo: F.amarelo, ativoTexto: "#000000", badgeFundo: F.blue, badgeTexto: "#FFFFFF", marca: F.blue }} />
+        <div className="flex-1 min-w-0">
           {aba === "central" && <Suspense fallback={<p className="font-body text-sm py-10 text-center" style={{ color: F.muted }}>Carregando a Central de Prospecção...</p>}><CentralProspeccao {...ctx} sessao={sessao} /></Suspense>}
           {aba === "painel" && <AbaPainel {...ctx} />}
           {aba === "propostas" && <AbaPropostas {...ctx} />}

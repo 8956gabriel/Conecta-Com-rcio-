@@ -11,6 +11,7 @@
 // Os totais mensais públicos continuam na tabela sala_atendimentos_totais
 // (a mesma do Painel Admin → "Sala do Empreendedor - Atendimentos").
 // =============================================================================
+import { MenuLateral } from "./ui/MenuLateral.jsx";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Store, MessageCircle, MapPin, Clock, CalendarDays, ClipboardList, Inbox, BarChart3, Settings, Users,
@@ -58,19 +59,23 @@ export const LOGO_SALA = "/sala-do-empreendedor-logo.png";
 export const SITE_SALA = import.meta.env.VITE_SITE === "sala";
 export const LINKS_SALA = SITE_SALA ? { publico: "/publico", agente: "/agente", admin: "/admin" } : { publico: "/sala", agente: "/sala/agente", admin: "/sala/admin" };
 
+// Cores da logomarca da Sala do Empreendedor (azul-marinho + laranja).
+// Fixas: não seguem a cor principal escolhida para o Conecta Comércio.
 const S = {
-  blue: "var(--cor-principal, #0A5AA8)",
-  blueDeep: "var(--cor-principal-profunda, #052A4D)",
-  blueTint: "#EAF2FB",
-  blueTint2: "#F5F9FD",
-  amber: "#F5B700",
+  blue: "#0B2474",
+  blueDeep: "#06164A",
+  blueTint: "#ECEFF8",
+  blueTint2: "#F7F8FC",
+  amber: "#F29E72",
+  laranja: "#F29E72",
+  laranjaTint: "#FDF1EA",
   green: "#1E8E5A",
   greenBright: "#25A85B",
   greenTint: "#E7F6EE",
-  ink: "#0E2233",
-  muted: "#5C7186",
+  ink: "#14213D",
+  muted: "#4A5578",
   soft: "#8896A6",
-  line: "#DCE7F2",
+  line: "#E1E5EF",
   danger: "#B4462F",
 };
 
@@ -583,15 +588,23 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
     ...(area === "admin" ? [{ id: "config", label: "Página pública", icon: Settings }, { id: "equipe", label: "Equipe e permissões", icon: Users }] : []),
   ];
   const abaAtual = itens.some((i) => i.id === aba) ? aba : itens[0].id;
+  const porId = (...ids) => ids.map((id) => itens.find((i) => i.id === id)).filter(Boolean);
+  const gruposMenu = [
+    { titulo: "Visão geral", itens: porId("indicadores", "painel", "pedidos", "agenda") },
+    { titulo: "Atendimento", itens: porId("atendimentos", "empreendedores", "empresas", "orientacoes") },
+    { titulo: "Planejamento", itens: porId("estrategias", "calendario", "gestao", "selo") },
+    { titulo: "Relatórios", itens: porId("relatorio") },
+    { titulo: "Administração", itens: porId("config", "equipe") },
+  ];
   const ctx = { config, setConfig, pedidos, setPedidos, atendimentos, setAtendimentos, totais, equipe, setEquipe, avisar, meuNome, meuCadastro, gerir: acesso.gerir, abrirAtendimento: (ini) => { setFormAtendimento(ini || {}); setAba("atendimentos"); }, formAtendimento, setFormAtendimento, recarregar: carregar };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
+    <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
       {toast && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 font-body text-sm font-semibold px-4 py-2.5 rounded-xl text-white shadow-lg" style={{ background: toast.tipo === "erro" ? S.danger : S.green }}>{toast.m}</div>
       )}
       <div className="rounded-3xl p-5 md:p-6 text-white relative overflow-hidden" style={{ background: `linear-gradient(125deg, ${S.blueDeep}, ${S.blue})` }}>
-        <div aria-hidden className="absolute -right-10 -top-10 w-48 h-48 rounded-full" style={{ background: "rgba(245,183,0,0.18)" }} />
+        <div aria-hidden className="absolute -right-10 -top-10 w-48 h-48 rounded-full" style={{ background: "rgba(242,158,114,0.35)" }} />
         <span className="inline-flex items-center bg-white rounded-xl px-3 py-1.5 mb-3 relative"><img src={config?.logo_url || LOGO_SALA} alt="Sala do Empreendedor" className="h-8 w-auto object-contain" /></span>
         <p className="font-body text-[11px] font-bold uppercase tracking-[0.16em] text-white/70 relative">{area === "admin" ? "Administração" : "Área do atendente"}</p>
         <h1 className="font-display font-extrabold text-2xl md:text-3xl mt-1 relative">Olá, {meuNome.split(" ")[0]}!</h1>
@@ -604,17 +617,10 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5 mt-4">
-        {itens.map((i) => (
-          <button key={i.id} onClick={() => setAba(i.id)} className="font-body text-xs font-bold rounded-xl px-3 py-2 inline-flex items-center gap-1.5 whitespace-nowrap border"
-            style={abaAtual === i.id ? { background: S.blue, color: "#fff", borderColor: S.blue } : { background: "#fff", color: "#425A70", borderColor: S.line }}>
-            <i.icon size={14} /> {i.label}
-            {i.badge > 0 && <span className="ml-0.5 text-[10px] font-extrabold px-1.5 rounded-full" style={{ background: S.amber, color: S.ink }}>{i.badge}</span>}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-5">
+      <div className="mt-5 flex flex-col md:flex-row gap-4 md:gap-6 items-stretch md:items-start">
+        <MenuLateral chave={`sala-${area}`} grupos={gruposMenu} atual={abaAtual} onSelecionar={setAba} rotuloAtual={itens.find((i) => i.id === abaAtual)?.label}
+          cores={{ fundo: "#FFFFFF", borda: S.line, texto: "#33405E", textoSuave: S.muted, ativoFundo: S.blue, ativoTexto: "#FFFFFF", badgeFundo: S.laranja, badgeTexto: S.blue, marca: S.blue }} />
+        <div className="flex-1 min-w-0">
         {abaAtual === "painel" && <AbaPainel ctx={ctx} setAba={setAba} />}
         {abaAtual === "pedidos" && <AbaPedidos ctx={ctx} />}
         {abaAtual === "agenda" && <AbaAgenda ctx={ctx} />}
@@ -630,6 +636,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
         {abaAtual === "relatorio" && <AbaRelatorio ctx={ctx} />}
         {abaAtual === "config" && <AbaConfig ctx={ctx} />}
         {abaAtual === "equipe" && <AbaEquipe ctx={ctx} />}
+        </div>
       </div>
     </div>
   );
