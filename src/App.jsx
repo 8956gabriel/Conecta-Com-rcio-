@@ -1986,7 +1986,15 @@ const GRUPOS_MENU_ADMIN_BASE = [
   { titulo: "Administração", ids: ["modulos", "permissoes", "usuarios", "todos-usuarios", "identidade", "auditoria", "backup"] },
 ];
 
-function AdminPanel() {
+// Projeto Master · seção 16: o que cada perfil vê no Painel Admin.
+// (O banco também confere — supabase-perfis-editor-visualizador.sql.)
+const ABAS_POR_PAPEL = {
+  editor: ["dashboard", "noticias", "banners", "vagas", "calendario", "cursos", "turismo", "utilidade", "enquetes", "depoimentos", "faq", "mural", "classificados"],
+  visualizador: ["dashboard", "desenvolvimento", "acessos"],
+};
+const NOME_PAPEL_ADMIN = { editor: "Editor", visualizador: "Visualizador" };
+
+export function AdminPanel({ papel = "admin" }) {
   const [tab, setTab] = useState("dashboard");
   const avisosCentral = useAvisosCentral(); // Projeto Master · seção 19
   const [menuAdminAberto, setMenuAdminAberto] = useState(false);
@@ -5445,6 +5453,10 @@ function AdminPanel() {
     { id: "modulos", label: "Módulos do site", icon: Layers },
   ];
 
+  if (ABAS_POR_PAPEL[papel]) { // editor e visualizador veem só o que podem usar
+    const permitidas = ABAS_POR_PAPEL[papel];
+    for (let i = items.length - 1; i >= 0; i--) if (!permitidas.includes(items[i].id)) items.splice(i, 1);
+  }
   const itemAtivo = items.find((it) => it.id === tab);
   const semGrupo = items.filter((it) => !GRUPOS_MENU_ADMIN_BASE.some((g) => g.ids.includes(it.id))).map((it) => it.id);
   const GRUPOS_MENU_ADMIN = semGrupo.length ? [...GRUPOS_MENU_ADMIN_BASE, { titulo: "Outros", ids: semGrupo }] : GRUPOS_MENU_ADMIN_BASE;
@@ -16618,6 +16630,7 @@ export default function ConectaComercio() {
     if (!sessao) return false;
     if (!perfil) return true; // ainda carregando o perfil — libera provisoriamente
     if (perfil.tipo === "admin") return true; // admin tem acesso a todos os painéis do site
+    if (restrito === "admin" && (perfil.tipo === "editor" || perfil.tipo === "visualizador")) return true; // Painel Admin com menu reduzido
     return perfil.tipo === restrito;
   };
 
@@ -16675,7 +16688,12 @@ export default function ConectaComercio() {
         ) : podeVer("admin") ? (
           <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
             <SectionHeader eyebrow="Área restrita" title="Painel administrativo" sub={perfil?.nome ? `Olá, ${perfil.nome}` : "Visível só para administradores da plataforma"} />
-            <AdminPanel />
+            {NOME_PAPEL_ADMIN[perfil?.tipo] && (
+              <p className="rounded-xl px-4 py-2.5 mb-4 font-body text-sm" style={{ background: "#EAF2FB", color: C.blue }}>
+                Você entrou como <b>{NOME_PAPEL_ADMIN[perfil.tipo]}</b>: {perfil.tipo === "editor" ? "cuida de notícias, banners, vagas, eventos, cursos, turismo, enquetes, FAQ e da moderação da comunidade." : "vê os números do painel, sem alterar nada."}
+              </p>
+            )}
+            <AdminPanel papel={perfil?.tipo || "admin"} />
           </div>
         ) : (
           <AcessoRestrito tipo="admin" onEntrar={() => irPara(modos.find((m) => m.id === "admin"))} />

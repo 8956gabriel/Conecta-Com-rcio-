@@ -14,7 +14,7 @@ const INK = "#0E2233", MUTED = "#5C7186", LINHA = "#DCE7F2";
 const COR_SALA = "#F19F74", COR_FOMENTO = "#1E8E5A";
 
 const PAPEIS = {
-  conecta: { cliente: "Cliente", empresario: "Comerciante", prestador: "Prestador", admin: "Administrador geral" },
+  conecta: { cliente: "Cliente", empresario: "Comerciante", prestador: "Prestador", editor: "Editor (conteúdo)", visualizador: "Visualizador (só vê)", admin: "Administrador geral" },
   sala: { nenhum: "Sem acesso", atendente: "Atendente", gestor: "Administrador da Sala" },
   fomento: { nenhum: "Sem acesso", agente: "Agente de crédito", gestor: "Administrador da Fomento" },
 };
@@ -22,6 +22,7 @@ const SETORES = { conecta: "Conecta Comércio", sala: "Sala do Empreendedor", fo
 const FILTROS = [
   ["todos", "Todos"],
   ["admin", "Administradores"],
+  ["equipe-conteudo", "Editores e visualizadores"],
   ["equipe-sala", "Equipe da Sala"],
   ["equipe-fomento", "Equipe da Fomento"],
   ["comerciantes", "Comerciantes"],
@@ -105,6 +106,7 @@ export default function Permissoes({ notificar }) {
       if (filtro === "equipe-sala") return papelSala(u) !== "nenhum";
       if (filtro === "equipe-fomento") return papelFomento(u) !== "nenhum";
       if (filtro === "comerciantes") return u.tipo === "empresario" || u.tipo === "prestador";
+      if (filtro === "equipe-conteudo") return u.tipo === "editor" || u.tipo === "visualizador";
       return true;
     });
   }, [lista, busca, filtro]);
@@ -181,6 +183,8 @@ export default function Permissoes({ notificar }) {
 
       <p className="font-body text-xs mt-3 flex flex-wrap gap-x-4 gap-y-1" style={{ color: MUTED }}>
         <span><b>Administrador geral</b>: vê e muda tudo, inclusive a Sala e a Fomento.</span>
+        <span><b>Editor</b>: notícias, banners, vagas, eventos, cursos, turismo, enquetes, FAQ e moderação da comunidade.</span>
+        <span><b>Visualizador</b>: só vê os números do painel, sem alterar nada.</span>
         <span><b>Administrador da Sala/Fomento</b>: equipe e configurações do próprio setor.</span>
         <span><b>Atendente / Agente</b>: trabalha no seu ambiente.</span>
       </p>
