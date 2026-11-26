@@ -19,6 +19,7 @@ import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { FomentoPublico, FomentoAdmin, useFomentoAcesso } from "./FomentoParana.jsx";
 import { SalaPublico, SalaPainel, useSalaAcesso } from "./SalaEmpreendedor.jsx";
 import DesenvolvimentoEconomico from "./central/DesenvolvimentoEconomico.jsx";
+import Permissoes from "./central/Permissoes.jsx";
 import { PortalAcesso } from "./SalaGestao.jsx";
 
 // ---------------------------------------------------------------------------
@@ -1977,7 +1978,7 @@ const GRUPOS_MENU_ADMIN_BASE = [
   { titulo: "Comunidade", ids: ["turismo", "mural", "classificados", "ouvidoria", "utilidade", "enquetes", "depoimentos", "faq"] },
   { titulo: "Conteúdo e divulgação", ids: ["noticias", "vagas", "banners", "notificacoes", "feira", "calendario", "credenciais", "cursos", "licitacoes"] },
   { titulo: "Sala e Fomento", ids: ["servicos", "sala-empreendedor", "fomento-parana"] },
-  { titulo: "Administração", ids: ["modulos", "usuarios", "todos-usuarios", "identidade"] },
+  { titulo: "Administração", ids: ["modulos", "permissoes", "usuarios", "todos-usuarios", "identidade"] },
 ];
 
 function AdminPanel() {
@@ -5397,6 +5398,7 @@ function AdminPanel() {
     { id: "desenvolvimento", label: "Desenvolvimento econômico", icon: TrendingUp },
     { id: "usuarios", label: "Cadastrar usuário", icon: UserCircle2 },
     { id: "todos-usuarios", label: "Usuários cadastrados", icon: Users },
+    { id: "permissoes", label: "Usuários e permissões", icon: ShieldCheck },
     { id: "acessos", label: "Relatório de acessos", icon: TrendingUp },
     { id: "categorias", label: "Categorias", icon: Tag },
     { id: "empresas", label: "Comerciantes", icon: CheckCircle2 },
@@ -9138,6 +9140,8 @@ function AdminPanel() {
         )}
 
         {tab === "desenvolvimento" && <DesenvolvimentoEconomico />}
+
+        {tab === "permissoes" && <Permissoes notificar={notificar} />}
 
         {tab === "modulos" && (
           <div className="max-w-3xl">
