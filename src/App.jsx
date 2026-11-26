@@ -12693,7 +12693,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       subtitulo: "MOVIMENTO LOCAL",
       icon: BadgeCheck,
       foto_url: null,
-      onClick: undefined,
+      onClick: () => empresasSecaoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
     }];
     const empresaDestaque = (empresasReais ?? []).find((e) => e.destaque);
     if (empresaDestaque) {
@@ -16437,6 +16437,8 @@ export default function ConectaComercio() {
     { id: "fomento", label: "Fomento Paraná", icon: Landmark },
     { id: "sala", label: "Sala do Empreendedor", icon: Store },
     { id: "acesso", label: "Acesso", icon: Store, oculto: true },
+    { id: "termos", label: "Termos de uso", icon: FileText, oculto: true },
+    { id: "privacidade", label: "Política de privacidade", icon: FileText, oculto: true },
     { id: "conta", label: sessao && perfil ? (perfil.nome ? `Olá, ${perfil.nome.split(" ")[0]}` : "Minha conta") : "Entrar / Cadastro", icon: UserCircle2 },
     { id: "admin", label: "Painel Admin", icon: ShieldCheck, restrito: "admin" },
     { id: "empresario", label: "Painel Empresário", icon: Briefcase, restrito: "empresario" },
