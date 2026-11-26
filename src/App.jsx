@@ -16419,13 +16419,13 @@ export default function ConectaComercio() {
 
   const modos = [
     { id: "site", label: "Site", icon: Store },
-    ...(siteConfig?.turismo_ativo ? [{ id: "turismo", label: "Turismo", icon: MapPinned }] : []),
+    { id: "turismo", label: "Turismo", icon: MapPinned, oculto: !siteConfig?.turismo_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
     { id: "votacao", label: "Votação", icon: Vote },
-    ...(siteConfig?.mural_ativo ? [{ id: "mural", label: "Mural", icon: Users }] : []),
-    ...(siteConfig?.utilidade_ativo ? [{ id: "utilidade", label: "Utilidade pública", icon: Phone }] : []),
-    ...(siteConfig?.ouvidoria_ativo ? [{ id: "ouvidoria", label: "Ouvidoria", icon: MessageCircle }] : []),
-    ...(siteConfig?.classificados_ativo ? [{ id: "classificados", label: "Classificados", icon: Repeat }] : []),
-    ...(siteConfig?.estatisticas_ativo ? [{ id: "estatisticas", label: "Números", icon: TrendingUp }] : []),
+    { id: "mural", label: "Mural", icon: Users, oculto: !siteConfig?.mural_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
+    { id: "utilidade", label: "Utilidade pública", icon: Phone, oculto: !siteConfig?.utilidade_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
+    { id: "ouvidoria", label: "Ouvidoria", icon: MessageCircle, oculto: !siteConfig?.ouvidoria_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
+    { id: "classificados", label: "Classificados", icon: Repeat, oculto: !siteConfig?.classificados_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
+    { id: "estatisticas", label: "Números", icon: TrendingUp, oculto: !siteConfig?.estatisticas_ativo }, // fora do menu quando desligado; link direto decide em ModuloProtegido
     { id: "fomento", label: "Fomento Paraná", icon: Landmark },
     { id: "sala", label: "Sala do Empreendedor", icon: Store },
     { id: "acesso", label: "Acesso", icon: Store, oculto: true },
