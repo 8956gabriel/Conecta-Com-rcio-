@@ -16,6 +16,8 @@ import { FomentoPublico, FomentoAdmin } from "./FomentoParana.jsx";
 
 const AZUL = "#0A5AA8", AZUL_ESC = "#052A4D", AMARELO = "#F5B700", LINHA = "#DCE7F2", MUTED = "#5C7186", INK = "#0E2233";
 const ROTAS = { "/": "publico", "/agente": "agente", "/admin": "admin", "/entrar": "entrar" };
+// Login único (seção 15): o botão leva ao Conecta, que devolve um código de uso único
+const CONECTA_URL = "https://conectacomercio.app.br";
 const rotaAtual = () => ROTAS[window.location.pathname.replace(/\/+$/, "") || "/"] || "publico";
 
 export default function FomentoSite() {
@@ -29,6 +31,7 @@ function FomentoSiteNormal() {
   const [perfil, setPerfil] = useState(null);
   const [recuperando, setRecuperando] = useState(false);
   const [destino, setDestino] = useState(null);
+  const [ssoMsg, setSsoMsg] = useState(null);
 
   const ir = (r) => {
     const path = Object.entries(ROTAS).find(([, v]) => v === r)?.[0] || "/";
@@ -50,6 +53,20 @@ function FomentoSiteNormal() {
     };
     document.addEventListener("click", clique);
     return () => { window.removeEventListener("popstate", pop); document.removeEventListener("click", clique); };
+  }, []);
+
+  // Volta do Conecta com o código de uso único: troca por um login próprio da Fomento
+  useEffect(() => {
+    const h = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const codigo = h.get("sso");
+    if (!codigo || !supabaseConfigurado) return;
+    const volta = h.get("volta") === "admin" ? "admin" : "agente";
+    window.history.replaceState(null, "", window.location.pathname); // tira o código da barra de endereço
+    setSsoMsg({ t: "ok", m: "Entrando com a sua conta do Conecta..." });
+    supabase.auth.verifyOtp({ token_hash: codigo, type: h.get("tipo") || "magiclink" }).then(({ error }) => {
+      if (error) setSsoMsg({ t: "erro", m: "O acesso pelo Conecta expirou ou já foi usado. Tente de novo ou entre com e-mail e senha." });
+      else { setSsoMsg(null); ir(volta); }
+    });
   }, []);
 
   useEffect(() => {
@@ -98,7 +115,7 @@ function FomentoSiteNormal() {
         {rota === "publico" && <FomentoPublico siteConfig={null} />}
         {rota === "agente" && (sessao ? <FomentoAdmin key="agente" area="agente" sessao={sessao} perfil={perfil} /> : <Carregando />)}
         {rota === "admin" && (sessao ? <FomentoAdmin key="admin" area="admin" sessao={sessao} perfil={perfil} /> : <Carregando />)}
-        {rota === "entrar" && <Entrar sessao={sessao} recuperando={recuperando} onRecuperado={() => setRecuperando(false)} onEntrou={() => { const d = destino || "agente"; setDestino(null); ir(d); }} />}
+        {rota === "entrar" && <Entrar sessao={sessao} destino={destino} ssoMsg={ssoMsg} recuperando={recuperando} onRecuperado={() => setRecuperando(false)} onEntrou={() => { const d = destino || "agente"; setDestino(null); ir(d); }} />}
       </main>
 
       <footer className="border-t mt-10" style={{ borderColor: LINHA }}>
@@ -115,7 +132,7 @@ function Carregando() {
   return <div className="py-24 text-center font-body text-sm" style={{ color: MUTED }}>Carregando...</div>;
 }
 
-function Entrar({ sessao, recuperando, onRecuperado, onEntrou }) {
+function Entrar({ sessao, destino, ssoMsg, recuperando, onRecuperado, onEntrou }) {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [ver, setVer] = useState(false);
@@ -159,6 +176,7 @@ function Entrar({ sessao, recuperando, onRecuperado, onEntrou }) {
       <div className="rounded-3xl border bg-white p-6 shadow-sm" style={{ borderColor: LINHA }}>
         <span className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3" style={{ background: AMARELO }}><Landmark size={22} color={AZUL_ESC} /></span>
         <p className="font-display font-extrabold text-xl" style={{ color: INK }}>{recuperando ? "Criar nova senha" : "Entrar"}</p>
+        {ssoMsg && <div className="rounded-xl px-3 py-2 mt-2 font-body text-xs" style={{ background: ssoMsg.t === "erro" ? "#FBEAE5" : "#EAF2FB", color: ssoMsg.t === "erro" ? "#B4462F" : AZUL }}>{ssoMsg.m}</div>}
         <p className="font-body text-sm mt-1 mb-5" style={{ color: MUTED }}>{recuperando ? "Digite a nova senha da sua conta." : "Acesso da equipe do Fomento Paraná. Use a mesma conta do Conecta Comércio."}</p>
         <form onSubmit={recuperando ? novaSenha : entrar} className="space-y-3">
           {!recuperando && <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Seu e-mail" className={input} style={{ borderColor: LINHA }} />}
@@ -170,6 +188,16 @@ function Entrar({ sessao, recuperando, onRecuperado, onEntrou }) {
           <button type="submit" disabled={carregando} className="w-full font-body text-sm font-bold py-3 rounded-xl text-white disabled:opacity-60" style={{ background: AZUL }}>{carregando ? "Aguarde..." : recuperando ? "Salvar nova senha" : "Entrar"}</button>
         </form>
         {!recuperando && <button onClick={esqueci} className="mt-3 font-body text-xs font-semibold underline" style={{ color: AZUL }}>Esqueci minha senha</button>}
+        {!recuperando && (
+          <>
+            <div className="flex items-center gap-3 my-4"><span className="flex-1 h-px" style={{ background: LINHA }} /><span className="font-body text-[11px] font-semibold" style={{ color: MUTED }}>ou</span><span className="flex-1 h-px" style={{ background: LINHA }} /></div>
+            <a href={`${CONECTA_URL}/#/sso-fomento?volta=${destino === "admin" ? "admin" : "agente"}`}
+              className="w-full flex items-center justify-center gap-2 font-body text-sm font-bold py-3 rounded-xl border" style={{ borderColor: AZUL, color: AZUL }}>
+              <LogIn size={16} /> Entrar com a conta do Conecta Comércio
+            </a>
+            <p className="font-body text-[11px] mt-2 text-center" style={{ color: MUTED }}>Se você já está conectado no Conecta, entra sem digitar a senha.</p>
+          </>
+        )}
       </div>
     </div>
   );
