@@ -8,7 +8,8 @@
 //   /admin     → administração
 //   /entrar    → login
 // =============================================================================
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { registrar as registrarVisita, instalarRastreioCliques, ignorarRastreio } from "./shared/rastreio.js";
 import { Globe, LogIn, LogOut, ShieldCheck, Users, Eye, EyeOff, Home } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { SalaPublico, SalaPainel, LOGO_SALA } from "./SalaEmpreendedor.jsx";
@@ -71,6 +72,19 @@ export default function SalaSite() {
   useEffect(() => {
     if (supabaseConfigurado && sessao === null && (rota === "agente" || rota === "admin")) { setDestino(rota); ir("entrar"); }
   }, [sessao, rota]);
+
+  // Visitas e cliques (o que é mais visto e procurado) — a equipe não conta
+  const rastreioPronto = sessao !== undefined && (!sessao || !!perfil);
+  const entradaRegistrada = useRef(false);
+  const rotaRef = useRef(rota);
+  rotaRef.current = rota;
+  useEffect(() => {
+    if (!rastreioPronto) return;
+    ignorarRastreio(["admin", "editor", "visualizador"].includes(perfil?.tipo) || !!sessao);
+    if (!entradaRegistrada.current) { entradaRegistrada.current = true; registrarVisita({ tipo: "entrada", ambiente: "sala", pagina: rota }); }
+    registrarVisita({ tipo: "pagina", ambiente: "sala", pagina: rota });
+  }, [rota, rastreioPronto]);
+  useEffect(() => instalarRastreioCliques(() => ({ ambiente: "sala", pagina: rotaRef.current })), []);
 
   const sair = async () => { await supabase.auth.signOut(); ir("inicio"); };
   const nome = perfil?.nome ? perfil.nome.split(" ")[0] : sessao?.user?.email?.split("@")[0];
