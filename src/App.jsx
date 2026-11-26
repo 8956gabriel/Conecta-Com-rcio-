@@ -27,6 +27,7 @@ import Backup from "./central/Backup.jsx";
 import CadastroUnico from "./central/CadastroUnico.jsx";
 import Auditoria from "./central/Auditoria.jsx";
 import Relatorios from "./central/Relatorios.jsx";
+import Retrospectiva from "./central/Retrospectiva.jsx";
 import VisitasCliques from "./central/VisitasCliques.jsx";
 import PortalEntrada from "./shared/PortalEntrada.jsx";
 import { registrar as registrarVisita, instalarRastreioCliques, ignorarRastreio, definirAlvoAtual } from "./shared/rastreio.js";
@@ -1984,7 +1985,7 @@ const meusProdutos = [
 // Categorias do menu do Painel Admin (Projeto Master · seção 8). Item que não
 // estiver em nenhum grupo cai automaticamente em "Outros", para nada sumir.
 const GRUPOS_MENU_ADMIN_BASE = [
-  { titulo: "Início", ids: ["avisos", "dashboard", "visitas", "desenvolvimento", "relatorios", "acessos"] },
+  { titulo: "Início", ids: ["avisos", "dashboard", "visitas", "retrospectiva", "desenvolvimento", "relatorios", "acessos"] },
   { titulo: "Comércio", ids: ["empresas", "categorias", "criterios", "prestadores", "agenda", "produtos", "promocoes", "combos", "cupons", "fidelidade", "avaliacoes"] },
   { titulo: "Comunidade", ids: ["turismo", "mural", "classificados", "ouvidoria", "utilidade", "enquetes", "depoimentos", "faq"] },
   { titulo: "Conteúdo e divulgação", ids: ["noticias", "vagas", "banners", "notificacoes", "feira", "calendario", "credenciais", "cursos", "licitacoes"] },
@@ -1996,7 +1997,7 @@ const GRUPOS_MENU_ADMIN_BASE = [
 // (O banco também confere — supabase-perfis-editor-visualizador.sql.)
 const ABAS_POR_PAPEL = {
   editor: ["dashboard", "visitas", "noticias", "banners", "vagas", "calendario", "cursos", "turismo", "utilidade", "enquetes", "depoimentos", "faq", "mural", "classificados"],
-  visualizador: ["dashboard", "visitas", "desenvolvimento", "acessos"],
+  visualizador: ["dashboard", "visitas", "retrospectiva", "desenvolvimento", "acessos"],
 };
 const NOME_PAPEL_ADMIN = { editor: "Editor", visualizador: "Visualizador" };
 
@@ -5421,6 +5422,7 @@ export function AdminPanel({ papel = "admin" }) {
     { id: "todos-usuarios", label: "Usuários cadastrados", icon: Users },
     { id: "permissoes", label: "Usuários e permissões", icon: ShieldCheck },
     { id: "auditoria", label: "Auditoria", icon: ScrollText },
+    { id: "retrospectiva", label: "Retrospectiva", icon: Sparkles },
     { id: "relatorios", label: "Relatórios por tema", icon: FileText },
     { id: "visitas", label: "Visitas e cliques", icon: MousePointerClick },
     { id: "backup", label: "Backup dos dados", icon: DatabaseBackup },
@@ -9180,6 +9182,7 @@ export function AdminPanel({ papel = "admin" }) {
 
         {tab === "auditoria" && <Auditoria />}
 
+        {tab === "retrospectiva" && <Retrospectiva />}
         {tab === "relatorios" && <Relatorios />}
 
         {tab === "visitas" && <VisitasCliques />}
