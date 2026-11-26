@@ -82,11 +82,11 @@ const TEMAS = [
     } },
   { id: "capacitacoes", titulo: "Capacitações", icon: GraduationCap, desc: "Cursos e palestras com número de inscritos e presenças.",
     async gerar(desde) {
-      const cursos = (await todos("cursos", "id,titulo,data_evento,local,criado_em")).filter((x) => !desde || (x.data_evento || x.criado_em) >= desde);
+      const cursos = (await todos("cursos", "id,titulo,data_inicio,local,criado_em")).filter((x) => !desde || (x.data_inicio || x.criado_em) >= desde);
       const insc = await todos("curso_inscricoes", "curso_id,presenca_confirmada");
-      const linhas = cursos.sort((a, b) => (b.data_evento || "").localeCompare(a.data_evento || "")).map((c) => {
+      const linhas = cursos.sort((a, b) => (b.data_inicio || "").localeCompare(a.data_inicio || "")).map((c) => {
         const i = insc.filter((x) => x.curso_id === c.id);
-        return [c.titulo, d(c.data_evento), c.local || "", i.length, i.filter((x) => x.presenca_confirmada).length];
+        return [c.titulo, d(c.data_inicio), c.local || "", i.length, i.filter((x) => x.presenca_confirmada).length];
       });
       return { resumo: [["Cursos e palestras", cursos.length], ["Inscrições", linhas.reduce((s, x) => s + x[3], 0)], ["Presenças confirmadas", linhas.reduce((s, x) => s + x[4], 0)]], cabecalho: ["Curso / palestra", "Data", "Local", "Inscritos", "Presenças"], linhas };
     } },
