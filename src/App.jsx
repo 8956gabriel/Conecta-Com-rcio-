@@ -11,6 +11,7 @@ import {
   Calendar, CalendarDays, Camera, Upload, PartyPopper, Landmark, Handshake, Palette,
   Leaf, ArrowUp, ArrowDown, Phone, Repeat, QrCode, Share2, RefreshCw, Zap, Activity,
   EyeOff, Layers,
+  DatabaseBackup,
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -20,6 +21,7 @@ import { FomentoPublico, FomentoAdmin, useFomentoAcesso } from "./FomentoParana.
 import { SalaPublico, SalaPainel, useSalaAcesso } from "./SalaEmpreendedor.jsx";
 import DesenvolvimentoEconomico from "./central/DesenvolvimentoEconomico.jsx";
 import Permissoes from "./central/Permissoes.jsx";
+import Backup from "./central/Backup.jsx";
 import CentralAvisos, { useAvisosCentral } from "./central/Avisos.jsx";
 import { PortalAcesso } from "./SalaGestao.jsx";
 
@@ -1979,7 +1981,7 @@ const GRUPOS_MENU_ADMIN_BASE = [
   { titulo: "Comunidade", ids: ["turismo", "mural", "classificados", "ouvidoria", "utilidade", "enquetes", "depoimentos", "faq"] },
   { titulo: "Conteúdo e divulgação", ids: ["noticias", "vagas", "banners", "notificacoes", "feira", "calendario", "credenciais", "cursos", "licitacoes"] },
   { titulo: "Sala e Fomento", ids: ["servicos", "sala-empreendedor", "fomento-parana"] },
-  { titulo: "Administração", ids: ["modulos", "permissoes", "usuarios", "todos-usuarios", "identidade"] },
+  { titulo: "Administração", ids: ["modulos", "permissoes", "usuarios", "todos-usuarios", "identidade", "backup"] },
 ];
 
 function AdminPanel() {
@@ -5402,6 +5404,7 @@ function AdminPanel() {
     { id: "usuarios", label: "Cadastrar usuário", icon: UserCircle2 },
     { id: "todos-usuarios", label: "Usuários cadastrados", icon: Users },
     { id: "permissoes", label: "Usuários e permissões", icon: ShieldCheck },
+    { id: "backup", label: "Backup dos dados", icon: DatabaseBackup },
     { id: "acessos", label: "Relatório de acessos", icon: TrendingUp },
     { id: "categorias", label: "Categorias", icon: Tag },
     { id: "empresas", label: "Comerciantes", icon: CheckCircle2 },
@@ -9146,6 +9149,8 @@ function AdminPanel() {
         {tab === "desenvolvimento" && <DesenvolvimentoEconomico />}
 
         {tab === "permissoes" && <Permissoes notificar={notificar} />}
+
+        {tab === "backup" && <Backup />}
 
         {tab === "avisos" && <CentralAvisos avisos={avisosCentral.avisos} recarregar={avisosCentral.recarregar} irPara={setTab} />}
 
