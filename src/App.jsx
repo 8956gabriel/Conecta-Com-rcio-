@@ -9693,6 +9693,49 @@ function PainelAvisosEmpresario({ siteConfig }) {
   );
 }
 
+// Menu lateral dos painéis do Empresário e do Prestador (Projeto Master · Fase 5):
+// fixo ao rolar no computador, botão que abre/fecha no celular, itens agrupados.
+// Item que não estiver em nenhum grupo aparece no fim, para nada sumir.
+function MenuLateralPainel({ titulo, items, tab, setTab, grupos }) {
+  const [aberto, setAberto] = useState(false);
+  const ativo = items.find((it) => it.id === tab);
+  const usados = new Set((grupos || []).flatMap((g) => g.ids));
+  const lista = grupos
+    ? [...grupos, { titulo: "Outros", ids: items.filter((it) => !usados.has(it.id)).map((it) => it.id) }]
+    : [{ titulo: "", ids: items.map((it) => it.id) }];
+  return (
+    <aside className="md:sticky md:top-20 h-fit md:max-h-[calc(100vh-6rem)] md:overflow-y-auto no-scrollbar rounded-2xl border bg-white p-3" style={{ borderColor: C.line }}>
+      <p className="hidden md:block font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2 truncate" style={{ color: "#5C7186" }}>{titulo}</p>
+      <button onClick={() => setAberto((v) => !v)} className="md:hidden w-full flex items-center gap-2 px-2 py-1.5 font-body text-sm font-bold" style={{ color: C.blueDeep }}>
+        <LayoutDashboard size={16} color={C.blue} /> <span className="flex-1 text-left truncate">{ativo?.label || titulo}</span>
+        <span className="font-body text-[11px] font-semibold" style={{ color: "#8A9BAE" }}>{aberto ? "Fechar" : "Menu"}</span>
+      </button>
+      <div className={`${aberto ? "block mt-2" : "hidden"} md:block`}>
+        {lista.map((g) => {
+          const doGrupo = g.ids.map((id) => items.find((it) => it.id === id)).filter(Boolean);
+          if (!doGrupo.length) return null;
+          return (
+            <div key={g.titulo || "itens"} className="mb-2">
+              {g.titulo && <p className="font-body text-[10px] font-extrabold uppercase tracking-[0.14em] px-2 mt-1 mb-1" style={{ color: "#8A9BAE" }}>{g.titulo}</p>}
+              {doGrupo.map((it) => {
+                const Icon = it.icon;
+                const on = tab === it.id;
+                return (
+                  <button key={it.id} onClick={() => { setTab(it.id); setAberto(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-body font-semibold text-left"
+                    style={{ background: on ? C.blueTint : "transparent", color: on ? C.blue : "#425A70" }}>
+                    <Icon size={16} /> <span className="truncate">{it.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
 function EmpresarioPanel({ siteConfig }) {
   const [tab, setTab] = useState("avisos");
   const [modalProdutoAberto, setModalProdutoAberto] = useState(false);
@@ -10287,20 +10330,11 @@ function EmpresarioPanel({ siteConfig }) {
 
   return (
     <div className="grid md:grid-cols-[220px_1fr] gap-6">
-      <aside className="rounded-2xl border p-3 h-fit" style={{ borderColor: C.line }}>
-        <p className="font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2 truncate" style={{ color: "#5C7186" }}>{perfilForm.nome || "Minha empresa"}</p>
-        {items.map((it) => {
-          const Icon = it.icon;
-          const active = tab === it.id;
-          return (
-            <button key={it.id} onClick={() => setTab(it.id)}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-body font-semibold text-left"
-              style={{ background: active ? C.blueTint : "transparent", color: active ? C.blue : "#425A70" }}>
-              <Icon size={16} /> {it.label}
-            </button>
-          );
-        })}
-      </aside>
+      <MenuLateralPainel titulo={perfilForm.nome || "Minha empresa"} items={items} tab={tab} setTab={setTab} grupos={[
+        { titulo: "Minha empresa", ids: ["avisos", "perfil", "visualizacoes"] },
+        { titulo: "Vendas", ids: ["produtos", "promocoes", "cupons", "combos", "fidelidade"] },
+        { titulo: "Comunidade", ids: ["vagas", "avaliacoes"] },
+      ]} />
 
       <div className="min-w-0">
         {tab === "avisos" && <PainelAvisosEmpresario siteConfig={siteConfig} />}
@@ -10982,20 +11016,7 @@ function PrestadorPanel({ siteConfig }) {
 
   return (
     <div className="grid md:grid-cols-[220px_1fr] gap-6">
-      <aside className="rounded-2xl border p-3 h-fit" style={{ borderColor: C.line }}>
-        <p className="font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2 truncate" style={{ color: "#5C7186" }}>{perfilForm.nome || "Meu cadastro"}</p>
-        {items.map((it) => {
-          const Icon = it.icon;
-          const active = tab === it.id;
-          return (
-            <button key={it.id} onClick={() => setTab(it.id)}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-body font-semibold text-left"
-              style={{ background: active ? C.blueTint : "transparent", color: active ? C.blue : "#425A70" }}>
-              <Icon size={16} /> {it.label}
-            </button>
-          );
-        })}
-      </aside>
+      <MenuLateralPainel titulo={perfilForm.nome || "Meu cadastro"} items={items} tab={tab} setTab={setTab} />
 
       <div className="min-w-0">
         {tab === "perfil" && (
