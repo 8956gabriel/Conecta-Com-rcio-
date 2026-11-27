@@ -1,3 +1,5 @@
+import { exigirLogin } from "./_auth.js";
+
 // Analisa uma FOTO REAL do produto (enviada pelo comerciante) e devolve dicas
 // rápidas para deixá-la mais atraente. A IA nunca gera ou substitui a foto —
 // só dá feedback sobre a foto real, pra manter a confiança de quem compra.
@@ -7,6 +9,8 @@ export default async function handler(req, res) {
     res.status(405).json({ error: "Método não permitido" });
     return;
   }
+
+  if (!(await exigirLogin(req, res))) return;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {

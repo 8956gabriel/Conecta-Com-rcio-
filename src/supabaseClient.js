@@ -20,3 +20,13 @@ export function usarClienteDemonstracao(cliente) {
   supabase = cliente;
   emDemonstracao = true;
 }
+
+// Cabeçalho com o token do usuário logado, para as rotas /api que exigem login.
+export async function cabecalhoComLogin() {
+  const cabecalho = { "content-type": "application/json" };
+  if (!supabaseReal) return cabecalho;
+  const { data } = await supabaseReal.auth.getSession();
+  const token = data?.session?.access_token;
+  if (token) cabecalho.Authorization = `Bearer ${token}`;
+  return cabecalho;
+}

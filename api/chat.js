@@ -1,3 +1,5 @@
+import { origemPermitida } from "./_auth.js";
+
 // Função serverless (Vercel detecta automaticamente qualquer arquivo em /api).
 // Ela roda no servidor, então a chave da IA (ANTHROPIC_API_KEY) nunca fica
 // visível para quem acessa o site.
@@ -26,6 +28,11 @@ export default async function handler(req, res) {
     return;
   }
 
+  if (!origemPermitida(req)) {
+    res.status(403).json({ error: "Origem não autorizada." });
+    return;
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     res.status(500).json({
@@ -37,6 +44,17 @@ export default async function handler(req, res) {
   const { messages } = req.body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     res.status(400).json({ error: "Nenhuma mensagem recebida." });
+    return;
+  }
+
+  // Limites para o assistente não ser usado como IA gratuita para outros fins:
+  // só texto, só os papéis da conversa, no máximo 20 mensagens de até 1.000 caracteres.
+  const conversa = messages.slice(-20);
+  const valida = conversa.every(
+    (m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.length <= 1000
+  );
+  if (!valida || conversa[0].role !== "user") {
+    res.status(400).json({ error: "Mensagem inválida ou longa demais." });
     return;
   }
 
@@ -52,7 +70,7 @@ export default async function handler(req, res) {
         model: "claude-haiku-4-5-20251001",
         max_tokens: 500,
         system: SYSTEM_PROMPT,
-        messages,
+        messages: conversa,
       }),
     });
 

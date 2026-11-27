@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { supabase, supabaseConfigurado } from "./supabaseClient";
+import { supabase, supabaseConfigurado, cabecalhoComLogin } from "./supabaseClient";
 // Módulo Fomento Paraná (acrescentado — ver src/FomentoParana.jsx e supabase-fomento-parana.sql)
 import { FomentoPublico, FomentoAdmin, useFomentoAcesso } from "./FomentoParana.jsx";
 import { SalaPublico, SalaPainel, useSalaAcesso } from "./SalaEmpreendedor.jsx";
@@ -4203,7 +4203,7 @@ export function AdminPanel({ papel = "admin" }) {
     try {
       const resp = await fetch("/api/gerar-descricao", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: await cabecalhoComLogin(),
         body: JSON.stringify({ nome: novoProdutoAdmin.nome, categoria: novoProdutoAdmin.categoria, palavrasChave: "" }),
       });
       const dados = await resp.json();
@@ -4223,7 +4223,7 @@ export function AdminPanel({ papel = "admin" }) {
     try {
       const resp = await fetch("/api/gerar-imagem-ilustrativa", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: await cabecalhoComLogin(),
         body: JSON.stringify({ nome: novoProdutoAdmin.nome, categoria: novoProdutoAdmin.categoria, descricao: novoProdutoAdmin.descricao }),
       });
       const dados = await resp.json();
