@@ -12477,13 +12477,16 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       }
       const json = subscription.toJSON();
       const idsFavoritos = Object.keys(favs).filter((k) => favs[k]);
-      const { error } = await supabase.from("push_subscriptions").upsert({
+      // Segurança: registra pela função push_registrar (só mexe nesta inscrição).
+      // Se ela ainda não existir no banco, usa o jeito antigo.
+      let { error } = await supabase.rpc("push_registrar", { p_endpoint: json.endpoint, p_p256dh: json.keys.p256dh, p_auth: json.keys.auth, p_favoritos: idsFavoritos });
+      if (error) ({ error } = await supabase.from("push_subscriptions").upsert({
         endpoint: json.endpoint,
         p256dh: json.keys.p256dh,
         auth: json.keys.auth,
         empresas_favoritas: idsFavoritos,
         atualizado_em: new Date().toISOString(),
-      }, { onConflict: "endpoint" });
+      }, { onConflict: "endpoint" }));
       if (error) throw error;
       localStorage.setItem("cc_push_endpoint", json.endpoint);
       setStatusPush("ativado");
@@ -12500,7 +12503,9 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
     const endpoint = localStorage.getItem("cc_push_endpoint");
     if (!endpoint) return;
     const idsFavoritos = Object.keys(favs).filter((k) => favs[k]);
-    supabase.from("push_subscriptions").update({ empresas_favoritas: idsFavoritos, atualizado_em: new Date().toISOString() }).eq("endpoint", endpoint).then(() => {});
+    supabase.rpc("push_atualizar_favoritos", { p_endpoint: endpoint, p_favoritos: idsFavoritos }).then(({ error }) => {
+      if (error) supabase.from("push_subscriptions").update({ empresas_favoritas: idsFavoritos, atualizado_em: new Date().toISOString() }).eq("endpoint", endpoint).then(() => {});
+    });
   }, [favs, statusPush]);
   const [empresasReais, setEmpresasReais] = useState(null); // null = ainda carregando / indisponível
   const [produtosReais, setProdutosReais] = useState(null);
@@ -16515,7 +16520,12 @@ function CredencialDigital({ codigo }) {
 
   useEffect(() => {
     if (!supabaseConfigurado) { setCredencial(null); return; }
-    supabase.from("credenciais").select("*").eq("codigo", codigo).single().then(({ data }) => {
+    // Segurança (LGPD): busca só a credencial deste código, sem o telefone, pela
+    // função credencial_publica. Se ela ainda não existir no banco, usa a
+    // consulta antiga para não quebrar o crachá.
+    supabase.rpc("credencial_publica", { p_codigo: codigo }).then(async ({ data: viaFuncao, error: erroFuncao }) => {
+      let data = viaFuncao;
+      if (erroFuncao) ({ data } = await supabase.from("credenciais").select("id, codigo, nome, tipo, status, foto_url, evento_id, checkin_feito").eq("codigo", codigo).maybeSingle());
       setCredencial(data ?? null);
       if (data?.evento_id) {
         supabase.from("eventos_calendario").select("titulo, data_inicio").eq("id", data.evento_id).single()
