@@ -1647,6 +1647,16 @@ function AbaContratos(ctx) {
 }
 
 // ---------------------------------------------------------------- Pré-cadastros do site
+// Fluxo de acompanhamento dos interessados (Projeto Master 12.4) — 8 etapas.
+// "convertido" (virou proposta oficial) e "descartado" continuam existindo.
+const ETAPAS_INTERESSE = ["novo", "contatado", "agendado", "atendido", "orientacao_documental", "em_analise", "acompanhamento", "finalizado"];
+const ROTULOS_INTERESSE = {
+  novo: "Novo interessado", contatado: "Primeiro contato", agendado: "Agendamento", atendido: "Atendimento realizado",
+  orientacao_documental: "Orientação documental", em_analise: "Encaminhado para análise", acompanhamento: "Em acompanhamento",
+  finalizado: "Finalizado", convertido: "Virou proposta", descartado: "Descartado",
+};
+const proximaEtapa = (s) => ETAPAS_INTERESSE[Math.min(ETAPAS_INTERESSE.indexOf(s) + 1, ETAPAS_INTERESSE.length - 1)] || "contatado";
+
 function AbaInteresses(ctx) {
   const acoes = useAcoesProposta(ctx);
   const [filtro, setFiltro] = useState("novo");
@@ -1673,14 +1683,32 @@ function AbaInteresses(ctx) {
     ctx.avisar("Encaminhado à Sala do Empreendedor — aparece em 'Pedidos do site' da Sala.");
   };
   const lista = (ctx.interesses || []).filter((i) => !filtro || i.status === filtro);
-  const rotulos = { novo: "Novos", contatado: "Contatados", convertido: "Viraram proposta", descartado: "Descartados" };
+  const rotulos = ROTULOS_INTERESSE;
+  // Fluxo de acompanhamento (Projeto Master 12.4): mover de etapa + histórico individual.
+  const [movendo, setMovendo] = useState(null); // { i, para, nota }
+  const [historico, setHistorico] = useState(null); // { i, itens }
 
-  const mudar = async (i, status, extra = {}) => {
+  const mudar = async (i, status, extra = {}, nota = "") => {
+    const agora = new Date().toISOString();
     if (supabaseConfigurado) {
-      const { error } = await supabase.from("fomento_interesses").update({ status, ...extra }).eq("id", i.id);
-      if (error) { ctx.avisar(error.message, "erro"); return; }
+      let { error } = await supabase.from("fomento_interesses").update({ status, ...extra, etapa_atualizada_em: agora }).eq("id", i.id);
+      if (error && /etapa_atualizada_em/.test(error.message || "")) ({ error } = await supabase.from("fomento_interesses").update({ status, ...extra }).eq("id", i.id));
+      if (error) {
+        ctx.avisar(/status_check|violates check/.test(error.message || "") ? "Para usar as 8 etapas, falta rodar o arquivo supabase-fomento-fluxo-interessados.sql no Supabase." : error.message, "erro");
+        return false;
+      }
+      if (status !== i.status) {
+        await supabase.from("fomento_interesses_historico").insert({ interesse_id: i.id, de: i.status, para: status, nota: nota || null, por_nome: ctx.config?.agente_nome || null });
+      }
     }
-    ctx.setInteresses((l) => l.map((x) => (x.id === i.id ? { ...x, status, ...extra } : x)));
+    ctx.setInteresses((l) => l.map((x) => (x.id === i.id ? { ...x, status, ...extra, etapa_atualizada_em: agora } : x)));
+    return true;
+  };
+  const abrirHistorico = async (i) => {
+    setHistorico({ i, itens: null });
+    if (!supabaseConfigurado) { setHistorico({ i, itens: [] }); return; }
+    const { data, error } = await supabase.from("fomento_interesses_historico").select("*").eq("interesse_id", i.id).order("criado_em", { ascending: false });
+    setHistorico({ i, itens: error ? [] : data || [], semTabela: !!error });
   };
 
   return (
@@ -1707,11 +1735,20 @@ function AbaInteresses(ctx) {
               </span>
             </div>
             {i.mensagem && <p className="font-body text-sm mt-2" style={{ color: F.ink }}>“{i.mensagem}”</p>}
+            {ETAPAS_INTERESSE.includes(i.status) && (
+              <div className="flex items-center gap-1 mt-3" title={`Etapa ${ETAPAS_INTERESSE.indexOf(i.status) + 1} de 8: ${ROTULOS_INTERESSE[i.status]}`}>
+                {ETAPAS_INTERESSE.map((e, n) => (
+                  <span key={e} className="h-1.5 flex-1 rounded-full" style={{ background: n <= ETAPAS_INTERESSE.indexOf(i.status) ? F.blue : F.line }} />
+                ))}
+                <span className="font-body text-[10px] font-bold ml-1.5 whitespace-nowrap" style={{ color: F.muted }}>{ETAPAS_INTERESSE.indexOf(i.status) + 1}/8</span>
+              </div>
+            )}
             <div className="flex flex-wrap gap-1.5 mt-3">
               <a href={linkWhats(i.whatsapp, `Olá, ${i.nome.split(" ")[0]}! Aqui é ${ctx.config?.agente_nome || "o Agente de Crédito"}, da Fomento Paraná em Ivatuba. Recebi seu pré-cadastro no Conecta Comércio.`)} target="_blank" rel="noopener noreferrer"
                 onClick={() => i.status === "novo" && mudar(i, "contatado")} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg text-white flex items-center gap-1" style={{ background: F.greenBright }}><MessageCircle size={12} /> {i.whatsapp}</a>
               {i.status !== "convertido" && <button onClick={() => setConvertendo(i)} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg text-white flex items-center gap-1" style={{ background: F.blue }}><PlusCircle size={12} /> Converter em proposta</button>}
-              {i.status === "novo" && <button onClick={() => mudar(i, "contatado")} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg border" style={{ borderColor: F.line, color: "#425A70" }}>Marcar contatado</button>}
+              {!["descartado", "convertido", "finalizado"].includes(i.status) && <button onClick={() => setMovendo({ i, para: proximaEtapa(i.status), nota: "" })} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg border" style={{ borderColor: F.blue, color: F.blue }}>Mover etapa</button>}
+              <button onClick={() => abrirHistorico(i)} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg border" style={{ borderColor: F.line, color: "#425A70" }}>Histórico</button>
               <button onClick={() => setEncSala({ i, motivo: "", autorizou: false })} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg border flex items-center gap-1" style={{ borderColor: F.line, color: "#425A70" }}><StoreSala size={12} /> Encaminhar à Sala</button>
               {!["descartado", "convertido"].includes(i.status) && <button onClick={() => mudar(i, "descartado")} className="font-body text-[11px] font-bold px-2.5 py-1.5 rounded-lg border" style={{ borderColor: F.line, color: F.danger }}>Descartar</button>}
             </div>
@@ -1719,6 +1756,44 @@ function AbaInteresses(ctx) {
         ))}
         {!lista.length && <p className="font-body text-sm py-6 text-center" style={{ color: F.soft }}>Nenhum pré-cadastro aqui.</p>}
       </div>
+      <Modal aberto={!!movendo} onFechar={() => setMovendo(null)} titulo="Mover para a próxima etapa">
+        {movendo && (
+          <div className="flex flex-col gap-3">
+            <p className="font-body text-sm" style={{ color: F.muted }}><b style={{ color: F.ink }}>{movendo.i.nome}</b> está em: {ROTULOS_INTERESSE[movendo.i.status]}</p>
+            <div className="flex flex-col gap-1.5">
+              {ETAPAS_INTERESSE.map((e, n) => (
+                <label key={e} className="flex items-center gap-2 font-body text-sm rounded-lg border px-3 py-2 cursor-pointer" style={{ borderColor: movendo.para === e ? F.blue : F.line, background: movendo.para === e ? F.blueTint : "#fff", color: F.ink }}>
+                  <input type="radio" name="etapa" checked={movendo.para === e} onChange={() => setMovendo({ ...movendo, para: e })} />
+                  <span className="font-bold" style={{ color: F.muted }}>{n + 1}.</span> {ROTULOS_INTERESSE[e]}{e === movendo.i.status ? " (atual)" : ""}
+                </label>
+              ))}
+            </div>
+            <label className="font-body text-xs font-bold" style={{ color: F.ink }}>Nota para o histórico (opcional)
+              <textarea rows={2} value={movendo.nota} onChange={(e) => setMovendo({ ...movendo, nota: e.target.value })} placeholder="Ex.: atendimento marcado para 02/12, trazer comprovante de endereço" className="mt-1 w-full border rounded-xl px-3 py-2 font-body text-sm font-normal outline-none" style={{ borderColor: F.line }} />
+            </label>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setMovendo(null)} className="font-body text-sm font-bold px-4 py-2 rounded-xl border" style={{ borderColor: F.line, color: "#425A70" }}>Cancelar</button>
+              <button onClick={async () => { if (await mudar(movendo.i, movendo.para, {}, movendo.nota.trim())) { ctx.avisar(`${movendo.i.nome}: ${ROTULOS_INTERESSE[movendo.para]}.`); setMovendo(null); } }} className="font-body text-sm font-bold px-4 py-2 rounded-xl text-white" style={{ background: F.blue }}>Salvar etapa</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+      <Modal aberto={!!historico} onFechar={() => setHistorico(null)} titulo={historico ? `Histórico — ${historico.i.nome}` : ""}>
+        {historico && (historico.itens === null ? <p className="font-body text-sm" style={{ color: F.muted }}>Carregando...</p> : (
+          <div className="flex flex-col gap-2">
+            <p className="font-body text-xs" style={{ color: F.muted }}>Pré-cadastro recebido em {dataHoraBR(historico.i.criado_em)}.</p>
+            {historico.semTabela && <p className="font-body text-xs rounded-lg px-3 py-2" style={{ background: "#FFF6E9", color: "#8A5A12" }}>O histórico começa a ser gravado depois que o arquivo supabase-fomento-fluxo-interessados.sql for rodado no Supabase.</p>}
+            {!historico.itens.length && !historico.semTabela && <p className="font-body text-sm" style={{ color: F.soft }}>Nenhuma mudança de etapa registrada ainda.</p>}
+            {historico.itens.map((h) => (
+              <div key={h.id} className="rounded-xl border px-3 py-2" style={{ borderColor: F.line }}>
+                <p className="font-body text-xs font-bold" style={{ color: F.ink }}>{ROTULOS_INTERESSE[h.de] || h.de || "—"} → {ROTULOS_INTERESSE[h.para] || h.para}</p>
+                <p className="font-body text-[11px]" style={{ color: F.muted }}>{dataHoraBR(h.criado_em)}{h.por_nome ? ` · ${h.por_nome}` : ""}</p>
+                {h.nota && <p className="font-body text-xs mt-1" style={{ color: F.ink }}>{h.nota}</p>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </Modal>
       <Modal aberto={!!encSala} onFechar={() => setEncSala(null)} titulo="Encaminhar à Sala do Empreendedor">
         {encSala && (
           <div className="flex flex-col gap-3">
