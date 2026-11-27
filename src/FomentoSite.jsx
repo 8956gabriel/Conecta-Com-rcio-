@@ -11,7 +11,7 @@
 // =============================================================================
 import React, { useEffect, useRef, useState } from "react";
 import { registrar as registrarVisita, instalarRastreioCliques, ignorarRastreio } from "./shared/rastreio.js";
-import { Landmark, LogIn, LogOut, Radar, ShieldCheck, Home, Eye, EyeOff, MonitorPlay, Lock, Globe } from "lucide-react";
+import { LogIn, LogOut, Radar, ShieldCheck, Home, Eye, EyeOff, MonitorPlay, Lock, Globe } from "lucide-react";
 import PortalEntrada from "./shared/PortalEntrada.jsx";
 import { supabase, supabaseReal, supabaseConfigurado, usarClienteDemonstracao } from "./supabaseClient";
 import { criarClienteDemonstracao, lerPasse, salvarPasse, apagarPasse, marcarPagina } from "./fomentoDemo";
@@ -134,7 +134,7 @@ function FomentoSiteNormal() {
         {rota === "inicio" && (
           <div className="max-w-6xl mx-auto px-4 md:px-6 py-10">
             <PortalEntrada
-              marca={<span className="flex items-center gap-3"><span className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: AMARELO }}><Landmark size={28} color={AZUL_ESC} /></span><span className="text-left leading-tight"><span className="block font-display font-extrabold text-2xl" style={{ color: AZUL_ESC }}>Fomento Paraná</span><span className="block font-body text-xs font-bold" style={{ color: "#B98900" }}>Agente de Crédito · Ivatuba-PR</span></span></span>}
+              marca={<span className="flex flex-col items-center gap-1.5"><img src={LOGO_FOMENTO} alt="Fomento Paraná" className="h-14 w-auto" /><span className="block font-body text-xs font-bold" style={{ color: AZUL_ESC }}>Agente de Crédito · Ivatuba-PR</span></span>}
               opcoes={[
                 { chave: "publico", icon: Globe, titulo: "Área pública", texto: "Linhas de crédito, quem pode pedir, documentos e o contato do agente. Sem login.", cor: AZUL, onClick: () => ir("publico") },
                 { chave: "agente", icon: Radar, titulo: "Área do agente", texto: "Central de Prospecção, propostas, contratos, lembretes e pontuação. Com login.", cor: "#1E8E5A", onClick: () => ir("agente") },
@@ -204,7 +204,7 @@ function Entrar({ sessao, destino, ssoMsg, recuperando, onRecuperado, onEntrou }
   return (
     <div className="max-w-sm mx-auto px-4 py-14">
       <div className="rounded-3xl border bg-white p-6 shadow-sm" style={{ borderColor: LINHA }}>
-        <span className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3" style={{ background: AMARELO }}><Landmark size={22} color={AZUL_ESC} /></span>
+        <img src={LOGO_FOMENTO} alt="Fomento Paraná" className="h-10 w-auto mb-3" />
         <p className="font-display font-extrabold text-xl" style={{ color: INK }}>{recuperando ? "Criar nova senha" : "Entrar"}</p>
         {ssoMsg && <div className="rounded-xl px-3 py-2 mt-2 font-body text-xs" style={{ background: ssoMsg.t === "erro" ? "#FBEAE5" : "#EAF2FB", color: ssoMsg.t === "erro" ? "#B4462F" : AZUL }}>{ssoMsg.m}</div>}
         <p className="font-body text-sm mt-1 mb-5" style={{ color: MUTED }}>{recuperando ? "Digite a nova senha da sua conta." : "Acesso da equipe do Fomento Paraná. Use a mesma conta do Conecta Comércio."}</p>
