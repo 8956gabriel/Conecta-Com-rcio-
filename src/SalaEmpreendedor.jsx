@@ -15,7 +15,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Store, MessageCircle, MapPin, Clock, CalendarDays, ClipboardList, Inbox, BarChart3, Settings, Users,
   ExternalLink, Download, Trash2, Pencil, CheckCircle2, X, ShieldCheck, PlusCircle, Search, LayoutDashboard,
-  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge, Building2,
+  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge, Building2, Megaphone,
 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { ImportarGise } from "./SalaImportarGise.jsx";
@@ -23,6 +23,7 @@ import { exportarPDF } from "./central/motor.js";
 import { AbaEstrategias, AbaCalendario, AgendaPublicaSala } from "./SalaPlanejamento.jsx";
 import { AbaBaseEmpresas } from "./SalaEmpresas.jsx";
 import PainelLateral from "./shared/PainelLateral.jsx";
+import { AbaAvisos, AvisosPublicos } from "./SalaAvisos.jsx";
 import { AbaSelo, AbaGestao, AbaOrientacoes, AbaEmpreendedores, AbaIndicadores, OrientacoesPublicas, DocProtegido } from "./SalaGestao.jsx";
 
 // As mesmas categorias do relatório oficial do Sebrae (usadas também no
@@ -320,6 +321,8 @@ export function SalaPublico() {
         </div>
       </section>
 
+      <AvisosPublicos />
+
       {/* SERVIÇOS ONLINE */}
       <section id="sala-servicos" className="max-w-6xl mx-auto px-4 md:px-6 mt-10 scroll-mt-20">
         <Titulo eyebrow="Faça você mesmo" title="Serviços online" sub="Links oficiais do governo. Se travar em alguma etapa, agende um atendimento que a gente ajuda." />
@@ -586,6 +589,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
     { titulo: "Planejamento", itens: [
       { id: "estrategias", label: "Estratégias", icon: Target },
       { id: "calendario", label: "Calendário", icon: CalendarRange },
+      { id: "avisos", label: "Avisos e publicações", icon: Megaphone },
       { id: "gestao", label: "Gestão da Sala", icon: Briefcase },
     ] },
     { titulo: "Selo e relatórios", itens: [
@@ -637,6 +641,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
         {abaAtual === "calendario" && <AbaCalendario ctx={ctx} />}
         {abaAtual === "relatorio" && <AbaRelatorio ctx={ctx} />}
         {abaAtual === "config" && <AbaConfig ctx={ctx} />}
+        {abaAtual === "avisos" && <AbaAvisos ctx={ctx} />}
         {abaAtual === "equipe" && <AbaEquipe ctx={ctx} />}
       </div>
     </div>
