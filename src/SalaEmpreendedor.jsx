@@ -15,7 +15,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Store, MessageCircle, MapPin, Clock, CalendarDays, ClipboardList, Inbox, BarChart3, Settings, Users,
   ExternalLink, Download, Trash2, Pencil, CheckCircle2, X, ShieldCheck, PlusCircle, Search, LayoutDashboard,
-  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge, Building2,
+  ChevronLeft, ChevronRight, Link2, Upload, Send, Phone, Mail, Target, CalendarRange, Award, BookOpen, Briefcase, Contact, Gauge, Building2, Megaphone,
 } from "lucide-react";
 import { supabase, supabaseConfigurado } from "./supabaseClient";
 import { ImportarGise } from "./SalaImportarGise.jsx";
@@ -23,6 +23,7 @@ import { exportarPDF } from "./central/motor.js";
 import { AbaEstrategias, AbaCalendario, AgendaPublicaSala } from "./SalaPlanejamento.jsx";
 import { AbaBaseEmpresas } from "./SalaEmpresas.jsx";
 import PainelLateral from "./shared/PainelLateral.jsx";
+import { AbaAvisos, AvisosPublicos } from "./SalaAvisos.jsx";
 import { AbaSelo, AbaGestao, AbaOrientacoes, AbaEmpreendedores, AbaIndicadores, OrientacoesPublicas, DocProtegido } from "./SalaGestao.jsx";
 
 // As mesmas categorias do relatório oficial do Sebrae (usadas também no
@@ -59,19 +60,23 @@ export const LOGO_SALA = "/sala-do-empreendedor-logo.png";
 export const SITE_SALA = import.meta.env.VITE_SITE === "sala";
 export const LINKS_SALA = SITE_SALA ? { publico: "/publico", agente: "/agente", admin: "/admin" } : { publico: "/sala", agente: "/sala/agente", admin: "/sala/admin" };
 
+// Cores da logomarca da Sala do Empreendedor (azul-marinho + laranja).
+// Fixas: não seguem a cor principal escolhida para o Conecta Comércio.
 const S = {
-  blue: "var(--cor-principal, #0A5AA8)",
-  blueDeep: "var(--cor-principal-profunda, #052A4D)",
-  blueTint: "#EAF2FB",
-  blueTint2: "#F5F9FD",
-  amber: "#F5B700",
+  blue: "#0B2474",
+  blueDeep: "#06164A",
+  blueTint: "#ECEFF8",
+  blueTint2: "#F7F8FC",
+  amber: "#F29E72",
+  laranja: "#F29E72",
+  laranjaTint: "#FDF1EA",
   green: "#1E8E5A",
   greenBright: "#25A85B",
   greenTint: "#E7F6EE",
-  ink: "#0E2233",
-  muted: "#5C7186",
+  ink: "#14213D",
+  muted: "#4A5578",
   soft: "#8896A6",
-  line: "#DCE7F2",
+  line: "#E1E5EF",
   danger: "#B4462F",
 };
 
@@ -319,6 +324,8 @@ export function SalaPublico() {
           )}
         </div>
       </section>
+
+      <AvisosPublicos />
 
       {/* SERVIÇOS ONLINE */}
       <section id="sala-servicos" className="max-w-6xl mx-auto px-4 md:px-6 mt-10 scroll-mt-20">
@@ -586,6 +593,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
     { titulo: "Planejamento", itens: [
       { id: "estrategias", label: "Estratégias", icon: Target },
       { id: "calendario", label: "Calendário", icon: CalendarRange },
+      { id: "avisos", label: "Avisos e publicações", icon: Megaphone },
       { id: "gestao", label: "Gestão da Sala", icon: Briefcase },
     ] },
     { titulo: "Selo e relatórios", itens: [
@@ -637,6 +645,7 @@ export function SalaPainel({ sessao, perfil, area = "agente" }) {
         {abaAtual === "calendario" && <AbaCalendario ctx={ctx} />}
         {abaAtual === "relatorio" && <AbaRelatorio ctx={ctx} />}
         {abaAtual === "config" && <AbaConfig ctx={ctx} />}
+        {abaAtual === "avisos" && <AbaAvisos ctx={ctx} />}
         {abaAtual === "equipe" && <AbaEquipe ctx={ctx} />}
       </div>
     </div>
