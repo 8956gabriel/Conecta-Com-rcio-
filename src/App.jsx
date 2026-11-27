@@ -30,6 +30,7 @@ import Relatorios from "./central/Relatorios.jsx";
 import Retrospectiva from "./central/Retrospectiva.jsx";
 import VisitasCliques from "./central/VisitasCliques.jsx";
 import PortalEntrada from "./shared/PortalEntrada.jsx";
+import AdminShell from "./shared/AdminShell.jsx";
 import { registrar as registrarVisita, instalarRastreioCliques, ignorarRastreio, definirAlvoAtual } from "./shared/rastreio.js";
 import CentralAvisos, { useAvisosCentral } from "./central/Avisos.jsx";
 import { PortalAcesso } from "./SalaGestao.jsx";
@@ -2021,8 +2022,12 @@ const ABAS_POR_PAPEL = {
   visualizador: ["dashboard", "visitas", "retrospectiva", "desenvolvimento", "acessos"],
 };
 const NOME_PAPEL_ADMIN = { editor: "Editor", visualizador: "Visualizador" };
+const NOME_PAPEL_ADMIN_SHELL = {
+  editor: "Você entrou como Editor: cuida de notícias, banners, vagas, eventos, cursos, turismo, enquetes, FAQ e da moderação da comunidade.",
+  visualizador: "Você entrou como Visualizador: vê os números do painel, sem alterar nada.",
+};
 
-export function AdminPanel({ papel = "admin" }) {
+export function AdminPanel({ papel = "admin", perfil = null, onSair }) {
   const [tab, setTab] = useState("dashboard");
   const avisosCentral = useAvisosCentral(); // Projeto Master · seção 19
   const [menuAdminAberto, setMenuAdminAberto] = useState(false);
@@ -5520,63 +5525,26 @@ export function AdminPanel({ papel = "admin" }) {
   const semGrupo = items.filter((it) => !GRUPOS_MENU_ADMIN_BASE.some((g) => g.ids.includes(it.id))).map((it) => it.id);
   const GRUPOS_MENU_ADMIN = semGrupo.length ? [...GRUPOS_MENU_ADMIN_BASE, { titulo: "Outros", ids: semGrupo }] : GRUPOS_MENU_ADMIN_BASE;
 
+  // Layout administrativo no padrão Conecta Gestão 360 (barra lateral, cabeçalho
+  // com busca/notificações/perfil, breadcrumb). As abas e o conteúdo são os mesmos.
+  const gruposShell = GRUPOS_MENU_ADMIN.map((g) => ({
+    titulo: g.titulo,
+    itens: g.ids.map((id) => items.find((it) => it.id === id)).filter(Boolean),
+  })).filter((g) => g.itens.length);
+  const nomePapelShell = { admin: "Administrador", editor: "Editor", visualizador: "Visualizador" }[papel] || "Administrador";
+
   return (
-    <div>
+    <AdminShell
+      sistema={{ nome: "Conecta", destaque: "Comércio", sub: "Painel administrativo" }}
+      area="Painel Administrativo" grupos={gruposShell} atual={tab} onSelecionar={setTab} chave="admin"
+      usuario={{ nome: perfil?.nome || perfil?.email || "Administrador", papel: nomePapelShell }}
+      notificacoes={items.some((it) => it.id === "avisos") ? { total: avisosCentral.pendencias || 0, onAbrir: () => setTab("avisos") } : undefined}
+      onModulos={() => { window.location.hash = "#/portal"; }}
+      onSair={onSair}>
       <ToastStack toasts={toastsAdmin} />
-      <div className="rounded-2xl p-5 mb-6 flex items-center justify-between gap-4 flex-wrap overflow-hidden relative"
-        style={{ background: `linear-gradient(120deg, ${C.blueDeep}, ${C.blue})` }}>
-        <div aria-hidden="true" className="absolute -right-8 -top-10 w-40 h-40 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }} />
-        <div aria-hidden="true" className="absolute right-16 bottom-[-3rem] w-28 h-28 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }} />
-        <div className="relative">
-          <p className="font-body text-[11px] font-bold uppercase tracking-wider text-white/70">Painel do administrador</p>
-          <h1 className="font-display text-xl md:text-2xl font-extrabold text-white mt-0.5">{itemAtivo?.label || "Estatísticas"}</h1>
-        </div>
-        <div className="relative flex items-center gap-2 shrink-0">
-          {[
-            [statsReais?.empresas, "Empresas"],
-            [statsReais?.produtos, "Produtos"],
-            [statsReais?.vagas, "Vagas"],
-          ].map(([n, l]) => (
-            <div key={l} className="rounded-xl px-3.5 py-2 text-center" style={{ background: "rgba(255,255,255,0.14)" }}>
-              <p className="font-display font-extrabold text-lg text-white leading-none">{statsReais ? n : "…"}</p>
-              <p className="font-body text-[10px] text-white/70 mt-1">{l}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-[240px_1fr] gap-6">
-      {/* Menu lateral por categorias (Projeto Master · Fase 5): mesmos itens de antes, agrupados. */}
-      <aside className="md:sticky md:top-20 h-fit md:max-h-[calc(100vh-6rem)] md:overflow-y-auto no-scrollbar rounded-2xl border bg-white p-3" style={{ borderColor: C.line }}>
-        <button onClick={() => setMenuAdminAberto((v) => !v)} className="md:hidden w-full flex items-center gap-2 px-2 py-1.5 font-body text-sm font-bold" style={{ color: C.blueDeep }}>
-          <LayoutDashboard size={16} color={C.blue} /> <span className="flex-1 text-left truncate">{itemAtivo?.label || "Menu"}</span>
-          <span className="font-body text-[11px] font-semibold" style={{ color: "#8A9BAE" }}>{menuAdminAberto ? "Fechar" : "Menu"}</span>
-        </button>
-        <div className={`${menuAdminAberto ? "block mt-2" : "hidden"} md:block`}>
-        {GRUPOS_MENU_ADMIN.map((g) => {
-          const doGrupo = g.ids.map((id) => items.find((it) => it.id === id)).filter(Boolean);
-          if (!doGrupo.length) return null;
-          return (
-            <div key={g.titulo} className="mb-3">
-              <p className="font-body text-[10px] font-extrabold uppercase tracking-[0.14em] px-2 mb-1" style={{ color: "#8A9BAE" }}>{g.titulo}</p>
-              {doGrupo.map((it) => {
-                const Icon = it.icon;
-                const active = tab === it.id;
-                return (
-                  <button key={it.id} onClick={() => { if (it.href) { window.location.hash = it.href; } else { setTab(it.id); setMenuAdminAberto(false); } }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-body font-semibold text-left"
-                    style={{ background: active ? C.blueTint : "transparent", color: active ? C.blue : "#425A70" }}>
-                    <Icon size={16} /> <span className="truncate flex-1">{it.label}</span>
-                    {it.badge > 0 && <span className="font-body text-[10px] font-extrabold px-1.5 rounded-full text-white" style={{ background: "#D9480F" }}>{it.badge}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          );
-        })}
-        </div>
-      </aside>
-
+      {papel !== "admin" && NOME_PAPEL_ADMIN_SHELL[papel] && (
+        <p className="rounded-xl px-4 py-2.5 mb-4 font-body text-sm" style={{ background: "#EAF3FA", color: C.blue }}>{NOME_PAPEL_ADMIN_SHELL[papel]}</p>
+      )}
       <div className="min-w-0">
         {tab === "dashboard" && (
           <div>
@@ -5587,6 +5555,42 @@ export function AdminPanel({ papel = "admin" }) {
                 Modo demonstração: conecte o Supabase para ver os números reais da plataforma.
               </div>
             )}
+            {/* Situação dos cadastros de comerciantes — calculada da lista real de empresas */}
+            {supabaseConfigurado && (
+              <div className="rounded-2xl border bg-white p-4 md:p-5 mb-6" style={{ borderColor: C.line }}>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Situação dos cadastros de comerciantes</p>
+                  <button onClick={() => setTab("empresas")} className="font-body text-xs font-semibold rounded-lg border px-3 py-1.5 hover:bg-[#F4F7FA]" style={{ borderColor: C.line, color: C.blue }}>Ver comerciantes</button>
+                </div>
+                {empresasPend === null ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">{[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-16" />)}</div>
+                ) : (() => {
+                  const limite = Date.now() - 30 * 86400000;
+                  const cont = (f) => empresasPend.filter(f).length;
+                  const itens = [
+                    ["Total de cadastros", empresasPend.length, C.blue, null],
+                    ["Aprovados (ativos)", cont((e) => e.status === "aprovada"), "#20A46A", "aprovada"],
+                    ["Aguardando análise", cont((e) => e.status === "pendente"), "#B7791F", "pendente"],
+                    ["Recusados", cont((e) => e.status === "recusada"), "#C93C3C", "recusada"],
+                    ["Novos (30 dias)", cont((e) => e.criado_em && new Date(e.criado_em).getTime() >= limite), "#287CB5", null],
+                  ];
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      {itens.map(([rotulo, valor, cor]) => (
+                        <div key={rotulo} className="rounded-xl px-3.5 py-3" style={{ background: "#F4F7FA", borderLeft: `3px solid ${cor}` }}>
+                          <p className="font-display font-extrabold text-xl" style={{ color: C.ink }}>{valor}</p>
+                          <p className="font-body text-xs" style={{ color: "#66768A" }}>{rotulo}</p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+                {empresasPend !== null && empresasPend.length === 0 && (
+                  <p className="font-body text-xs mt-3" style={{ color: "#66768A" }}>Ainda não há comerciantes cadastrados.</p>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               {[
                 [statsReais?.empresas, "Empresas aprovadas", Building2],
@@ -5597,9 +5601,9 @@ export function AdminPanel({ papel = "admin" }) {
                 [statsReais?.eventos, "Eventos no calendário", CalendarDays],
               ].map(([n, l, Icon], i) => {
                 const cor = PALETA_GRAFICOS[i % PALETA_GRAFICOS.length];
-                if (!statsReais) {
+                if (!statsReais && supabaseConfigurado) {
                   return (
-                    <div key={l} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                    <div key={l} className="rounded-2xl border p-4 bg-white" style={{ borderColor: C.line }}>
                       <Skeleton className="w-9 h-9" />
                       <Skeleton className="w-12 h-5 mt-2.5" />
                       <Skeleton className="w-20 h-3 mt-1.5" />
@@ -5607,11 +5611,11 @@ export function AdminPanel({ papel = "admin" }) {
                   );
                 }
                 return (
-                  <div key={l} className="glow-card rounded-2xl border p-4" style={{ borderColor: C.line }}>
+                  <div key={l} className="glow-card rounded-2xl border p-4 bg-white" style={{ borderColor: C.line }}>
                     <span className="flex items-center justify-center w-9 h-9 rounded-xl" style={{ background: `${cor}1a`, color: cor }}>
                       <Icon size={16} />
                     </span>
-                    <p className="font-display font-extrabold text-xl mt-2.5" style={{ color: C.ink }}>{n}</p>
+                    <p className="font-display font-extrabold text-xl mt-2.5" style={{ color: C.ink }}>{n ?? "—"}</p>
                     <p className="font-body text-xs" style={{ color: "#66768A" }}>{l}</p>
                   </div>
                 );
@@ -5621,6 +5625,11 @@ export function AdminPanel({ papel = "admin" }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                 <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Acessos no site (últimos 7 dias)</p>
+                {!acessosSemanaReais?.length ? (
+                  <div className="h-[200px] flex flex-col items-center justify-center rounded-xl text-center px-4" style={{ background: "#F4F7FA" }}>
+                    {supabaseConfigurado && acessosSemanaReais === null ? <Skeleton className="w-full h-full" /> : <p className="font-body text-xs" style={{ color: "#66768A" }}>Sem dados de acesso para mostrar.</p>}
+                  </div>
+                ) : (
                 <div style={{ width: "100%", height: 200 }}>
                   <ResponsiveContainer>
                     <LineChart data={acessosSemanaReais ?? []}>
@@ -5631,6 +5640,7 @@ export function AdminPanel({ papel = "admin" }) {
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
+                )}
                 {acessosSemanaReais && acessosSemanaReais.every((d) => d.views === 0) && (
                   <p className="font-body text-[11px] mt-2" style={{ color: "#66768A" }}>Sem visitas registradas ainda nos últimos 7 dias.</p>
                 )}
@@ -5638,6 +5648,11 @@ export function AdminPanel({ papel = "admin" }) {
 
               <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                 <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Crescimento mensal (novas empresas)</p>
+                {!crescimentoMensal?.length ? (
+                  <div className="h-[200px] flex flex-col items-center justify-center rounded-xl text-center px-4" style={{ background: "#F4F7FA" }}>
+                    {supabaseConfigurado && crescimentoMensal === null ? <Skeleton className="w-full h-full" /> : <p className="font-body text-xs" style={{ color: "#66768A" }}>Sem cadastros de empresas para mostrar.</p>}
+                  </div>
+                ) : (
                 <div style={{ width: "100%", height: 200 }}>
                   <ResponsiveContainer>
                     <LineChart data={crescimentoMensal ?? []}>
@@ -5648,6 +5663,7 @@ export function AdminPanel({ papel = "admin" }) {
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
+                )}
               </div>
             </div>
 
@@ -5757,7 +5773,7 @@ export function AdminPanel({ papel = "admin" }) {
                   [statsReais?.combos, "Combos ativos", HandCoins],
                 ].map(([n, l, Icon], i) => {
                   const cor = PALETA_GRAFICOS[i % PALETA_GRAFICOS.length];
-                  if (!statsReais) {
+                  if (!statsReais && supabaseConfigurado) {
                     return (
                       <div key={l} className="rounded-xl border p-3" style={{ borderColor: C.line }}>
                         <Skeleton className="w-8 h-8" />
@@ -5771,7 +5787,7 @@ export function AdminPanel({ papel = "admin" }) {
                       <span className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: `${cor}1a`, color: cor }}>
                         <Icon size={14} />
                       </span>
-                      <p className="font-display font-extrabold text-lg mt-2" style={{ color: C.ink }}>{n}</p>
+                      <p className="font-display font-extrabold text-lg mt-2" style={{ color: C.ink }}>{n ?? "—"}</p>
                       <p className="font-body text-[11px]" style={{ color: "#66768A" }}>{l}</p>
                     </div>
                   );
@@ -5784,7 +5800,7 @@ export function AdminPanel({ papel = "admin" }) {
             <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
               <p className="font-display font-bold text-sm mb-3" style={{ color: C.ink }}>Resumo de usuários</p>
               {!todosUsuariosAdmin ? (
-                <Skeleton className="w-full h-16" />
+                supabaseConfigurado ? <Skeleton className="w-full h-16" /> : <p className="font-body text-xs" style={{ color: "#66768A" }}>Disponível quando o Supabase estiver conectado.</p>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   {[
@@ -9448,8 +9464,7 @@ export function AdminPanel({ papel = "admin" }) {
           </div>
         )}
       </div>
-      </div>
-    </div>
+    </AdminShell>
   );
 }
 
@@ -9791,7 +9806,7 @@ function MenuLateralPainel({ titulo, items, tab, setTab, grupos }) {
   );
 }
 
-function EmpresarioPanel({ siteConfig }) {
+function EmpresarioPanel({ siteConfig, perfil = null, onSair }) {
   const [tab, setTab] = useState("avisos");
   const [modalProdutoAberto, setModalProdutoAberto] = useState(false);
 
@@ -10384,12 +10399,17 @@ function EmpresarioPanel({ siteConfig }) {
   ];
 
   return (
-    <div className="grid md:grid-cols-[220px_1fr] gap-6">
-      <MenuLateralPainel titulo={perfilForm.nome || "Minha empresa"} items={items} tab={tab} setTab={setTab} grupos={[
+    <AdminShell
+      sistema={{ nome: "Conecta", destaque: "Comércio", sub: "Painel do comerciante" }}
+      area="Painel do Comerciante" atual={tab} onSelecionar={setTab} chave="empresario"
+      grupos={[
         { titulo: "Minha empresa", ids: ["avisos", "perfil", "visualizacoes"] },
         { titulo: "Vendas", ids: ["produtos", "promocoes", "cupons", "combos", "fidelidade"] },
         { titulo: "Comunidade", ids: ["vagas", "avaliacoes"] },
-      ]} />
+      ].map((g) => ({ titulo: g.titulo, itens: g.ids.map((id) => items.find((it) => it.id === id)).filter(Boolean) }))}
+      usuario={{ nome: perfilForm.nome || perfil?.nome || perfil?.email || "Minha empresa", papel: "Comerciante" }}
+      notificacoes={{ total: 0, onAbrir: () => setTab("avisos") }}
+      onModulos={() => { window.location.hash = "#/portal"; }} onSair={onSair}>
 
       <div className="min-w-0">
         {tab === "avisos" && <PainelAvisosEmpresario siteConfig={siteConfig} />}
@@ -10914,7 +10934,7 @@ function EmpresarioPanel({ siteConfig }) {
       </div>
 
       {modalProdutoAberto && <ModalNovoProduto onFechar={() => setModalProdutoAberto(false)} onSalvo={() => carregarMeusProdutos(empresaId)} />}
-    </div>
+    </AdminShell>
   );
 }
 
@@ -10923,7 +10943,7 @@ function EmpresarioPanel({ siteConfig }) {
 // Empresário, porém mais enxuto (a tabela `prestadores` não tem produtos,
 // vagas, cupons, combos ou fidelidade — só perfil e avaliações).
 // ---------------------------------------------------------------------------
-function PrestadorPanel({ siteConfig }) {
+function PrestadorPanel({ siteConfig, perfil = null, onSair }) {
   const [tab, setTab] = useState("perfil");
   const [prestadorId, setPrestadorId] = useState(null);
   const [prestadorNaoEncontrado, setPrestadorNaoEncontrado] = useState(false);
@@ -11070,8 +11090,12 @@ function PrestadorPanel({ siteConfig }) {
   ];
 
   return (
-    <div className="grid md:grid-cols-[220px_1fr] gap-6">
-      <MenuLateralPainel titulo={perfilForm.nome || "Meu cadastro"} items={items} tab={tab} setTab={setTab} />
+    <AdminShell
+      sistema={{ nome: "Conecta", destaque: "Comércio", sub: "Painel do prestador" }}
+      area="Painel do Prestador" atual={tab} onSelecionar={setTab} chave="prestador"
+      grupos={[{ titulo: "Meu cadastro", itens: items }]}
+      usuario={{ nome: perfilForm.nome || perfil?.nome || perfil?.email || "Prestador", papel: "Prestador de serviço" }}
+      onModulos={() => { window.location.hash = "#/portal"; }} onSair={onSair}>
 
       <div className="min-w-0">
         {tab === "perfil" && (
@@ -11189,7 +11213,7 @@ function PrestadorPanel({ siteConfig }) {
           </div>
         )}
       </div>
-    </div>
+    </AdminShell>
   );
 }
 
@@ -16933,6 +16957,10 @@ export default function ConectaComercio() {
 
   // Um painel só é liberado se: Supabase não configurado (modo demo livre),
   // ou há sessão E o perfil tem o tipo exigido.
+  // Sair do painel: encerra a sessão no Supabase e volta para o site.
+  const sairDoPainel = async () => {
+    try { if (supabaseConfigurado) await supabase.auth.signOut(); } finally { window.location.hash = "#/"; }
+  };
   const podeVer = (restrito) => {
     if (!supabaseConfigurado) return true;
     if (!sessao) return false;
@@ -16940,7 +16968,9 @@ export default function ConectaComercio() {
     if (perfil.tipo === "admin") return true; // admin tem acesso a todos os painéis do site
     if (restrito === "admin" && (perfil.tipo === "editor" || perfil.tipo === "visualizador")) return true; // Painel Admin com menu reduzido
     return perfil.tipo === restrito;
-  };
+  };  // Painéis com layout administrativo próprio (AdminShell): sem a barra do site.
+  const modoPainelApp = sessao !== undefined && ["admin", "empresario", "prestador"].includes(modo) && podeVer(modo);
+
 
   // Credencial digital pública (link/QR Code de um evento) — página própria,
   // sem menu e sem exigir login, então sai daqui antes do layout normal.
@@ -16961,7 +16991,7 @@ export default function ConectaComercio() {
 
       {/* Barra institucional de navegação (padrão Conecta Gestão 360): faixa azul-marinho
           em toda a largura, módulo atual destacado, rolagem lateral no celular. */}
-      <nav aria-label="Áreas da plataforma" className="sticky top-0 z-40 w-full" style={{ background: C.blueDark, boxShadow: "0 1px 0 rgba(255,255,255,.06), 0 2px 8px rgba(14,49,80,.18)" }}>
+      {!modoPainelApp && <nav aria-label="Áreas da plataforma" className="sticky top-0 z-40 w-full" style={{ background: C.blueDark, boxShadow: "0 1px 0 rgba(255,255,255,.06), 0 2px 8px rgba(14,49,80,.18)" }}>
         <div className="cg-container mx-auto px-2 md:px-4 h-11 flex items-center gap-1 overflow-x-auto no-scrollbar">
           {modos.filter((m) => !m.oculto).map((m) => {
             const Icon = m.icon;
@@ -16977,7 +17007,7 @@ export default function ConectaComercio() {
           })}
           <span className="shrink-0 ml-auto md:ml-1"><BotaoCompartilhar /></span>
         </div>
-      </nav>
+      </nav>}
 
       <div key={modo} className="page-transition">
       {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} siteConfig={siteConfig} sessao={sessao} perfil={perfil} irParaModo={setModo} />}
@@ -17004,15 +17034,7 @@ export default function ConectaComercio() {
         sessao === undefined ? (
           <LoadingBrand texto="Verificando seu acesso..." />
         ) : podeVer("admin") ? (
-          <div className="cg-container mx-auto px-4 md:px-6 py-8">
-            <SectionHeader eyebrow="Área restrita" title="Painel administrativo" sub={perfil?.nome ? `Olá, ${perfil.nome}` : "Visível só para administradores da plataforma"} />
-            {NOME_PAPEL_ADMIN[perfil?.tipo] && (
-              <p className="rounded-xl px-4 py-2.5 mb-4 font-body text-sm" style={{ background: "#EAF3FA", color: C.blue }}>
-                Você entrou como <b>{NOME_PAPEL_ADMIN[perfil.tipo]}</b>: {perfil.tipo === "editor" ? "cuida de notícias, banners, vagas, eventos, cursos, turismo, enquetes, FAQ e da moderação da comunidade." : "vê os números do painel, sem alterar nada."}
-              </p>
-            )}
-            <AdminPanel papel={perfil?.tipo || "admin"} />
-          </div>
+          <AdminPanel papel={perfil?.tipo || "admin"} perfil={perfil} onSair={sairDoPainel} />
         ) : (
           <AcessoRestrito tipo="admin" onEntrar={() => irPara(modos.find((m) => m.id === "admin"))} />
         )
@@ -17022,10 +17044,7 @@ export default function ConectaComercio() {
         sessao === undefined ? (
           <LoadingBrand texto="Verificando seu acesso..." />
         ) : podeVer("empresario") ? (
-          <div className="cg-container mx-auto px-4 md:px-6 py-8">
-            <SectionHeader eyebrow="Área restrita" title="Painel do empresário" sub={perfil?.nome ? `Olá, ${perfil.nome}` : "Visível só para o dono da empresa, após login"} />
-            <EmpresarioPanel siteConfig={siteConfig} />
-          </div>
+          <EmpresarioPanel siteConfig={siteConfig} perfil={perfil} onSair={sairDoPainel} />
         ) : (
           <AcessoRestrito tipo="empresario" onEntrar={() => irPara(modos.find((m) => m.id === "empresario"))} />
         )
@@ -17035,10 +17054,7 @@ export default function ConectaComercio() {
         sessao === undefined ? (
           <LoadingBrand texto="Verificando seu acesso..." />
         ) : podeVer("prestador") ? (
-          <div className="cg-container mx-auto px-4 md:px-6 py-8">
-            <SectionHeader eyebrow="Área restrita" title="Painel do prestador" sub={perfil?.nome ? `Olá, ${perfil.nome}` : "Visível só para o prestador de serviço, após login"} />
-            <PrestadorPanel siteConfig={siteConfig} />
-          </div>
+          <PrestadorPanel siteConfig={siteConfig} perfil={perfil} onSair={sairDoPainel} />
         ) : (
           <AcessoRestrito tipo="prestador" onEntrar={() => irPara(modos.find((m) => m.id === "prestador"))} />
         )
