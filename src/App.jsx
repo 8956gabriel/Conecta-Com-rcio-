@@ -47,16 +47,21 @@ function useCidade() {
 // ---------------------------------------------------------------------------
 // Tokens
 // ---------------------------------------------------------------------------
+// Paleta no padrão Conecta Gestão 360 (azul institucional #165D99, fundo
+// #F4F7FA, texto #243447, linhas #E1E8EF). A cor principal continua editável
+// em Painel Admin → Identidade do site (vira --cor-principal).
 const C = {
-  blue: "var(--cor-principal, #0A5AA8)",
-  blueDark: "var(--cor-principal-escura, #073F73)",
-  blueDeep: "var(--cor-principal-profunda, #052A4D)",
-  blueTint: "#EAF2FB",
-  blueTint2: "#F5F9FD",
-  ink: "#0E2233",
+  blue: "var(--cor-principal, #165D99)",
+  blueDark: "var(--cor-principal-escura, #123B5D)",
+  blueDeep: "var(--cor-principal-profunda, #0E3150)",
+  blueTint: "#EAF3FA",
+  blueTint2: "#F4F7FA",
+  ink: "#243447",
   amber: "#E8A23D",
   amberDark: "#C6811F",
-  line: "#DCE7F2",
+  line: "#E1E8EF",
+  muted: "#66768A",
+  bg: "#F4F7FA",
 };
 
 // Paleta usada nos gráficos de barra/pizza e nos ícones dos cartões de
@@ -328,9 +333,25 @@ function aplicarCorPrincipal(hex) {
 }
 
 const fontImport = `
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap');
-.font-display { font-family: 'Manrope', sans-serif; }
-.font-body { font-family: 'Inter', sans-serif; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+.font-display { font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; letter-spacing: -0.01em; }
+.font-body { font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+body { background: #F4F7FA; color: #243447; -webkit-text-size-adjust: 100%; }
+html, body { overflow-x: clip; }
+/* Foco visível para navegação por teclado (acessibilidade) */
+:focus-visible { outline: 2px solid var(--cor-principal, #165D99); outline-offset: 2px; border-radius: 6px; }
+/* Campos: borda e foco no padrão Gestão 360 */
+input:not([type=checkbox]):not([type=radio]):not([type=range]):focus, select:focus, textarea:focus {
+  border-color: var(--cor-principal, #165D99) !important; box-shadow: 0 0 0 3px rgba(22, 93, 153, .14); outline: none;
+}
+/* Containers fluidos (padrão Gestão 360): 94–97% da largura no computador,
+   sem passar de 1640px; no celular, a largura toda com respiro lateral. */
+.cg-container { width: 100%; max-width: 1640px; }
+@media (min-width: 1024px) { .cg-container { width: 96%; } }
+/* Tabelas largas: rolam dentro do próprio quadro, nunca a página inteira */
+.tabela-rolavel { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Menos movimento para quem pede (acessibilidade) */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
 
 @keyframes stamp-in { 0% { transform: scale(1.4) rotate(-14deg); opacity: 0 } 60% { transform: scale(0.94) rotate(-8deg); opacity: 1 } 100% { transform: scale(1) rotate(-8deg); opacity: 1 } }
 .stamp { animation: stamp-in 0.9s cubic-bezier(.2,.8,.2,1) both; }
@@ -340,7 +361,7 @@ const fontImport = `
   33% { transform: translate(34px,-26px) scale(1.08); }
   66% { transform: translate(-24px,20px) scale(0.94); }
 }
-.blob { filter: blur(70px); animation: float-blob 12s ease-in-out infinite; }
+.blob { filter: blur(70px); opacity: .7; } /* sem animação contínua (padrão Gestão 360: menos movimento) */
 .blob-b { animation-duration: 15s; animation-delay: -4s; }
 .blob-c { animation-duration: 18s; animation-delay: -8s; }
 
@@ -760,7 +781,7 @@ function SectionHeader({ eyebrow, title, sub, linkLabel, onLinkClick }) {
       <div>
         <Eyebrow>{eyebrow}</Eyebrow>
         <h2 className="font-display text-2xl md:text-[28px] font-extrabold" style={{ color: C.ink }}>{title}</h2>
-        {sub && <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>{sub}</p>}
+        {sub && <p className="font-body text-sm mt-1" style={{ color: "#66768A" }}>{sub}</p>}
       </div>
       {linkLabel && (
         <button type="button" onClick={onLinkClick} className="font-body flex items-center gap-1 text-sm font-semibold shrink-0" style={{ color: C.blue }}>
@@ -812,7 +833,7 @@ function CategoryCard({ cat, onClick }) {
       </span>
       <div>
         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{cat.nome}</p>
-        {cat.count !== undefined && <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{cat.count} empresas</p>}
+        {cat.count !== undefined && <p className="font-body text-xs mt-0.5" style={{ color: "#66768A" }}>{cat.count} empresas</p>}
       </div>
     </button>
   );
@@ -852,10 +873,10 @@ function EmpresaCard({ e, fav, onFav, onAbrir }) {
             {e.verificada && <BadgeCheck size={14} color={C.blue} aria-label="Comerciante verificado" />}
           </p>
         </button>
-        <p className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}>
+        <p className="font-body text-xs flex items-center gap-1" style={{ color: "#66768A" }}>
           <MapPin size={11} /> {e.bairro}, {e.cidade}
         </p>
-        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{e.itens} {e.itens === 1 ? "item ativo" : "itens ativos"}</p>
+        <p className="font-body text-xs" style={{ color: "#66768A" }}>{e.itens} {e.itens === 1 ? "item ativo" : "itens ativos"}</p>
         <div className="flex flex-wrap gap-1.5">
           <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body mt-0.5" style={{ background: e.regiao === "bairro_refugio" ? "#F3E8FF" : C.blueTint, color: e.regiao === "bairro_refugio" ? "#7C3AED" : C.blue }}>
             <MapPin size={11} /> {e.regiao === "bairro_refugio" ? "Bairro do Refúgio" : "Ivatuba"}
@@ -1040,7 +1061,7 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
               {empresa.nome}
               {empresa.verificada && <BadgeCheck size={16} color={C.blue} />}
             </p>
-            <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{empresa.cat} · {empresa.bairro}, {empresa.cidade}</p>
+            <p className="font-body text-xs mt-0.5" style={{ color: "#66768A" }}>{empresa.cat} · {empresa.bairro}, {empresa.cidade}</p>
             <div className="flex flex-wrap gap-1.5 mt-2">
               {planoPremiumAtivo(empresa) && (
                 <span className="w-fit flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-bold font-body text-white" style={{ background: "linear-gradient(120deg, #C6811F, #E8A23D)" }}>
@@ -1104,7 +1125,7 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
                 {DIAS_SEMANA.map((d) => {
                   const cfg = empresa.horario_funcionamento[d.chave];
                   return (
-                    <p key={d.chave} className="font-body text-[11px]" style={{ color: "#5C7186" }}>
+                    <p key={d.chave} className="font-body text-[11px]" style={{ color: "#66768A" }}>
                       {d.label}: {cfg?.aberto && cfg.abre && cfg.fecha ? `${cfg.abre} às ${cfg.fecha}` : "fechado"}
                     </p>
                   );
@@ -1150,7 +1171,7 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
                     <p className="font-body text-xs font-bold" style={{ color: C.ink }}>{c.titulo}</p>
                     {c.preco && <span className="font-body text-xs font-extrabold shrink-0" style={{ color: C.blue }}>R$ {Number(c.preco).toFixed(2).replace(".", ",")}</span>}
                   </div>
-                  {c.descricao && <p className="font-body text-[11px] mt-0.5" style={{ color: "#5C7186" }}>{c.descricao}</p>}
+                  {c.descricao && <p className="font-body text-[11px] mt-0.5" style={{ color: "#66768A" }}>{c.descricao}</p>}
                 </div>
               ))}
             </div>
@@ -1197,7 +1218,7 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
             {avaliacoes === null && <Skeleton className="w-full h-16" />}
 
             {avaliacoes && avaliacoes.length === 0 && (
-              <p className="font-body text-xs mb-3" style={{ color: "#5C7186" }}>Ainda não tem avaliações — seja o primeiro a comentar.</p>
+              <p className="font-body text-xs mb-3" style={{ color: "#66768A" }}>Ainda não tem avaliações — seja o primeiro a comentar.</p>
             )}
 
             <div className="flex flex-col gap-3 mb-4">
@@ -1209,7 +1230,7 @@ function ModalPerfilEmpresa({ empresa, onFechar }) {
                       {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={11} fill={n <= a.nota ? "#E8A23D" : "none"} color="#E8A23D" />)}
                     </div>
                   </div>
-                  {a.comentario && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{a.comentario}</p>}
+                  {a.comentario && <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>{a.comentario}</p>}
                   {a.resposta_comerciante && (
                     <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: C.blueTint2 }}>
                       <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>Resposta do comerciante</p>
@@ -1301,7 +1322,7 @@ function AvaliacaoPrestadorForm({ prestadorId, onEnviado }) {
         <button type="submit" disabled={enviando} className="font-body text-xs font-bold rounded-lg px-4 py-2 text-white disabled:opacity-60" style={{ background: C.blue }}>
           {enviando ? "Enviando..." : "Enviar"}
         </button>
-        <button type="button" onClick={() => setAberto(false)} className="font-body text-xs font-bold rounded-lg px-4 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>
+        <button type="button" onClick={() => setAberto(false)} className="font-body text-xs font-bold rounded-lg px-4 py-2 border" style={{ borderColor: C.line, color: "#66768A" }}>
           Cancelar
         </button>
       </div>
@@ -1360,7 +1381,7 @@ function ModalDetalhePrestador({ p, onFechar, linkWhats, linkInsta, avaliacoes, 
           {avaliacoes.slice(0, 3).map((a) => (
             <div key={a.id} className="mt-2 pl-2 border-l-2" style={{ borderColor: C.line }}>
               <p className="font-body text-xs font-bold" style={{ color: C.ink }}>{a.nome}</p>
-              {a.comentario && <p className="font-body text-xs" style={{ color: "#5C7186" }}>{a.comentario}</p>}
+              {a.comentario && <p className="font-body text-xs" style={{ color: "#66768A" }}>{a.comentario}</p>}
             </div>
           ))}
           <AvaliacaoPrestadorForm prestadorId={p.id} onEnviado={onAvaliacaoEnviada} />
@@ -1397,7 +1418,7 @@ function PrestadorCard({ p, agendamentoAtivo, avaliacoes = [], onAvaliacaoEnviad
           )}
         </button>
         {p.endereco && (
-          <p className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}>
+          <p className="font-body text-xs flex items-center gap-1" style={{ color: "#66768A" }}>
             <MapPin size={11} /> {p.endereco}
           </p>
         )}
@@ -1483,16 +1504,16 @@ function ModalAgendarHorario({ prestador, onFechar }) {
             <div className="py-4 text-center">
               <CheckCircle2 size={30} color="#1E8E5A" className="mx-auto mb-2" />
               <p className="font-display font-bold text-base" style={{ color: C.ink }}>Horário reservado!</p>
-              <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>{slotEscolhido.data} às {slotEscolhido.hora}, com {prestador.nome}.</p>
+              <p className="font-body text-sm mt-1" style={{ color: "#66768A" }}>{slotEscolhido.data} às {slotEscolhido.hora}, com {prestador.nome}.</p>
             </div>
           ) : (
             <>
               {slots === null && <div className="flex flex-col gap-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 rounded-lg" />)}</div>}
-              {slots && slots.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum horário disponível no momento — tente falar direto pelo WhatsApp.</p>}
+              {slots && slots.length === 0 && <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhum horário disponível no momento — tente falar direto pelo WhatsApp.</p>}
               <div className="flex flex-col gap-3 mb-4">
                 {Object.entries(slotsPorData).map(([data, doDia]) => (
                   <div key={data}>
-                    <p className="font-body text-xs font-bold mb-1.5" style={{ color: "#5C7186" }}>{data}</p>
+                    <p className="font-body text-xs font-bold mb-1.5" style={{ color: "#66768A" }}>{data}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {doDia.map((s) => (
                         <button key={s.id} type="button" onClick={() => setSlotEscolhido(s)}
@@ -1535,7 +1556,7 @@ function ModalDetalheProduto({ p, onFechar, onAdicionarCarrinho, podeAdicionar, 
           <div className="h-44 rounded-2xl flex items-center justify-center overflow-hidden mb-4" style={{ background: C.blueTint }}>
             {p.foto_url ? <img loading="lazy" decoding="async" src={p.foto_url} alt={p.nome} className="w-full h-full object-cover" /> : <ShoppingBag size={32} color={C.blue} />}
           </div>
-          <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.empresa}</p>
+          <p className="font-body text-xs" style={{ color: "#66768A" }}>{p.empresa}</p>
           {p.precoPromocional ? (
             <div className="flex items-center gap-2 mt-1">
               <p className="font-display font-extrabold text-xl" style={{ color: "#B4462F" }}>{p.precoPromocional}</p>
@@ -1594,7 +1615,7 @@ function ProdutoCard({ p, onAdicionarCarrinho, fav, onFav }) {
       <div className="p-3.5 flex flex-col gap-1">
         <button type="button" onClick={() => setAberto(true)} className="text-left">
           <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
-          <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.empresa}</p>
+          <p className="font-body text-xs" style={{ color: "#66768A" }}>{p.empresa}</p>
         </button>
         {p.precoPromocional ? (
           <div className="flex items-center gap-2 mt-1">
@@ -1644,7 +1665,7 @@ function ModalDetalheVaga({ v, onFechar, linkWhats, prazoFormatado }) {
           <button onClick={onFechar} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: C.blueTint2 }} aria-label="Fechar"><X size={16} color="#425A70" /></button>
         </div>
         <div className="p-5 flex flex-col gap-2">
-          <p className="font-body text-sm" style={{ color: "#5C7186" }}>{v.empresa} · {v.cidade}</p>
+          <p className="font-body text-sm" style={{ color: "#66768A" }}>{v.empresa} · {v.cidade}</p>
           <p className="font-body text-base font-bold" style={{ color: C.amberDark }}>{v.salario}</p>
           {v.tipo && (
             <span className="font-body text-[11px] font-bold px-2 py-1 rounded-full w-fit" style={{ background: C.blueTint2, color: "#425A70" }}>{v.tipo}</span>
@@ -1689,9 +1710,9 @@ function VagaCard({ v }) {
           )}
         </div>
         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
-        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{v.empresa} · {v.cidade}</p>
+        <p className="font-body text-xs" style={{ color: "#66768A" }}>{v.empresa} · {v.cidade}</p>
         <p className="font-body text-xs font-semibold" style={{ color: C.amberDark }}>{v.salario}</p>
-        {v.beneficios && <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{v.beneficios}</p>}
+        {v.beneficios && <p className="font-body text-[11px]" style={{ color: "#66768A" }}>{v.beneficios}</p>}
         {prazoFormatado && <p className="font-body text-[11px] font-semibold" style={{ color: "#B4462F" }}>Inscrições até {prazoFormatado}</p>}
       </button>
       {linkWhats ? (
@@ -1730,7 +1751,7 @@ function ModalDetalheCurso({ c, onFechar }) {
           </div>
         </div>
         <div className="p-5">
-          <p className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}>
+          <p className="font-body text-xs flex items-center gap-1" style={{ color: "#66768A" }}>
             <MapPin size={12} /> {local}{c.professor ? ` · ${c.professor}` : ""}{c.carga_horaria ? ` · ${c.carga_horaria}` : ""}{dataFormatada ? ` · ${dataFormatada}` : ""}
           </p>
           {c.certificado && (
@@ -1850,10 +1871,10 @@ function CursoCard({ c }) {
           <p className="font-display font-bold text-sm flex flex-wrap items-center gap-1.5" style={{ color: C.ink }}>
             <span className="min-w-0 break-words">{c.titulo}</span>
             {c.data_inicio && c.data_inicio < new Date().toISOString().slice(0, 10) && (
-              <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#EAF0F7", color: "#5C7186" }}>Já aconteceu</span>
+              <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#EAF0F7", color: "#66768A" }}>Já aconteceu</span>
             )}
           </p>
-          <p className="font-body text-xs mt-1 flex items-center gap-1" style={{ color: "#5C7186" }}>
+          <p className="font-body text-xs mt-1 flex items-center gap-1" style={{ color: "#66768A" }}>
             <MapPin size={11} /> {local}{c.professor ? ` · ${c.professor}` : ""}{c.carga_horaria ? ` · ${c.carga_horaria}` : ""}
           </p>
         </button>
@@ -5591,7 +5612,7 @@ export function AdminPanel({ papel = "admin" }) {
                       <Icon size={16} />
                     </span>
                     <p className="font-display font-extrabold text-xl mt-2.5" style={{ color: C.ink }}>{n}</p>
-                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>{l}</p>
+                    <p className="font-body text-xs" style={{ color: "#66768A" }}>{l}</p>
                   </div>
                 );
               })}
@@ -5603,15 +5624,15 @@ export function AdminPanel({ papel = "admin" }) {
                 <div style={{ width: "100%", height: 200 }}>
                   <ResponsiveContainer>
                     <LineChart data={acessosSemanaReais ?? []}>
-                      <XAxis dataKey="dia" tick={{ fontSize: 12, fill: "#5C7186" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: "#5C7186" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
+                      <XAxis dataKey="dia" tick={{ fontSize: 12, fill: "#66768A" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: "#66768A" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
                       <Tooltip />
                       <Line type="monotone" dataKey="views" stroke={C.blue} strokeWidth={2.5} dot={{ r: 3 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
                 {acessosSemanaReais && acessosSemanaReais.every((d) => d.views === 0) && (
-                  <p className="font-body text-[11px] mt-2" style={{ color: "#5C7186" }}>Sem visitas registradas ainda nos últimos 7 dias.</p>
+                  <p className="font-body text-[11px] mt-2" style={{ color: "#66768A" }}>Sem visitas registradas ainda nos últimos 7 dias.</p>
                 )}
               </div>
 
@@ -5620,8 +5641,8 @@ export function AdminPanel({ papel = "admin" }) {
                 <div style={{ width: "100%", height: 200 }}>
                   <ResponsiveContainer>
                     <LineChart data={crescimentoMensal ?? []}>
-                      <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#5C7186" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: "#5C7186" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#66768A" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: "#66768A" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
                       <Tooltip />
                       <Line type="monotone" dataKey="empresas" stroke={C.amberDark} strokeWidth={2.5} dot={{ r: 3 }} />
                     </LineChart>
@@ -5636,8 +5657,8 @@ export function AdminPanel({ papel = "admin" }) {
                 <div style={{ width: "100%", height: 200 }}>
                   <ResponsiveContainer>
                     <BarChart data={resumoBarrasAdmin}>
-                      <XAxis dataKey="nome" tick={{ fontSize: 10, fill: "#5C7186" }} axisLine={false} tickLine={false} interval={0} angle={-20} textAnchor="end" height={40} />
-                      <YAxis tick={{ fontSize: 12, fill: "#5C7186" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
+                      <XAxis dataKey="nome" tick={{ fontSize: 10, fill: "#66768A" }} axisLine={false} tickLine={false} interval={0} angle={-20} textAnchor="end" height={40} />
+                      <YAxis tick={{ fontSize: 12, fill: "#66768A" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
                       <Tooltip />
                       <Bar dataKey="valor" radius={[6, 6, 0, 0]}>
                         {resumoBarrasAdmin.map((_, i) => <Cell key={i} fill={PALETA_GRAFICOS[i % PALETA_GRAFICOS.length]} />)}
@@ -5662,7 +5683,7 @@ export function AdminPanel({ papel = "admin" }) {
                     </ResponsiveContainer>
                   </div>
                 ) : (
-                  <p className="font-body text-sm" style={{ color: "#5C7186" }}>Sem empresas aprovadas o suficiente ainda.</p>
+                  <p className="font-body text-sm" style={{ color: "#66768A" }}>Sem empresas aprovadas o suficiente ainda.</p>
                 )}
               </div>
             </div>
@@ -5674,23 +5695,23 @@ export function AdminPanel({ papel = "admin" }) {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${C.line}` }}>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#5C7186" }}>Empresa</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#5C7186" }}>Categoria</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2 text-right" style={{ color: "#5C7186" }}>Views</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#66768A" }}>Empresa</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#66768A" }}>Categoria</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2 text-right" style={{ color: "#66768A" }}>Views</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(empresasDestaqueReais ?? []).map((e, i) => (
                         <tr key={e.nome + i} style={{ borderBottom: i < empresasDestaqueReais.length - 1 ? `1px solid ${C.line}` : "none" }}>
                           <td className="font-body text-sm font-semibold py-2 truncate max-w-[140px]" style={{ color: C.ink }}>{e.nome}</td>
-                          <td className="font-body text-xs py-2" style={{ color: "#5C7186" }}>{e.categoria}</td>
+                          <td className="font-body text-xs py-2" style={{ color: "#66768A" }}>{e.categoria}</td>
                           <td className="font-body text-xs font-bold py-2 text-right" style={{ color: C.blue }}>{e.visualizacoes ?? 0}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 ) : (
-                  <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma empresa aprovada ainda.</p>
+                  <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhuma empresa aprovada ainda.</p>
                 )}
               </div>
 
@@ -5700,8 +5721,8 @@ export function AdminPanel({ papel = "admin" }) {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${C.line}` }}>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#5C7186" }}>Nome</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2 text-right" style={{ color: "#5C7186" }}>Tipo</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2" style={{ color: "#66768A" }}>Nome</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide pb-2 text-right" style={{ color: "#66768A" }}>Tipo</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -5716,7 +5737,7 @@ export function AdminPanel({ papel = "admin" }) {
                     </tbody>
                   </table>
                 ) : (
-                  <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum cadastro ainda.</p>
+                  <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhum cadastro ainda.</p>
                 )}
               </div>
             </div>
@@ -5751,7 +5772,7 @@ export function AdminPanel({ papel = "admin" }) {
                         <Icon size={14} />
                       </span>
                       <p className="font-display font-extrabold text-lg mt-2" style={{ color: C.ink }}>{n}</p>
-                      <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{l}</p>
+                      <p className="font-body text-[11px]" style={{ color: "#66768A" }}>{l}</p>
                     </div>
                   );
                 })}
@@ -5775,7 +5796,7 @@ export function AdminPanel({ papel = "admin" }) {
                   ].map(([l, n]) => (
                     <div key={l} className="rounded-xl p-3 text-center" style={{ background: C.blueTint2 }}>
                       <p className="font-display font-extrabold text-lg" style={{ color: C.ink }}>{n}</p>
-                      <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{l}</p>
+                      <p className="font-body text-[11px]" style={{ color: "#66768A" }}>{l}</p>
                     </div>
                   ))}
                 </div>
@@ -5796,7 +5817,7 @@ export function AdminPanel({ papel = "admin" }) {
                   <div className="mt-2 flex items-center justify-between rounded-lg bg-white border px-3 py-2" style={{ borderColor: C.line }}>
                     <div>
                       <p className="font-body text-sm font-bold" style={{ color: C.ink }}>{usuarioExistenteSelecionado.nome}</p>
-                      <p className="font-body text-xs" style={{ color: "#5C7186" }}>{usuarioExistenteSelecionado.email || "sem e-mail"}</p>
+                      <p className="font-body text-xs" style={{ color: "#66768A" }}>{usuarioExistenteSelecionado.email || "sem e-mail"}</p>
                     </div>
                     <button type="button" onClick={limparUsuarioExistente} className="font-body text-xs font-bold" style={{ color: C.blue }}>
                       Trocar
@@ -5822,7 +5843,7 @@ export function AdminPanel({ papel = "admin" }) {
                             style={{ borderColor: C.line }}
                           >
                             <span className="font-body text-sm" style={{ color: C.ink }}>{u.nome}</span>
-                            <span className="font-body text-xs" style={{ color: "#5C7186" }}>
+                            <span className="font-body text-xs" style={{ color: "#66768A" }}>
                               {u.email} · {u.tipo}
                             </span>
                           </button>
@@ -6071,17 +6092,17 @@ export function AdminPanel({ papel = "admin" }) {
               <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Nome</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>E-mail</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Perfil</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>WhatsApp</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Instagram</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>CPF</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>CNPJ</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Cadastro</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Último acesso</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Status</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Ações</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Nome</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>E-mail</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Perfil</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>WhatsApp</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Instagram</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>CPF</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>CNPJ</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Cadastro</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Último acesso</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Status</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -6095,7 +6116,7 @@ export function AdminPanel({ papel = "admin" }) {
                       {editandoUsuarioAdmin === u.id ? (
                         <>
                           <td data-label="Nome" className="px-3 py-2"><input value={formUsuarioAdmin.nome} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, nome: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-28" style={{ borderColor: C.line }} /></td>
-                          <td data-label="E-mail" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.email || "—"}</td>
+                          <td data-label="E-mail" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{u.email || "—"}</td>
                           <td data-label="Perfil" className="px-3 py-2.5">
                             <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
                           </td>
@@ -6103,8 +6124,8 @@ export function AdminPanel({ papel = "admin" }) {
                           <td data-label="Instagram" className="px-3 py-2"><input value={formUsuarioAdmin.instagram} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, instagram: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
                           <td data-label="CPF" className="px-3 py-2"><input value={formUsuarioAdmin.cpf} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, cpf: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
                           <td data-label="CNPJ" className="px-3 py-2"><input value={formUsuarioAdmin.cnpj} onChange={(e) => setFormUsuarioAdmin((f) => ({ ...f, cnpj: e.target.value }))} className="font-body text-sm border rounded-lg px-2 py-1.5 outline-none w-24" style={{ borderColor: C.line }} /></td>
-                          <td data-label="Cadastro" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
-                          <td data-label="Último acesso" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{formatarUltimoAcesso(u.ultimo_acesso)}</td>
+                          <td data-label="Cadastro" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td data-label="Último acesso" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{formatarUltimoAcesso(u.ultimo_acesso)}</td>
                           <td data-label="Status" className="px-3 py-2.5">{u.bloqueado ? "Bloqueado" : "Ativo"}</td>
                           <td data-label="Ações" className="px-3 py-2.5">
                             <button onClick={() => salvarEdicaoUsuarioAdmin(u.id)} className="font-body text-xs font-bold" style={{ color: C.blue }}>Salvar</button>
@@ -6113,17 +6134,17 @@ export function AdminPanel({ papel = "admin" }) {
                       ) : (
                         <>
                           <td data-label="Nome" className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{u.nome || "—"}</td>
-                          <td data-label="E-mail" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.email || "—"}</td>
+                          <td data-label="E-mail" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{u.email || "—"}</td>
                           <td data-label="Perfil" className="px-3 py-2.5">
                             <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
                           </td>
-                          <td data-label="WhatsApp" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.telefone || "—"}</td>
-                          <td data-label="Instagram" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.instagram || "—"}</td>
-                          <td data-label="CPF" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.cpf || "—"}</td>
-                          <td data-label="CNPJ" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.cnpj || "—"}</td>
-                          <td data-label="Cadastro" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td data-label="WhatsApp" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{u.telefone || "—"}</td>
+                          <td data-label="Instagram" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{u.instagram || "—"}</td>
+                          <td data-label="CPF" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{u.cpf || "—"}</td>
+                          <td data-label="CNPJ" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{u.cnpj || "—"}</td>
+                          <td data-label="Cadastro" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
                           <td data-label="Último acesso" className="px-3 py-2.5">
-                            <span className="font-body text-xs flex items-center gap-1.5" style={{ color: estaOnline(u.ultimo_acesso) ? "#1E8E5A" : "#5C7186" }}>
+                            <span className="font-body text-xs flex items-center gap-1.5" style={{ color: estaOnline(u.ultimo_acesso) ? "#1E8E5A" : "#66768A" }}>
                               {estaOnline(u.ultimo_acesso) && (
                                 <span className="relative flex h-1.5 w-1.5 shrink-0">
                                   <span className="pulse-dot absolute inline-flex h-full w-full rounded-full" style={{ background: "#25A85B" }} />
@@ -6157,7 +6178,7 @@ export function AdminPanel({ papel = "admin" }) {
                 </tbody>
               </table>
               {todosUsuariosAdmin && usuariosPaginaAtualAdmin.length === 0 && (
-                <p className="font-body text-sm p-4" style={{ color: "#5C7186" }}>Nenhum usuário encontrado.</p>
+                <p className="font-body text-sm p-4" style={{ color: "#66768A" }}>Nenhum usuário encontrado.</p>
               )}
             </div>
 
@@ -6167,7 +6188,7 @@ export function AdminPanel({ papel = "admin" }) {
                   className="font-body text-xs font-bold px-3 py-2 rounded-lg border disabled:opacity-40" style={{ borderColor: C.line, color: "#425A70" }} aria-label="Página anterior">
                   <ChevronLeft size={13} />
                 </button>
-                <p className="font-body text-xs font-semibold" style={{ color: "#5C7186" }}>Página {paginaTodosUsuariosAdmin} de {totalPaginasUsuariosAdmin}</p>
+                <p className="font-body text-xs font-semibold" style={{ color: "#66768A" }}>Página {paginaTodosUsuariosAdmin} de {totalPaginasUsuariosAdmin}</p>
                 <button onClick={() => setPaginaTodosUsuariosAdmin((p) => Math.min(totalPaginasUsuariosAdmin, p + 1))} disabled={paginaTodosUsuariosAdmin === totalPaginasUsuariosAdmin}
                   className="font-body text-xs font-bold px-3 py-2 rounded-lg border disabled:opacity-40" style={{ borderColor: C.line, color: "#425A70" }} aria-label="Próxima página">
                   <ChevronRight size={13} />
@@ -6200,15 +6221,15 @@ export function AdminPanel({ papel = "admin" }) {
               </div>
               <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                 <p className="font-display font-extrabold text-2xl" style={{ color: C.ink }}>{relatorioAcessosAdmin.ativosHoje}</p>
-                <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>Ativos nas últimas 24h</p>
+                <p className="font-body text-xs mt-0.5" style={{ color: "#66768A" }}>Ativos nas últimas 24h</p>
               </div>
               <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                 <p className="font-display font-extrabold text-2xl" style={{ color: C.ink }}>{relatorioAcessosAdmin.ativosSemana}</p>
-                <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>Ativos nos últimos 7 dias</p>
+                <p className="font-body text-xs mt-0.5" style={{ color: "#66768A" }}>Ativos nos últimos 7 dias</p>
               </div>
               <div className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                 <p className="font-display font-extrabold text-2xl" style={{ color: C.ink }}>{relatorioAcessosAdmin.nuncaAcessou}</p>
-                <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>Nunca acessaram</p>
+                <p className="font-body text-xs mt-0.5" style={{ color: "#66768A" }}>Nunca acessaram</p>
               </div>
             </div>
 
@@ -6225,10 +6246,10 @@ export function AdminPanel({ papel = "admin" }) {
               <table className="w-full text-left border-collapse min-w-[640px]">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Nome</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Perfil</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Cadastro</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Último acesso</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Nome</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Perfil</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Cadastro</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Último acesso</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -6243,9 +6264,9 @@ export function AdminPanel({ papel = "admin" }) {
                       <td data-label="Perfil" className="px-3 py-2.5">
                         <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>{rotuloTipoUsuario(u.tipo)}</span>
                       </td>
-                      <td data-label="Cadastro" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                      <td data-label="Cadastro" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{u.criado_em ? new Date(u.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
                       <td data-label="Último acesso" className="px-3 py-2.5">
-                        <span className="font-body text-xs flex items-center gap-1.5" style={{ color: estaOnline(u.ultimo_acesso) ? "#1E8E5A" : "#5C7186" }}>
+                        <span className="font-body text-xs flex items-center gap-1.5" style={{ color: estaOnline(u.ultimo_acesso) ? "#1E8E5A" : "#66768A" }}>
                           {estaOnline(u.ultimo_acesso) && (
                             <span className="relative flex h-1.5 w-1.5 shrink-0">
                               <span className="pulse-dot absolute inline-flex h-full w-full rounded-full" style={{ background: "#25A85B" }} />
@@ -6260,7 +6281,7 @@ export function AdminPanel({ papel = "admin" }) {
                 </tbody>
               </table>
               {todosUsuariosAdmin && relatorioAcessosAdmin.lista.length === 0 && (
-                <p className="font-body text-sm p-4" style={{ color: "#5C7186" }}>Nenhum usuário encontrado.</p>
+                <p className="font-body text-sm p-4" style={{ color: "#66768A" }}>Nenhum usuário encontrado.</p>
               )}
             </div>
           </div>
@@ -6323,7 +6344,7 @@ export function AdminPanel({ papel = "admin" }) {
                     ) : (
                       <div className="flex-1 min-w-0">
                         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.nome}</p>
-                        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{c.ativa ? "Ativa" : "Desativada"} · ordem {c.ordem}</p>
+                        <p className="font-body text-xs" style={{ color: "#66768A" }}>{c.ativa ? "Ativa" : "Desativada"} · ordem {c.ordem}</p>
                       </div>
                     )}
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -6343,7 +6364,7 @@ export function AdminPanel({ papel = "admin" }) {
                 );
               })}
               {categoriasAdmin && categoriasAdmin.length === 0 && (
-                <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma categoria cadastrada ainda — as categorias de exemplo estão sendo usadas nos formulários por enquanto.</p>
+                <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhuma categoria cadastrada ainda — as categorias de exemplo estão sendo usadas nos formulários por enquanto.</p>
               )}
             </div>
           </div>
@@ -6476,7 +6497,7 @@ export function AdminPanel({ papel = "admin" }) {
                             </div>
                           ))}
                           {formEmpresa.fotos_urls.length < (formEmpresa.plano_premium ? LIMITE_FOTOS_PREMIUM : LIMITE_FOTOS_GRATUITO) && (
-                            <label className="w-14 h-14 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, color: "#5C7186" }}>
+                            <label className="w-14 h-14 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, color: "#66768A" }}>
                               {enviandoFotoGaleria ? "..." : <PlusCircle size={16} />}
                               <input type="file" accept="image/*" className="hidden" onChange={enviarFotoGaleriaEmpresa} />
                             </label>
@@ -6493,7 +6514,7 @@ export function AdminPanel({ papel = "admin" }) {
                         {p.nome}
                         {p.destaque && <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: C.amber, color: C.blueDeep }}>DESTAQUE</span>}
                       </p>
-                      <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.categoria} · status: {p.status}</p>
+                      <p className="font-body text-xs" style={{ color: "#66768A" }}>{p.categoria} · status: {p.status}</p>
                       {statusEmpresa[p.id] && statusEmpresa[p.id] !== "ok" && <p className="font-body text-[11px] mt-1" style={{ color: "#B4462F" }}>{statusEmpresa[p.id]}</p>}
                     </div>
                   )}
@@ -6517,8 +6538,8 @@ export function AdminPanel({ papel = "admin" }) {
                   )}
                 </div>
               ))}
-              {listaEmpresas.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma empresa cadastrada ainda.</p>}
-              {listaEmpresas.length > 0 && listaEmpresasFiltradaAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma empresa encontrada.</p>}
+              {listaEmpresas.length === 0 && <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhuma empresa cadastrada ainda.</p>}
+              {listaEmpresas.length > 0 && listaEmpresasFiltradaAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhuma empresa encontrada.</p>}
             </div>
             {listaEmpresasFiltradaAdmin.length > qtdEmpresasAdminVisiveis && (
               <button onClick={() => setQtdEmpresasAdminVisiveis((n) => n + 15)} className="font-body text-xs font-bold px-4 py-2.5 rounded-lg border mt-3" style={{ borderColor: C.line, color: "#425A70" }}>
@@ -6537,11 +6558,11 @@ export function AdminPanel({ papel = "admin" }) {
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Empresa</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>MEI</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Eventos</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Cursos</th>
-                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Feiras</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#66768A" }}>Empresa</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#66768A" }}>MEI</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#66768A" }}>Eventos</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#66768A" }}>Cursos</th>
+                    <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#66768A" }}>Feiras</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -6562,7 +6583,7 @@ export function AdminPanel({ papel = "admin" }) {
                   ))}
                 </tbody>
               </table>
-              {criteriosFiltrados.length === 0 && <p className="font-body text-sm mt-3" style={{ color: "#5C7186" }}>Nenhuma empresa encontrada.</p>}
+              {criteriosFiltrados.length === 0 && <p className="font-body text-sm mt-3" style={{ color: "#66768A" }}>Nenhuma empresa encontrada.</p>}
             </div>
             <p className="font-body text-[11px] mt-3" style={{ color: "#8896A6" }}>
               Eventos e cursos contam quem foi marcado como "Compareceu"/presença confirmada, cruzando pelo WhatsApp cadastrado na empresa. Feiras contam feirantes vinculados à empresa marcados como "Compareceu na feira".
@@ -6575,9 +6596,9 @@ export function AdminPanel({ papel = "admin" }) {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Nome</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>MEI</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#5C7186" }}>Compareceu na feira</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#66768A" }}>Nome</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#66768A" }}>MEI</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5 text-left" style={{ color: "#66768A" }}>Compareceu na feira</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -6643,8 +6664,8 @@ export function AdminPanel({ papel = "admin" }) {
                   ) : (
                     <div className="flex-1 min-w-0">
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
-                      <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.servico} · status: {p.status}</p>
-                      <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{p.whatsapp}{p.instagram ? ` · ${p.instagram}` : ""}{p.endereco ? ` · ${p.endereco}` : ""}</p>
+                      <p className="font-body text-xs" style={{ color: "#66768A" }}>{p.servico} · status: {p.status}</p>
+                      <p className="font-body text-[11px]" style={{ color: "#66768A" }}>{p.whatsapp}{p.instagram ? ` · ${p.instagram}` : ""}{p.endereco ? ` · ${p.endereco}` : ""}</p>
                       {statusPrestador[p.id] && <p className="font-body text-[11px] mt-1" style={{ color: "#B4462F" }}>{statusPrestador[p.id]}</p>}
                     </div>
                   )}
@@ -6668,7 +6689,7 @@ export function AdminPanel({ papel = "admin" }) {
                   )}
                 </div>
               ))}
-              {listaPrestadores.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum prestador cadastrado ainda.</p>}
+              {listaPrestadores.length === 0 && <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhum prestador cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -6710,7 +6731,7 @@ export function AdminPanel({ papel = "admin" }) {
                       <div className="flex-1 min-w-0">
                         <p className="font-display font-bold text-xs" style={{ color: C.ink }}>{s.data} às {s.hora}</p>
                         {s.status === "reservado" ? (
-                          <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>Reservado por {s.cliente_nome}{s.cliente_telefone ? ` · ${s.cliente_telefone}` : ""}</p>
+                          <p className="font-body text-[11px]" style={{ color: "#66768A" }}>Reservado por {s.cliente_nome}{s.cliente_telefone ? ` · ${s.cliente_telefone}` : ""}</p>
                         ) : (
                           <p className="font-body text-[11px]" style={{ color: "#1E8E5A" }}>Disponível</p>
                         )}
@@ -6723,7 +6744,7 @@ export function AdminPanel({ papel = "admin" }) {
                       <button onClick={() => apagarHorarioAgenda(s.id)} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                     </div>
                   ))}
-                  {(agendaAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum horário gerado ainda pra esse prestador.</p>}
+                  {(agendaAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum horário gerado ainda pra esse prestador.</p>}
                 </div>
               </>
             )}
@@ -6785,7 +6806,7 @@ export function AdminPanel({ papel = "admin" }) {
                                       </div>
                   </div>
                 )}
-                <p className="font-body text-[10px]" style={{ color: "#5C7186" }}>Se você anexar uma foto de verdade abaixo, ela tem prioridade sobre a foto gerada por IA.</p>
+                <p className="font-body text-[10px]" style={{ color: "#66768A" }}>Se você anexar uma foto de verdade abaixo, ela tem prioridade sobre a foto gerada por IA.</p>
               </div>
 
               <label className="font-body text-xs font-bold cursor-pointer sm:col-span-2 flex items-center gap-2" style={{ color: C.blue }}>
@@ -6810,14 +6831,14 @@ export function AdminPanel({ papel = "admin" }) {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
-                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>{p.empresas?.nome || "—"}</p>
+                    <p className="font-body text-xs" style={{ color: "#66768A" }}>{p.empresas?.nome || "—"}</p>
                   </div>
                   {p._denunciado ? (
                     <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: "#FBEAE5", color: "#B4462F" }}>Denunciado</span>
                   ) : p.ativo ? (
                     <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: "#E7F6EE", color: "#1E8E5A" }}>Publicado</span>
                   ) : (
-                    <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: C.blueTint, color: "#5C7186" }}>Inativo</span>
+                    <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: C.blueTint, color: "#66768A" }}>Inativo</span>
                   )}
                   <button onClick={() => alternarAtivoProduto(p.id, !p.ativo)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
                     {p.ativo ? "Despublicar" : "Publicar"}
@@ -6826,7 +6847,7 @@ export function AdminPanel({ papel = "admin" }) {
                   <button onClick={() => { if (confirmarExclusao()) { removerProduto(p.id); notificar("Produto removido."); } }} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Remover</button>
                 </div>
               ))}
-              {listaProdutosFiltradaAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>{listaProdutos.length === 0 ? "Nenhum produto publicado ainda." : "Nenhum produto encontrado."}</p>}
+              {listaProdutosFiltradaAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#66768A" }}>{listaProdutos.length === 0 ? "Nenhum produto publicado ainda." : "Nenhum produto encontrado."}</p>}
             </div>
             {listaProdutosFiltradaAdmin.length > qtdProdutosAdminVisiveis && (
               <button onClick={() => setQtdProdutosAdminVisiveis((n) => n + 15)} className="font-body text-xs font-bold px-4 py-2.5 rounded-lg border mt-3" style={{ borderColor: C.line, color: "#425A70" }}>
@@ -6875,11 +6896,11 @@ export function AdminPanel({ papel = "admin" }) {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome || p.produtos?.nome || "Promoção"}</p>
-                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>
+                    <p className="font-body text-xs" style={{ color: "#66768A" }}>
                       {p.produtos?.empresas?.nome || "—"} · -{p.desconto_percentual}% · até {p.valida_ate ? new Date(p.valida_ate + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
                     </p>
                   </div>
-                  <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: p.ativa ? "#E7F6EE" : C.blueTint, color: p.ativa ? "#1E8E5A" : "#5C7186" }}>
+                  <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: p.ativa ? "#E7F6EE" : C.blueTint, color: p.ativa ? "#1E8E5A" : "#66768A" }}>
                     {p.ativa ? "Ativa" : "Inativa"}
                   </span>
                   <button onClick={() => alternarAtivaPromocao(p.id, !p.ativa)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>
@@ -6901,7 +6922,7 @@ export function AdminPanel({ papel = "admin" }) {
                   )}
                 </div>
               ))}
-              {promocoesAdmin && promocoesAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma promoção cadastrada ainda.</p>}
+              {promocoesAdmin && promocoesAdmin.length === 0 && <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhuma promoção cadastrada ainda.</p>}
             </div>
           </div>
         )}
@@ -6956,12 +6977,12 @@ export function AdminPanel({ papel = "admin" }) {
                     {f.imagem_url && <img loading="lazy" decoding="async" src={f.imagem_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{f.titulo}</p>
-                      <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{f.data_inicio} · {f.local}</p>
+                      <p className="font-body text-[11px]" style={{ color: "#66768A" }}>{f.data_inicio} · {f.local}</p>
                     </div>
                     <button onClick={() => { if (confirmarExclusao()) { removerFeiraEspecial(f.id); notificar("Feira removida."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                   </div>
                 ))}
-                {listaFeirasEspeciais.length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma feira especial cadastrada.</p>}
+                {listaFeirasEspeciais.length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhuma feira especial cadastrada.</p>}
               </div>
             </div>
 
@@ -7042,24 +7063,24 @@ export function AdminPanel({ papel = "admin" }) {
                       ) : (
                         <div className="flex-1 min-w-0">
                           <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.nome}{f.categoria ? ` · ${f.categoria}` : ""}</p>
-                          <p className="font-body text-xs" style={{ color: "#5C7186" }}>{f.produto} · {f.whatsapp}{f.instagram ? ` · ${f.instagram}` : ""}{empresaVinculada ? ` · Empresa: ${empresaVinculada.nome}` : ""}</p>
-                          {f.descricao && <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{f.descricao}</p>}
+                          <p className="font-body text-xs" style={{ color: "#66768A" }}>{f.produto} · {f.whatsapp}{f.instagram ? ` · ${f.instagram}` : ""}{empresaVinculada ? ` · Empresa: ${empresaVinculada.nome}` : ""}</p>
+                          {f.descricao && <p className="font-body text-xs mt-0.5" style={{ color: "#66768A" }}>{f.descricao}</p>}
                         </div>
                       )}
                       <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
                         style={{
                           background: f.status === "aprovado" ? "#E7F6EE" : f.status === "recusado" ? "#FBEAE5" : C.blueTint,
-                          color: f.status === "aprovado" ? "#1E8E5A" : f.status === "recusado" ? "#B4462F" : "#5C7186",
+                          color: f.status === "aprovado" ? "#1E8E5A" : f.status === "recusado" ? "#B4462F" : "#66768A",
                         }}>
                         {f.status}
                       </span>
                       {editandoPerfil ? (
                         <>
                           <button onClick={() => { salvarLocalFeirante(f.id); setEditandoPerfilFeirante(null); }} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: C.blue }}>Salvar perfil</button>
-                          <button onClick={() => setEditandoPerfilFeirante(null)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#5C7186" }}>Cancelar</button>
+                          <button onClick={() => setEditandoPerfilFeirante(null)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#66768A" }}>Cancelar</button>
                         </>
                       ) : (
-                        <button onClick={() => setEditandoPerfilFeirante(f.id)} title="Editar perfil" style={{ color: "#5C7186" }}><Pencil size={15} /></button>
+                        <button onClick={() => setEditandoPerfilFeirante(f.id)} title="Editar perfil" style={{ color: "#66768A" }}><Pencil size={15} /></button>
                       )}
                       {f.status !== "aprovado" && (
                         <button onClick={() => mudarStatusFeirante(f.id, "aprovado")} className="font-body text-xs font-bold px-3 py-2 rounded-lg text-white" style={{ background: "#25A85B" }}>Aprovar</button>
@@ -7086,11 +7107,11 @@ export function AdminPanel({ papel = "admin" }) {
                       <button onClick={() => salvarLocalFeirante(f.id)} className="font-body text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.blueTint, color: C.blue }}>Salvar local</button>
                     </div>
                     <div className="flex items-center gap-4 flex-wrap pt-1">
-                      <label className="font-body text-xs font-semibold flex items-center gap-1.5 cursor-pointer" style={{ color: f.possui_mei ? "#1E8E5A" : "#5C7186" }}>
+                      <label className="font-body text-xs font-semibold flex items-center gap-1.5 cursor-pointer" style={{ color: f.possui_mei ? "#1E8E5A" : "#66768A" }}>
                         <input type="checkbox" checked={!!f.possui_mei} onChange={(e) => alternarMeiFeirante(f.id, e.target.checked)} />
                         Possui MEI
                       </label>
-                      <label className="font-body text-xs font-semibold flex items-center gap-1.5 cursor-pointer" style={{ color: f.compareceu ? "#1E8E5A" : "#5C7186" }}>
+                      <label className="font-body text-xs font-semibold flex items-center gap-1.5 cursor-pointer" style={{ color: f.compareceu ? "#1E8E5A" : "#66768A" }}>
                         <input type="checkbox" checked={!!f.compareceu} onChange={(e) => marcarCompareceuFeirante(f.id, e.target.checked)} />
                         Compareceu na feira
                       </label>
@@ -7120,7 +7141,7 @@ export function AdminPanel({ papel = "admin" }) {
                   </div>
                   );
                 })}
-                {(feirantes ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum cadastro de feirante ainda.</p>}
+                {(feirantes ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhum cadastro de feirante ainda.</p>}
               </div>
             </div>
           </div>
@@ -7189,7 +7210,7 @@ export function AdminPanel({ papel = "admin" }) {
                   style={{
                     borderColor: filtroTipoEventoAdmin === valor ? C.blue : C.line,
                     background: filtroTipoEventoAdmin === valor ? C.blueTint : "transparent",
-                    color: filtroTipoEventoAdmin === valor ? C.blue : "#5C7186",
+                    color: filtroTipoEventoAdmin === valor ? C.blue : "#66768A",
                   }}>
                   {label}
                 </button>
@@ -7198,7 +7219,7 @@ export function AdminPanel({ papel = "admin" }) {
 
             <div className="flex flex-col gap-2 max-w-2xl">
               {listaEventosFiltrada.length === 0 && (
-                <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum evento nessa categoria.</p>
+                <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhum evento nessa categoria.</p>
               )}
               {listaEventosFiltrada.map((ev) => (
                 <div key={ev.id} className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
@@ -7272,7 +7293,7 @@ export function AdminPanel({ papel = "admin" }) {
 
                     <div className="flex gap-2 sm:col-span-2">
                       <button onClick={() => salvarEdicaoEvento(ev.id)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-2" style={{ background: C.blue }}>Salvar</button>
-                      <button onClick={() => setEditandoEvento(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>Cancelar</button>
+                      <button onClick={() => setEditandoEvento(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#66768A" }}>Cancelar</button>
                     </div>
                   </div>
                 ) : (
@@ -7286,7 +7307,7 @@ export function AdminPanel({ papel = "admin" }) {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{ev.titulo}</p>
-                    <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>
+                    <p className="font-body text-[11px]" style={{ color: "#66768A" }}>
                       {ev.data_inicio}{ev.data_fim ? ` a ${ev.data_fim}` : ""}{ev.hora ? ` · ${ev.hora}` : ""}{ev.local ? ` · ${ev.local}` : ""} · {ev.tipo}
                     </p>
                   </div>
@@ -7303,7 +7324,7 @@ export function AdminPanel({ papel = "admin" }) {
                     <option value="adiado">Adiado</option>
                     <option value="cancelado">Cancelado</option>
                   </select>
-                  <button onClick={() => iniciarEdicaoEvento(ev)} title="Editar" style={{ color: "#5C7186" }}><Pencil size={15} /></button>
+                  <button onClick={() => iniciarEdicaoEvento(ev)} title="Editar" style={{ color: "#66768A" }}><Pencil size={15} /></button>
                   <button onClick={() => { if (confirmarExclusao()) { removerEvento(ev.id); notificar("Evento removido."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
                 )}
@@ -7336,7 +7357,7 @@ export function AdminPanel({ papel = "admin" }) {
                 )}
                 </div>
               ))}
-              {listaEventos.length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum evento cadastrado ainda.</p>}
+              {listaEventos.length === 0 && <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhum evento cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -7354,7 +7375,7 @@ export function AdminPanel({ papel = "admin" }) {
             {!eventoCredenciaisSelecionado ? (
               listaEventos.length === 0 ? (
                 <div className="rounded-2xl border p-5 max-w-lg" style={{ borderColor: C.line }}>
-                  <p className="font-body text-sm mb-3" style={{ color: "#5C7186" }}>
+                  <p className="font-body text-sm mb-3" style={{ color: "#66768A" }}>
                     Ainda não há nenhum evento cadastrado. Para cadastrar credenciais (crachás com QR Code), primeiro crie um evento no Calendário.
                   </p>
                   <button onClick={() => setTab("calendario")} className="font-body text-xs font-bold text-white rounded-lg px-4 py-2.5 flex items-center gap-1.5 w-fit" style={{ background: C.blue }}>
@@ -7362,7 +7383,7 @@ export function AdminPanel({ papel = "admin" }) {
                   </button>
                 </div>
               ) : (
-                <p className="font-body text-sm" style={{ color: "#5C7186" }}>Escolha um evento acima pra ver e cadastrar as credenciais dele.</p>
+                <p className="font-body text-sm" style={{ color: "#66768A" }}>Escolha um evento acima pra ver e cadastrar as credenciais dele.</p>
               )
             ) : (
               <>
@@ -7381,7 +7402,7 @@ export function AdminPanel({ papel = "admin" }) {
                           <Icon size={14} />
                         </span>
                         <p className="font-display font-extrabold text-lg mt-2" style={{ color: C.ink }}>{n}</p>
-                        <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{l}</p>
+                        <p className="font-body text-[11px]" style={{ color: "#66768A" }}>{l}</p>
                       </div>
                     );
                   })}
@@ -7418,13 +7439,13 @@ export function AdminPanel({ papel = "admin" }) {
                   <table className="w-full text-left border-collapse min-w-[640px]">
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Foto</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Nome</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Telefone</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Tipo</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Status</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Check-in</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#5C7186" }}>Ações</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Foto</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Nome</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Telefone</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Tipo</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Status</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Check-in</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2.5" style={{ color: "#66768A" }}>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -7461,8 +7482,8 @@ export function AdminPanel({ papel = "admin" }) {
                           ) : (
                             <>
                               <td data-label="Nome" className="font-body text-sm font-semibold px-3 py-2.5" style={{ color: C.ink }}>{c.nome}</td>
-                              <td data-label="Telefone" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{c.telefone || "—"}</td>
-                              <td data-label="Tipo" className="font-body text-xs px-3 py-2.5" style={{ color: "#5C7186" }}>{c.tipo}</td>
+                              <td data-label="Telefone" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{c.telefone || "—"}</td>
+                              <td data-label="Tipo" className="font-body text-xs px-3 py-2.5" style={{ color: "#66768A" }}>{c.tipo}</td>
                             </>
                           )}
                           <td data-label="Status" className="px-3 py-2.5">
@@ -7497,7 +7518,7 @@ export function AdminPanel({ papel = "admin" }) {
                     </tbody>
                   </table>
                   {credenciaisAdmin && credenciaisFiltradasAdmin.length === 0 && (
-                    <p className="font-body text-sm p-4" style={{ color: "#5C7186" }}>Nenhuma credencial encontrada.</p>
+                    <p className="font-body text-sm p-4" style={{ color: "#66768A" }}>Nenhuma credencial encontrada.</p>
                   )}
                 </div>
               </>
@@ -7514,7 +7535,7 @@ export function AdminPanel({ papel = "admin" }) {
                     <img loading="lazy" decoding="async"
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(String(credencialDigitalAberta.codigo))}`}
                       alt="QR Code" className="w-44 h-44" />
-                    <p className="font-body text-xs text-center" style={{ color: "#5C7186" }}>
+                    <p className="font-body text-xs text-center" style={{ color: "#66768A" }}>
                       Link pra enviar por WhatsApp:<br />
                       <span className="font-semibold break-all" style={{ color: C.blue }}>{`${window.location.origin}/#/credencial-${credencialDigitalAberta.codigo}`}</span>
                     </p>
@@ -7578,7 +7599,7 @@ export function AdminPanel({ papel = "admin" }) {
             <div className="mb-4 rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 max-w-3xl" style={{ borderColor: C.line, background: C.blueTint2 }}>
               <div>
                 <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Módulo Sala do Empreendedor</p>
-                <p className="font-body text-xs" style={{ color: "#5C7186" }}>Agenda, pedidos do site, ficha de atendimento e relatório automático — com links separados.</p>
+                <p className="font-body text-xs" style={{ color: "#66768A" }}>Agenda, pedidos do site, ficha de atendimento e relatório automático — com links separados.</p>
               </div>
               <div className="flex flex-wrap gap-2 shrink-0">
                 <a href="#/sala" className="font-body text-xs font-bold px-3 py-2 rounded-lg border bg-white" style={{ borderColor: C.line, color: "#425A70" }}>Página pública</a>
@@ -7610,7 +7631,7 @@ export function AdminPanel({ papel = "admin" }) {
             </div>
 
             {!totaisSalaGrid ? (
-              <p className="font-body text-sm" style={{ color: "#5C7186" }}>Carregando...</p>
+              <p className="font-body text-sm" style={{ color: "#66768A" }}>Carregando...</p>
             ) : (
               <>
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
@@ -7763,12 +7784,12 @@ export function AdminPanel({ papel = "admin" }) {
                           <td className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{r.categoria}</td>
                           <td className="px-2 py-2 text-center">
                             <p className="font-body text-xs font-bold" style={{ color: C.ink }}>{r.qtdTotal}</p>
-                            <p className="font-body text-[10px]" style={{ color: "#5C7186" }}>R$ {r.valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                            <p className="font-body text-[10px]" style={{ color: "#66768A" }}>R$ {r.valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
                           </td>
                           {Object.keys(ROTULO_STATUS_FOMENTO).map((chave) => (
                             <td key={chave} className="px-2 py-2 text-center">
                               <p className="font-body text-xs" style={{ color: C.ink }}>{r.porStatus[chave].qtd}</p>
-                              <p className="font-body text-[10px]" style={{ color: "#5C7186" }}>
+                              <p className="font-body text-[10px]" style={{ color: "#66768A" }}>
                                 {r.porStatus[chave].valor > 0 ? `R$ ${r.porStatus[chave].valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
                               </p>
                             </td>
@@ -7819,7 +7840,7 @@ export function AdminPanel({ papel = "admin" }) {
                           {Object.entries(ROTULO_STATUS_FOMENTO).map(([chave, rotulo]) => <option key={chave} value={chave}>{rotulo}</option>)}
                         </select>
                       </div>
-                      <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
+                      <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>
                         {l.nome ? `${l.whatsapp || "—"} · ` : l.categoria ? `${l.categoria} · ` : ""}
                         {l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}
                       </p>
@@ -7863,7 +7884,7 @@ export function AdminPanel({ papel = "admin" }) {
                     </div>
                   );
                 })}
-                {(fomentoLeadsAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum pedido cadastrado ainda.</p>}
+                {(fomentoLeadsAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum pedido cadastrado ainda.</p>}
               </div>
             </div>
           </div>
@@ -7897,7 +7918,7 @@ export function AdminPanel({ papel = "admin" }) {
                       {l.ativo ? "Aberto" : "Encerrado"}
                     </span>
                   </div>
-                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
+                  <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>
                     {l.orgao}{l.data_limite ? ` · prazo ${l.data_limite.split("-").reverse().join("/")}` : ""}{l.valor_estimado ? ` · R$ ${Number(l.valor_estimado).toFixed(2).replace(".", ",")}` : ""}
                   </p>
                   <div className="flex gap-2 mt-2">
@@ -7936,7 +7957,7 @@ export function AdminPanel({ papel = "admin" }) {
                   )}
                 </div>
               ))}
-              {(licitacoesAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum edital cadastrado ainda.</p>}
+              {(licitacoesAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum edital cadastrado ainda.</p>}
             </div>
 
             {licitacaoLeadsAdmin && licitacaoLeadsAdmin.length > 0 && (
@@ -7946,17 +7967,17 @@ export function AdminPanel({ papel = "admin" }) {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${C.line}`, background: C.blueTint2 }}>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Nome</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>WhatsApp</th>
-                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#5C7186" }}>Data</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#66768A" }}>Nome</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#66768A" }}>WhatsApp</th>
+                        <th className="font-body text-[10px] font-bold uppercase tracking-wide px-3 py-2" style={{ color: "#66768A" }}>Data</th>
                       </tr>
                     </thead>
                     <tbody>
                       {licitacaoLeadsAdmin.map((l) => (
                         <tr key={l.id} style={{ borderBottom: `1px solid ${C.line}` }}>
                           <td data-label="Nome" className="font-body text-xs px-3 py-2" style={{ color: C.ink }}>{l.nome}</td>
-                          <td data-label="WhatsApp" className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.whatsapp}</td>
-                          <td data-label="Data" className="font-body text-xs px-3 py-2" style={{ color: "#5C7186" }}>{l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
+                          <td data-label="WhatsApp" className="font-body text-xs px-3 py-2" style={{ color: "#66768A" }}>{l.whatsapp}</td>
+                          <td data-label="Data" className="font-body text-xs px-3 py-2" style={{ color: "#66768A" }}>{l.criado_em ? new Date(l.criado_em).toLocaleDateString("pt-BR") : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -8041,7 +8062,7 @@ export function AdminPanel({ papel = "admin" }) {
                       </label>
                       <div className="flex gap-2 mt-1">
                         <button onClick={() => salvarEdicaoPontoTuristico(p.id)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-2" style={{ background: C.blue }}>Salvar</button>
-                        <button onClick={() => setEditandoPontoTuristico(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>Cancelar</button>
+                        <button onClick={() => setEditandoPontoTuristico(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#66768A" }}>Cancelar</button>
                       </div>
                     </div>
                   ) : (
@@ -8053,9 +8074,9 @@ export function AdminPanel({ papel = "admin" }) {
                           {p.nome}
                           {p.destaque && <Star size={12} fill={C.amber} color={C.amber} />}
                         </p>
-                        <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{p.categoria}{p.endereco ? ` · ${p.endereco}` : ""}</p>
+                        <p className="font-body text-xs truncate" style={{ color: "#66768A" }}>{p.categoria}{p.endereco ? ` · ${p.endereco}` : ""}</p>
                       </div>
-                      <button onClick={() => iniciarEdicaoPontoTuristico(p)} title="Editar" style={{ color: "#5C7186" }}>
+                      <button onClick={() => iniciarEdicaoPontoTuristico(p)} title="Editar" style={{ color: "#66768A" }}>
                         <Pencil size={15} />
                       </button>
                       <button onClick={() => alternarDestaquePontoTuristico(p)} title={p.destaque ? "Remover destaque" : "Marcar como destaque"} style={{ color: p.destaque ? C.amber : "#B8C2CC" }}>
@@ -8066,7 +8087,7 @@ export function AdminPanel({ papel = "admin" }) {
                   )}
                 </div>
               ))}
-              {(pontosTuristicosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum ponto turístico cadastrado ainda.</p>}
+              {(pontosTuristicosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum ponto turístico cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -8115,7 +8136,7 @@ export function AdminPanel({ papel = "admin" }) {
                 <div key={u.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ borderColor: C.line }}>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{u.titulo}</p>
-                    <p className="font-body text-[11px] truncate" style={{ color: "#5C7186" }}>
+                    <p className="font-body text-[11px] truncate" style={{ color: "#66768A" }}>
                       {u.categoria === "telefone" ? "Telefone útil" : u.categoria === "onibus" ? "Ônibus" : "Órgão público"}
                       {u.telefone ? ` · ${u.telefone}` : ""}{u.horario ? ` · ${u.horario}` : ""}
                     </p>
@@ -8127,7 +8148,7 @@ export function AdminPanel({ papel = "admin" }) {
                   <button onClick={() => { if (confirmarExclusao("Excluir esse item?")) apagarUtilidade(u.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
-              {(utilidadeAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum item cadastrado ainda.</p>}
+              {(utilidadeAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum item cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -8183,7 +8204,7 @@ export function AdminPanel({ papel = "admin" }) {
                 <div key={d.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>
-                      {d.categoria} <span className="font-body text-[10px] font-normal" style={{ color: "#5C7186" }}>· protocolo {d.protocolo}</span>
+                      {d.categoria} <span className="font-body text-[10px] font-normal" style={{ color: "#66768A" }}>· protocolo {d.protocolo}</span>
                     </p>
                     <div className="flex items-center gap-2">
                       <select value={d.status} onChange={(e) => mudarStatusDenuncia(d.id, e.target.value)}
@@ -8204,7 +8225,7 @@ export function AdminPanel({ papel = "admin" }) {
                   </div>
                 </div>
               ))}
-              {(ouvidoriaAdmin ?? []).filter((d) => d.status !== "recebido").length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma por aqui ainda.</p>}
+              {(ouvidoriaAdmin ?? []).filter((d) => d.status !== "recebido").length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhuma por aqui ainda.</p>}
             </div>
           </div>
         )}
@@ -8255,7 +8276,7 @@ export function AdminPanel({ papel = "admin" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>
-                        {c.titulo} <span className="font-body text-[10px] font-normal uppercase" style={{ color: "#5C7186" }}>· {c.tipo === "venda" ? "venda" : c.tipo === "doacao" ? "doação" : "procura"}</span>
+                        {c.titulo} <span className="font-body text-[10px] font-normal uppercase" style={{ color: "#66768A" }}>· {c.tipo === "venda" ? "venda" : c.tipo === "doacao" ? "doação" : "procura"}</span>
                       </p>
                       <div className="flex items-center gap-2">
                         <button onClick={() => moderarClassificado(c.id, c.status === "concluido" ? "aprovado" : "concluido")}
@@ -8266,11 +8287,11 @@ export function AdminPanel({ papel = "admin" }) {
                       </div>
                     </div>
                     {c.preco != null && <p className="font-body text-xs font-bold" style={{ color: C.blue }}>R$ {Number(c.preco).toFixed(2).replace(".", ",")}</p>}
-                    <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{c.descricao}</p>
+                    <p className="font-body text-xs mt-0.5" style={{ color: "#66768A" }}>{c.descricao}</p>
                   </div>
                 </div>
               ))}
-              {(classificadosAdmin ?? []).filter((c) => c.status === "aprovado" || c.status === "concluido").length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum anúncio publicado ainda.</p>}
+              {(classificadosAdmin ?? []).filter((c) => c.status === "aprovado" || c.status === "concluido").length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum anúncio publicado ainda.</p>}
             </div>
           </div>
         )}
@@ -8311,7 +8332,7 @@ export function AdminPanel({ papel = "admin" }) {
               {(muralAdmin ?? []).filter((m) => m.status === "aprovado").map((m) => (
                 <div key={m.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{m.nome} <span className="font-body text-[10px] font-normal uppercase" style={{ color: "#5C7186" }}>· {m.categoria}</span></p>
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{m.nome} <span className="font-body text-[10px] font-normal uppercase" style={{ color: "#66768A" }}>· {m.categoria}</span></p>
                     <button onClick={() => { if (confirmarExclusao("Excluir essa publicação?")) apagarMural(m.id); }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                   </div>
                   <p className="font-body text-sm mt-1" style={{ color: "#425A70" }}>{m.mensagem}</p>
@@ -8329,7 +8350,7 @@ export function AdminPanel({ papel = "admin" }) {
                   )}
                 </div>
               ))}
-              {(muralAdmin ?? []).filter((m) => m.status === "aprovado").length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma publicação aprovada ainda.</p>}
+              {(muralAdmin ?? []).filter((m) => m.status === "aprovado").length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhuma publicação aprovada ainda.</p>}
             </div>
           </div>
         )}
@@ -8371,7 +8392,7 @@ export function AdminPanel({ papel = "admin" }) {
                 <div key={i} className="rounded-xl border p-3 flex flex-col gap-2" style={{ borderColor: C.line, background: "#fff" }}>
                   <div className="flex items-center gap-2">
                     <div className="w-14 h-14 rounded-lg border shrink-0 overflow-hidden flex items-center justify-center" style={{ borderColor: C.line, background: C.blueTint2 }}>
-                      {o.video_url ? <video src={o.video_url} muted playsInline className="w-full h-full object-cover" /> : o.foto_url ? <img src={o.foto_url} alt="" className="w-full h-full object-cover" /> : <span className="font-body text-[9px] text-center" style={{ color: "#5C7186" }}>sem mídia</span>}
+                      {o.video_url ? <video src={o.video_url} muted playsInline className="w-full h-full object-cover" /> : o.foto_url ? <img src={o.foto_url} alt="" className="w-full h-full object-cover" /> : <span className="font-body text-[9px] text-center" style={{ color: "#66768A" }}>sem mídia</span>}
                     </div>
                     <input value={o.texto} onChange={(e) => mudarOpcao(i, "texto", e.target.value)} placeholder={`Comércio ${i + 1} (nome)`} className="flex-1 min-w-0 font-body text-sm font-semibold border rounded-lg px-3 py-2.5 outline-none" style={{ borderColor: C.line }} />
                     {novaEnquete.opcoes.length > 2 && !o.existente && (
@@ -8402,7 +8423,7 @@ export function AdminPanel({ papel = "admin" }) {
               <div className="rounded-xl border p-3 flex flex-col gap-2 mt-1" style={{ borderColor: C.line }}>
                 <label className="flex items-start gap-2 font-body text-sm" style={{ color: C.ink }}>
                   <input type="checkbox" className="mt-1" checked={!!novaEnquete.exigir_localizacao} onChange={(e) => setNovaEnquete((v) => ({ ...v, exigir_localizacao: e.target.checked }))} />
-                  <span><strong>Só quem está na cidade pode votar</strong><br /><span className="text-xs" style={{ color: "#5C7186" }}>Pede a localização do celular na hora do voto</span></span>
+                  <span><strong>Só quem está na cidade pode votar</strong><br /><span className="text-xs" style={{ color: "#66768A" }}>Pede a localização do celular na hora do voto</span></span>
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {novaEnquete.exigir_localizacao && (
@@ -8416,7 +8437,7 @@ export function AdminPanel({ papel = "admin" }) {
                 </div>
                 <label className="flex items-start gap-2 font-body text-sm" style={{ color: C.ink }}>
                   <input type="checkbox" className="mt-1" checked={!!novaEnquete.mostrar_resultado} onChange={(e) => setNovaEnquete((v) => ({ ...v, mostrar_resultado: e.target.checked }))} />
-                  <span><strong>Mostrar resultado ao público</strong><br /><span className="text-xs" style={{ color: "#5C7186" }}>Desmarcado: só o admin vê os votos (dá pra liberar depois, na lista abaixo)</span></span>
+                  <span><strong>Mostrar resultado ao público</strong><br /><span className="text-xs" style={{ color: "#66768A" }}>Desmarcado: só o admin vê os votos (dá pra liberar depois, na lista abaixo)</span></span>
                 </label>
                 <p className="font-body text-[11px]" style={{ color: "#8896A6" }}>Sempre: sem cadastro e 1 voto por aparelho.</p>
               </div>
@@ -8436,14 +8457,14 @@ export function AdminPanel({ papel = "admin" }) {
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 mb-3">
                       <div>
                         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{eq.pergunta}</p>
-                        <p className="font-body text-[11px] mt-0.5" style={{ color: "#5C7186" }}>
+                        <p className="font-body text-[11px] mt-0.5" style={{ color: "#66768A" }}>
                           {total} {total === 1 ? "voto" : "votos"}{eq.exigir_localizacao ? " · só na cidade" : ""}{eq.encerra_em ? ` · até ${new Date(eq.encerra_em).toLocaleDateString("pt-BR")}` : ""}
                           {" · "}<button type="button" onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/#/votacao-${eq.id}`); notificar("Link da votação copiado."); }} className="font-bold" style={{ color: C.blue }}>copiar link</button>
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full"
-                          style={{ background: eq.ativa ? "#E7F6EE" : C.blueTint, color: eq.ativa ? "#1E8E5A" : "#5C7186" }}>
+                          style={{ background: eq.ativa ? "#E7F6EE" : C.blueTint, color: eq.ativa ? "#1E8E5A" : "#66768A" }}>
                           {eq.ativa ? "Ativa" : "Encerrada"}
                         </span>
                         <button onClick={() => alternarResultadoPublico(eq)} title="Quem pode ver o resultado" className="font-body text-[11px] font-bold px-2 py-1 rounded-lg border" style={{ borderColor: eq.mostrar_resultado ? "#1E8E5A" : C.line, color: eq.mostrar_resultado ? "#1E8E5A" : "#425A70" }}>
@@ -8481,7 +8502,7 @@ export function AdminPanel({ papel = "admin" }) {
                         );
                       })}
                     </div>
-                    <p className="font-body text-[11px] mt-2" style={{ color: "#5C7186" }}>{total} votos no total</p>
+                    <p className="font-body text-[11px] mt-2" style={{ color: "#66768A" }}>{total} votos no total</p>
                   </div>
                 );
               })}
@@ -8511,12 +8532,12 @@ export function AdminPanel({ papel = "admin" }) {
               {(cuponsAdmin ?? []).map((c) => (
                 <div key={c.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                   <div className="flex items-center justify-between">
-                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.titulo} <span className="font-body text-xs font-normal" style={{ color: "#5C7186" }}>· {c.empresas?.nome}</span></p>
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.titulo} <span className="font-body text-xs font-normal" style={{ color: "#66768A" }}>· {c.empresas?.nome}</span></p>
                     <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: c.ativo ? "#E7F6EE" : "#FBEAE5", color: c.ativo ? "#1E8E5A" : "#B4462F" }}>
                       {c.ativo ? "Ativo" : "Inativo"}
                     </span>
                   </div>
-                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
+                  <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>
                     Código: <span className="font-bold" style={{ color: C.blue }}>{c.codigo}</span> · Resgatado {c.usos_atuais}x
                     {c.validade && ` · válido até ${c.validade.split("-").reverse().join("/")}`}
                   </p>
@@ -8539,7 +8560,7 @@ export function AdminPanel({ papel = "admin" }) {
                   </div>
                 </div>
               ))}
-              {(cuponsAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum cupom cadastrado ainda.</p>}
+              {(cuponsAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum cupom cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -8565,12 +8586,12 @@ export function AdminPanel({ papel = "admin" }) {
               {(combosAdmin ?? []).map((c) => (
                 <div key={c.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                   <div className="flex items-center justify-between">
-                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.titulo} <span className="font-body text-xs font-normal" style={{ color: "#5C7186" }}>· {c.empresas?.nome}</span></p>
+                    <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{c.titulo} <span className="font-body text-xs font-normal" style={{ color: "#66768A" }}>· {c.empresas?.nome}</span></p>
                     <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: c.ativo ? "#E7F6EE" : "#FBEAE5", color: c.ativo ? "#1E8E5A" : "#B4462F" }}>
                       {c.ativo ? "Ativo" : "Inativo"}
                     </span>
                   </div>
-                  {c.descricao && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{c.descricao}</p>}
+                  {c.descricao && <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>{c.descricao}</p>}
                   {c.preco && <p className="font-body text-xs mt-1 font-bold" style={{ color: C.blue }}>R$ {Number(c.preco).toFixed(2).replace(".", ",")}</p>}
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => alternarAtivoComboAdmin(c.id, !c.ativo)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>{c.ativo ? "Desativar" : "Ativar"}</button>
@@ -8590,7 +8611,7 @@ export function AdminPanel({ papel = "admin" }) {
                   </div>
                 </div>
               ))}
-              {(combosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum combo cadastrado ainda.</p>}
+              {(combosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum combo cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -8603,7 +8624,7 @@ export function AdminPanel({ papel = "admin" }) {
                 <div key={a.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{a.nome} <span className="font-body text-xs font-normal" style={{ color: "#5C7186" }}>· {a.ponto_turistico_id ? `Turismo: ${a.pontos_turisticos?.nome || "ponto removido"}` : (a.empresas?.nome || "empresa removida")}</span></p>
+                      <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{a.nome} <span className="font-body text-xs font-normal" style={{ color: "#66768A" }}>· {a.ponto_turistico_id ? `Turismo: ${a.pontos_turisticos?.nome || "ponto removido"}` : (a.empresas?.nome || "empresa removida")}</span></p>
                       <div className="flex gap-0.5 mt-1">
                         {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={12} fill={n <= a.nota ? "#E8A23D" : "none"} color="#E8A23D" />)}
                       </div>
@@ -8619,7 +8640,7 @@ export function AdminPanel({ papel = "admin" }) {
                   )}
                 </div>
               ))}
-              {(avaliacoesAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma avaliação ainda.</p>}
+              {(avaliacoesAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhuma avaliação ainda.</p>}
             </div>
           </div>
         )}
@@ -8662,18 +8683,18 @@ export function AdminPanel({ papel = "admin" }) {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{d.nome}</p>
-                    <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{d.papel || d.cargo}{d.empresa ? ` · ${d.empresa}` : ""} · {"★".repeat(d.avaliacao || 0)}</p>
+                    <p className="font-body text-xs truncate" style={{ color: "#66768A" }}>{d.papel || d.cargo}{d.empresa ? ` · ${d.empresa}` : ""} · {"★".repeat(d.avaliacao || 0)}</p>
                   </div>
                   <select value={d.status} onChange={(e) => mudarStatusDepoimento(d.id, e.target.value)}
                     className="font-body text-[11px] font-bold border rounded-lg px-2 py-1.5 outline-none shrink-0"
-                    style={{ borderColor: C.line, color: d.status === "aprovado" ? "#1E8E5A" : "#5C7186" }}>
+                    style={{ borderColor: C.line, color: d.status === "aprovado" ? "#1E8E5A" : "#66768A" }}>
                     <option value="aprovado">Aprovado</option>
                     <option value="pendente">Pendente</option>
                   </select>
                   <button onClick={() => { if (confirmarExclusao()) { removerDepoimento(d.id); notificar("Depoimento excluído."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
-              {(depoimentosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum depoimento cadastrado ainda.</p>}
+              {(depoimentosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum depoimento cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -8708,13 +8729,13 @@ export function AdminPanel({ papel = "admin" }) {
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.pergunta}</p>
-                        <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{f.resposta}</p>
+                        <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>{f.resposta}</p>
                         <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 inline-block" style={{ background: C.blueTint, color: C.blue }}>{f.categoria || "Geral"}</span>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button onClick={() => moverFaq(i, -1)} disabled={i === 0} className="w-8 h-8 rounded-lg border flex items-center justify-center disabled:opacity-30" style={{ borderColor: C.line, color: "#425A70" }}><ArrowUp size={14} /></button>
                         <button onClick={() => moverFaq(i, 1)} disabled={i === (faqAdmin ?? []).length - 1} className="w-8 h-8 rounded-lg border flex items-center justify-center disabled:opacity-30" style={{ borderColor: C.line, color: "#425A70" }}><ArrowDown size={14} /></button>
-                        <button onClick={() => alternarAtivaFaq(f.id, !f.ativa)} className="font-body text-[10px] font-bold px-2 py-2 rounded-lg border" style={{ borderColor: C.line, color: f.ativa ? "#1E8E5A" : "#5C7186" }}>{f.ativa ? "Ativa" : "Oculta"}</button>
+                        <button onClick={() => alternarAtivaFaq(f.id, !f.ativa)} className="font-body text-[10px] font-bold px-2 py-2 rounded-lg border" style={{ borderColor: C.line, color: f.ativa ? "#1E8E5A" : "#66768A" }}>{f.ativa ? "Ativa" : "Oculta"}</button>
                         <button onClick={() => iniciarEdicaoFaq(f)} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#425A70" }}><Pencil size={14} /></button>
                         <button onClick={() => { if (confirmarExclusao()) { removerFaq(f.id); notificar("Pergunta excluída."); } }} className="w-8 h-8 rounded-lg border flex items-center justify-center" style={{ borderColor: C.line, color: "#B4462F" }}><Trash2 size={14} /></button>
                       </div>
@@ -8722,7 +8743,7 @@ export function AdminPanel({ papel = "admin" }) {
                   )}
                 </div>
               ))}
-              {(faqAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma pergunta cadastrada ainda.</p>}
+              {(faqAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhuma pergunta cadastrada ainda.</p>}
             </div>
           </div>
         )}
@@ -8792,12 +8813,12 @@ export function AdminPanel({ papel = "admin" }) {
                   {n.imagem_url && <img loading="lazy" decoding="async" src={n.imagem_url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{n.titulo}{n.destaque ? " ⭐" : ""}</p>
-                    <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{n.resumo || n.conteudo}{n.categoria ? ` · ${n.categoria}` : ""}</p>
+                    <p className="font-body text-xs truncate" style={{ color: "#66768A" }}>{n.resumo || n.conteudo}{n.categoria ? ` · ${n.categoria}` : ""}</p>
                   </div>
                   <button onClick={() => { if (confirmarExclusao()) { removerNoticia(n.id); notificar("Notícia excluída."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                 </div>
               ))}
-              {(noticiasAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma notícia publicada ainda.</p>}
+              {(noticiasAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhuma notícia publicada ainda.</p>}
             </div>
           </div>
         )}
@@ -8883,7 +8904,7 @@ export function AdminPanel({ papel = "admin" }) {
 
                       <div className="flex gap-2 mt-1">
                         <button onClick={() => salvarEdicaoCurso(c.id)} className="font-body text-xs font-bold text-white rounded-lg px-3 py-2" style={{ background: C.blue }}>Salvar</button>
-                        <button onClick={() => setEditandoCurso(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>Cancelar</button>
+                        <button onClick={() => setEditandoCurso(null)} className="font-body text-xs font-bold rounded-lg px-3 py-2 border" style={{ borderColor: C.line, color: "#66768A" }}>Cancelar</button>
                       </div>
                     </div>
                   ) : (
@@ -8891,12 +8912,12 @@ export function AdminPanel({ papel = "admin" }) {
                     {c.banner_url && <img loading="lazy" decoding="async" src={c.banner_url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <p className="font-display font-bold text-sm truncate" style={{ color: C.ink }}>{c.titulo}</p>
-                      <p className="font-body text-xs truncate" style={{ color: "#5C7186" }}>{c.instituicao}{c.data_inicio ? ` · ${c.data_inicio}` : ""}{c.certificado ? " · Com certificado" : ""}</p>
+                      <p className="font-body text-xs truncate" style={{ color: "#66768A" }}>{c.instituicao}{c.data_inicio ? ` · ${c.data_inicio}` : ""}{c.certificado ? " · Com certificado" : ""}</p>
                     </div>
                     <button onClick={() => verInscritos(c.id)} className="font-body text-[11px] font-bold flex items-center gap-1 shrink-0" style={{ color: C.blue }}>
                       <Users size={12} /> Inscritos{inscritosPorCurso[c.id] ? ` (${inscritosPorCurso[c.id].length})` : ""}
                     </button>
-                    <button onClick={() => iniciarEdicaoCurso(c)} title="Editar" style={{ color: "#5C7186" }}><Pencil size={15} /></button>
+                    <button onClick={() => iniciarEdicaoCurso(c)} title="Editar" style={{ color: "#66768A" }}><Pencil size={15} /></button>
                     <button onClick={() => { if (confirmarExclusao()) { removerCurso(c.id); notificar("Curso excluído."); } }} style={{ color: "#B4462F" }}><Trash2 size={15} /></button>
                   </div>
                   )}
@@ -8907,7 +8928,7 @@ export function AdminPanel({ papel = "admin" }) {
                           <span className="truncate">{i.nome} <span style={{ color: "#8896A6" }}>· {i.telefone}</span></span>
                           <button onClick={() => confirmarPresencaCurso(i.id, c.id, !i.presenca_confirmada)}
                             className="font-body text-[10px] font-bold px-2 py-1 rounded-full shrink-0"
-                            style={{ background: i.presenca_confirmada ? "#E7F6EE" : "#F1F4F8", color: i.presenca_confirmada ? "#1E8E5A" : "#5C7186" }}>
+                            style={{ background: i.presenca_confirmada ? "#E7F6EE" : "#F1F4F8", color: i.presenca_confirmada ? "#1E8E5A" : "#66768A" }}>
                             {i.presenca_confirmada ? "Presença confirmada" : "Confirmar presença"}
                           </button>
                         </div>
@@ -8930,7 +8951,7 @@ export function AdminPanel({ papel = "admin" }) {
                   )}
                 </div>
               ))}
-              {(cursosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum curso cadastrado ainda.</p>}
+              {(cursosAdmin ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum curso cadastrado ainda.</p>}
             </div>
           </div>
         )}
@@ -8962,9 +8983,9 @@ export function AdminPanel({ papel = "admin" }) {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.empresas?.nome || "—"}</p>
-                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>{f.meta_carimbos} carimbos · {f.recompensa || "sem recompensa definida"}</p>
+                    <p className="font-body text-xs" style={{ color: "#66768A" }}>{f.meta_carimbos} carimbos · {f.recompensa || "sem recompensa definida"}</p>
                   </div>
-                  <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: f.ativo ? "#E7F6EE" : C.blueTint, color: f.ativo ? "#1E8E5A" : "#5C7186" }}>{f.ativo ? "Ativo" : "Inativo"}</span>
+                  <span className="font-body text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: f.ativo ? "#E7F6EE" : C.blueTint, color: f.ativo ? "#1E8E5A" : "#66768A" }}>{f.ativo ? "Ativo" : "Inativo"}</span>
                   <button onClick={() => alternarAtivoFidelidadeAdmin(f.id, !f.ativo)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>{f.ativo ? "Desativar" : "Ativar"}</button>
                   <button onClick={() => iniciarEdicaoFidelidadeAdmin(f)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Editar</button>
                   <button onClick={() => { if (confirmarExclusao("Excluir esse cartão fidelidade?")) apagarFidelidadeAdmin(f.id); }} className="font-body text-xs font-bold px-3 py-2 rounded-lg" style={{ color: "#B4462F" }}>Excluir</button>
@@ -9020,7 +9041,7 @@ export function AdminPanel({ papel = "admin" }) {
                 <div key={v.id} className="rounded-2xl border p-4 flex items-center gap-4" style={{ borderColor: C.line }}>
                   <div className="flex-1">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
-                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>
+                    <p className="font-body text-xs" style={{ color: "#66768A" }}>
                       {v.empresas?.nome} · {v.salario}{v.tipo ? ` · ${v.tipo}` : ""}{v.prazo ? ` · até ${v.prazo}` : ""}
                     </p>
                   </div>
@@ -9192,7 +9213,7 @@ export function AdminPanel({ papel = "admin" }) {
                   {n.imagem_url && <img loading="lazy" decoding="async" src={n.imagem_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{n.titulo}</p>
-                    <p className="font-body text-[11px] truncate" style={{ color: "#5C7186" }}>{n.mensagem}</p>
+                    <p className="font-body text-[11px] truncate" style={{ color: "#66768A" }}>{n.mensagem}</p>
                   </div>
                 </div>
               ))}
@@ -9219,13 +9240,13 @@ export function AdminPanel({ papel = "admin" }) {
 
         {tab === "modulos" && (
           <div className="max-w-3xl">
-            <p className="font-body text-sm mb-4" style={{ color: "#5C7186" }}>
+            <p className="font-body text-sm mb-4" style={{ color: "#66768A" }}>
               Escolha o que aparece no site público. Ocultar não apaga nada: os dados continuam aqui no painel e você pode publicar de novo quando quiser.
               Módulo fora do ar também não abre pelo link direto para o público.
               Para as páginas do topo, escolha: <b>Publicado</b>, <b>Oculto</b>, <b>Em preparação</b> (o público vê "em breve") ou <b>Desativado</b>.
             </p>
             {siteConfigAdmin === null && supabaseConfigurado ? (
-              <p className="font-body text-sm" style={{ color: "#5C7186" }}>Carregando...</p>
+              <p className="font-body text-sm" style={{ color: "#66768A" }}>Carregando...</p>
             ) : (
               <>
                 {[
@@ -9236,9 +9257,9 @@ export function AdminPanel({ papel = "admin" }) {
                     <div className="flex items-end justify-between gap-2 mb-2">
                       <div>
                         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{titulo}</p>
-                        <p className="font-body text-xs" style={{ color: "#5C7186" }}>{sub}</p>
+                        <p className="font-body text-xs" style={{ color: "#66768A" }}>{sub}</p>
                       </div>
-                      <span className="font-body text-[11px] font-bold shrink-0" style={{ color: "#5C7186" }}>{lista.filter(estaAtivo).length} de {lista.length} publicados</span>
+                      <span className="font-body text-[11px] font-bold shrink-0" style={{ color: "#66768A" }}>{lista.filter(estaAtivo).length} de {lista.length} publicados</span>
                     </div>
                     <div className="rounded-2xl border divide-y bg-white" style={{ borderColor: C.line }}>
                       {lista.map((mod) => {
@@ -9248,7 +9269,7 @@ export function AdminPanel({ papel = "admin" }) {
                           <div key={mod.id} className="flex items-center gap-3 px-4 py-3" style={{ borderColor: C.line }}>
                             <div className="flex-1 min-w-0">
                               <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{mod.nome}</p>
-                              <p className="font-body text-xs" style={{ color: "#5C7186" }}>{mod.descricao}{pagina && <> · <a href={`#/${mod.id}`} className="underline" target="_blank" rel="noopener">abrir</a></>}</p>
+                              <p className="font-body text-xs" style={{ color: "#66768A" }}>{mod.descricao}{pagina && <> · <a href={`#/${mod.id}`} className="underline" target="_blank" rel="noopener">abrir</a></>}</p>
                             </div>
                             {pagina ? (
                               <>
@@ -9259,7 +9280,7 @@ export function AdminPanel({ papel = "admin" }) {
                                 </select>
                               </>
                             ) : (<>
-                            <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={ativo ? { background: "#E6F5EC", color: "#1E8E5A" } : { background: "#F1F4F8", color: "#5C7186" }}>{ativo ? "Publicado" : "Oculto"}</span>
+                            <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={ativo ? { background: "#E6F5EC", color: "#1E8E5A" } : { background: "#F1F4F8", color: "#66768A" }}>{ativo ? "Publicado" : "Oculto"}</span>
                             <button disabled={salvandoModulo === mod.id} onClick={() => alternarModulo(mod, !ativo)}
                               className="font-body text-xs font-bold rounded-lg px-3 py-2 border min-w-[92px] shrink-0" style={{ borderColor: ativo ? C.line : C.blue, color: ativo ? "#425A70" : "#fff", background: ativo ? "#fff" : C.blue, opacity: salvandoModulo === mod.id ? 0.6 : 1 }}>
                               {salvandoModulo === mod.id ? "Salvando..." : ativo ? "Ocultar" : "Publicar"}
@@ -9533,7 +9554,7 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
                 <CheckCircle2 size={26} color={C.blue} />
               </span>
               <p className="font-display font-bold text-lg" style={{ color: C.ink }}>Produto salvo!</p>
-              <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>Ele já aparece na sua lista de produtos.</p>
+              <p className="font-body text-sm mt-1" style={{ color: "#66768A" }}>Ele já aparece na sua lista de produtos.</p>
               <button onClick={onFechar} className="glow-btn font-body text-sm font-bold text-white rounded-xl py-2.5 px-5 mt-5" style={{ background: C.blue }}>Fechar</button>
             </div>
           ) : (
@@ -9589,7 +9610,7 @@ function ModalNovoProduto({ onFechar, onSalvo }) {
                 ) : (
                   <label className="flex items-center gap-2 justify-center rounded-lg border-2 border-dashed py-5 cursor-pointer" style={{ borderColor: C.line }}>
                     <Upload size={16} color="#B7C6D6" />
-                    <span className="font-body text-xs" style={{ color: "#5C7186" }}>Enviar foto real do produto</span>
+                    <span className="font-body text-xs" style={{ color: "#66768A" }}>Enviar foto real do produto</span>
                     <input type="file" accept="image/*" className="hidden" onChange={escolherFoto} />
                   </label>
                 )}
@@ -9661,7 +9682,7 @@ function PainelAvisosEmpresario({ siteConfig }) {
                 </span>
                 <div className="min-w-0">
                   <p className="font-display font-bold text-xs" style={{ color: C.ink }}>{s.titulo}</p>
-                  <p className="font-body text-[11px] mt-0.5" style={{ color: "#5C7186" }}>{s.descricao}</p>
+                  <p className="font-body text-[11px] mt-0.5" style={{ color: "#66768A" }}>{s.descricao}</p>
                 </div>
               </a>
             );
@@ -9691,7 +9712,7 @@ function PainelAvisosEmpresario({ siteConfig }) {
           <div className="grid sm:grid-cols-2 gap-3">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}</div>
         )}
         {cursosProximos && cursosProximos.length === 0 && (
-          <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum curso cadastrado no momento.</p>
+          <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum curso cadastrado no momento.</p>
         )}
         <div className="grid sm:grid-cols-2 gap-3">
           {(cursosProximos || []).slice(0, 4).map((c) => <CursoCard key={c.id} c={c} />)}
@@ -9704,7 +9725,7 @@ function PainelAvisosEmpresario({ siteConfig }) {
           <div className="flex flex-col gap-2">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>
         )}
         {noticiasRecentes && noticiasRecentes.length === 0 && (
-          <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhuma notícia publicada ainda.</p>
+          <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhuma notícia publicada ainda.</p>
         )}
         <div className="flex flex-col gap-2">
           {(noticiasRecentes || []).map((n) => (
@@ -9712,7 +9733,7 @@ function PainelAvisosEmpresario({ siteConfig }) {
               {n.foto_url && <img loading="lazy" decoding="async" src={n.foto_url} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />}
               <div className="min-w-0">
                 <p className="font-display font-bold text-xs" style={{ color: C.ink }}>{n.titulo}</p>
-                <p className="font-body text-[11px] mt-0.5 line-clamp-2" style={{ color: "#5C7186" }}>{n.resumo || n.conteudo}</p>
+                <p className="font-body text-[11px] mt-0.5 line-clamp-2" style={{ color: "#66768A" }}>{n.resumo || n.conteudo}</p>
               </div>
             </div>
           ))}
@@ -9739,7 +9760,7 @@ function MenuLateralPainel({ titulo, items, tab, setTab, grupos }) {
     : [{ titulo: "", ids: items.map((it) => it.id) }];
   return (
     <aside className="md:sticky md:top-20 h-fit md:max-h-[calc(100vh-6rem)] md:overflow-y-auto no-scrollbar rounded-2xl border bg-white p-3" style={{ borderColor: C.line }}>
-      <p className="hidden md:block font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2 truncate" style={{ color: "#5C7186" }}>{titulo}</p>
+      <p className="hidden md:block font-body text-[11px] font-bold uppercase tracking-wider px-2 mb-2 truncate" style={{ color: "#66768A" }}>{titulo}</p>
       <button onClick={() => setAberto((v) => !v)} className="md:hidden w-full flex items-center gap-2 px-2 py-1.5 font-body text-sm font-bold" style={{ color: C.blueDeep }}>
         <LayoutDashboard size={16} color={C.blue} /> <span className="flex-1 text-left truncate">{ativo?.label || titulo}</span>
         <span className="font-body text-[11px] font-semibold" style={{ color: "#8A9BAE" }}>{aberto ? "Fechar" : "Menu"}</span>
@@ -10501,7 +10522,7 @@ function EmpresarioPanel({ siteConfig }) {
                     </div>
                   ))}
                   {perfilForm.fotos_urls.length < limiteFotosPerfil && (
-                    <label className="w-14 h-14 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, color: "#5C7186" }}>
+                    <label className="w-14 h-14 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer" style={{ borderColor: C.line, color: "#66768A" }}>
                       {enviandoFotoGaleriaPerfil ? "..." : <PlusCircle size={16} />}
                       <input type="file" accept="image/*" className="hidden" onChange={enviarFotoGaleriaPerfil} />
                     </label>
@@ -10550,7 +10571,7 @@ function EmpresarioPanel({ siteConfig }) {
                     )}
                     <div className="flex-1">
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{p.nome}</p>
-                      <p className="font-body text-xs" style={{ color: "#5C7186" }}>
+                      <p className="font-body text-xs" style={{ color: "#66768A" }}>
                         {p.preco_exibicao ?? (p.preco != null ? `R$ ${Number(p.preco).toFixed(2)}` : "Sem preço")}
                         {p.preco_promocional != null ? ` · Promo: R$ ${Number(p.preco_promocional).toFixed(2)}` : ""}
                         {p.estoque != null ? ` · Estoque: ${p.estoque}` : ""} · {p.ativo ? "Ativo" : "Inativo"}
@@ -10574,7 +10595,7 @@ function EmpresarioPanel({ siteConfig }) {
                 );
               })}
               {(meusProdutosReais ?? []).length === 0 && meusProdutosReais !== null && (
-                <p className="font-body text-sm" style={{ color: "#5C7186" }}>Você ainda não cadastrou nenhum produto.</p>
+                <p className="font-body text-sm" style={{ color: "#66768A" }}>Você ainda não cadastrou nenhum produto.</p>
               )}
             </div>
           </div>
@@ -10599,7 +10620,7 @@ function EmpresarioPanel({ siteConfig }) {
               {statusPromocaoEmpresario === "ok" && <p className="sm:col-span-2 font-body text-xs font-semibold" style={{ color: "#1E8E5A" }}>Promoção publicada!</p>}
               {statusPromocaoEmpresario && statusPromocaoEmpresario !== "ok" && <p className="sm:col-span-2 font-body text-xs" style={{ color: "#B4462F" }}>{statusPromocaoEmpresario}</p>}
               {(meusProdutosReais ?? []).length === 0 && (
-                <p className="sm:col-span-2 font-body text-xs" style={{ color: "#5C7186" }}>Cadastre um produto primeiro na aba "Produtos" pra poder criar uma promoção.</p>
+                <p className="sm:col-span-2 font-body text-xs" style={{ color: "#66768A" }}>Cadastre um produto primeiro na aba "Produtos" pra poder criar uma promoção.</p>
               )}
             </form>
           </div>
@@ -10632,14 +10653,14 @@ function EmpresarioPanel({ siteConfig }) {
                 <div key={v.id} className="rounded-2xl border p-4 flex items-center gap-4" style={{ borderColor: C.line }}>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{v.cargo}</p>
-                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>{v.salario} · {v.tipo}{v.status === "encerrada" ? " · Encerrada" : ""}</p>
+                    <p className="font-body text-xs" style={{ color: "#66768A" }}>{v.salario} · {v.tipo}{v.status === "encerrada" ? " · Encerrada" : ""}</p>
                   </div>
                   {v.status !== "encerrada" && (
                     <button onClick={() => encerrarVagaEmpresario(v.id)} className="font-body text-xs font-bold px-3 py-2 rounded-lg border" style={{ borderColor: C.line, color: "#425A70" }}>Encerrar</button>
                   )}
                 </div>
               ))}
-              {(minhasVagasReais ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#5C7186" }}>Você ainda não publicou nenhuma vaga.</p>}
+              {(minhasVagasReais ?? []).length === 0 && <p className="font-body text-sm" style={{ color: "#66768A" }}>Você ainda não publicou nenhuma vaga.</p>}
             </div>
           </div>
         )}
@@ -10673,12 +10694,12 @@ function EmpresarioPanel({ siteConfig }) {
                       {c.ativo ? "Ativo" : "Inativo"}
                     </span>
                   </div>
-                  {c.descricao && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{c.descricao}</p>}
-                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
+                  {c.descricao && <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>{c.descricao}</p>}
+                  <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>
                     Código: <span className="font-bold" style={{ color: C.blue }}>{c.codigo}</span>
                     {c.validade && ` · válido até ${c.validade.split("-").reverse().join("/")}`}
                   </p>
-                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Resgatado {c.usos_atuais}x</p>
+                  <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>Resgatado {c.usos_atuais}x</p>
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => registrarResgateCupom(c.id, c.usos_atuais)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 text-white" style={{ background: "#25A85B" }}>+1 resgate</button>
                     <button onClick={() => alternarAtivoCupom(c.id, !c.ativo)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>{c.ativo ? "Desativar" : "Ativar"}</button>
@@ -10686,7 +10707,7 @@ function EmpresarioPanel({ siteConfig }) {
                   </div>
                 </div>
               ))}
-              {(meusCupons ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum cupom criado ainda.</p>}
+              {(meusCupons ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum cupom criado ainda.</p>}
             </div>
           </div>
         )}
@@ -10716,7 +10737,7 @@ function EmpresarioPanel({ siteConfig }) {
                       {c.ativo ? "Ativo" : "Inativo"}
                     </span>
                   </div>
-                  {c.descricao && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{c.descricao}</p>}
+                  {c.descricao && <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>{c.descricao}</p>}
                   {c.preco && <p className="font-body text-xs mt-1 font-bold" style={{ color: C.blue }}>R$ {Number(c.preco).toFixed(2).replace(".", ",")}</p>}
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => alternarAtivoCombo(c.id, !c.ativo)} className="font-body text-xs font-bold rounded-lg px-3 py-1.5 border" style={{ borderColor: C.line, color: "#425A70" }}>{c.ativo ? "Desativar" : "Ativar"}</button>
@@ -10724,7 +10745,7 @@ function EmpresarioPanel({ siteConfig }) {
                   </div>
                 </div>
               ))}
-              {(meusCombos ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum combo criado ainda.</p>}
+              {(meusCombos ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum combo criado ainda.</p>}
             </div>
           </div>
         )}
@@ -10768,7 +10789,7 @@ function EmpresarioPanel({ siteConfig }) {
                 Buscar / cadastrar cliente
               </button>
               {erroAcaoFidelidade && <p className="font-body text-xs mt-2" style={{ color: "#B4462F" }}>{erroAcaoFidelidade}</p>}
-              {clienteFidelidade === undefined && <p className="font-body text-xs mt-2" style={{ color: "#5C7186" }}>Buscando...</p>}
+              {clienteFidelidade === undefined && <p className="font-body text-xs mt-2" style={{ color: "#66768A" }}>Buscando...</p>}
               {clienteFidelidade && (
                 <div className="mt-3 rounded-xl p-3" style={{ background: C.blueTint2 }}>
                   <p className="font-body text-sm font-bold" style={{ color: C.ink }}>{clienteFidelidade.nome || clienteFidelidade.telefone}</p>
@@ -10794,7 +10815,7 @@ function EmpresarioPanel({ siteConfig }) {
                     <span className="font-body text-xs font-bold" style={{ color: C.blue }}>{c.carimbos}/{fidelidadeConfig.meta_carimbos}</span>
                   </div>
                 ))}
-                {(meusClientesFidelidade ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nenhum cliente cadastrado ainda.</p>}
+                {(meusClientesFidelidade ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Nenhum cliente cadastrado ainda.</p>}
               </div>
             </div>
           </div>
@@ -10813,7 +10834,7 @@ function EmpresarioPanel({ siteConfig }) {
                       {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={12} fill={n <= a.nota ? "#E8A23D" : "none"} color="#E8A23D" />)}
                     </div>
                   </div>
-                  {a.comentario && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{a.comentario}</p>}
+                  {a.comentario && <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>{a.comentario}</p>}
                   {a.resposta_comerciante ? (
                     <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: C.blueTint2 }}>
                       <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>Sua resposta</p>
@@ -10831,7 +10852,7 @@ function EmpresarioPanel({ siteConfig }) {
                   )}
                 </div>
               ))}
-              {(minhasAvaliacoes ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Ainda não recebeu nenhuma avaliação.</p>}
+              {(minhasAvaliacoes ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Ainda não recebeu nenhuma avaliação.</p>}
             </div>
           </div>
         )}
@@ -10841,7 +10862,7 @@ function EmpresarioPanel({ siteConfig }) {
             <SectionHeader eyebrow="Desempenho" title="Visualizações e Plano Premium" sub="Contagem real de acessos à ficha da sua empresa" />
             <div className="rounded-2xl border p-5 max-w-xs mb-6" style={{ borderColor: C.line }}>
               <p className="font-display font-extrabold text-3xl" style={{ color: C.blue }}>{visualizacoesEmpresa ?? "—"}</p>
-              <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>Total de visualizações desde o cadastro</p>
+              <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>Total de visualizações desde o cadastro</p>
             </div>
 
             {planoPremiumEmpresa.ativo ? (
@@ -10857,21 +10878,21 @@ function EmpresarioPanel({ siteConfig }) {
                 <div className="grid sm:grid-cols-2 gap-3 max-w-lg">
                   <div className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
                     <p className="font-display font-extrabold text-xl" style={{ color: C.ink }}>{(meusProdutosReais ?? []).filter((p) => p.ativo).length}</p>
-                    <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>Produtos ativos no catálogo</p>
+                    <p className="font-body text-[11px]" style={{ color: "#66768A" }}>Produtos ativos no catálogo</p>
                   </div>
                   <div className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
                     <p className="font-display font-extrabold text-xl" style={{ color: C.ink }}>{(minhasAvaliacoes ?? []).length}</p>
-                    <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>
+                    <p className="font-body text-[11px]" style={{ color: "#66768A" }}>
                       Avaliações recebidas{(minhasAvaliacoes ?? []).length > 0 ? ` · média ${(minhasAvaliacoes.reduce((s, a) => s + (a.nota || 0), 0) / minhasAvaliacoes.length).toFixed(1)}` : ""}
                     </p>
                   </div>
                   <div className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
                     <p className="font-display font-extrabold text-xl" style={{ color: C.ink }}>{(meusCupons ?? []).filter((c) => c.ativo).length}</p>
-                    <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>Cupons de desconto ativos</p>
+                    <p className="font-body text-[11px]" style={{ color: "#66768A" }}>Cupons de desconto ativos</p>
                   </div>
                   <div className="rounded-xl border p-3.5" style={{ borderColor: C.line }}>
                     <p className="font-display font-extrabold text-xl" style={{ color: C.ink }}>{(meusCombos ?? []).filter((c) => c.ativo).length}</p>
-                    <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>Combos ativos</p>
+                    <p className="font-body text-[11px]" style={{ color: "#66768A" }}>Combos ativos</p>
                   </div>
                 </div>
               </div>
@@ -11145,7 +11166,7 @@ function PrestadorPanel({ siteConfig }) {
                       {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={12} fill={n <= a.nota ? "#E8A23D" : "none"} color="#E8A23D" />)}
                     </div>
                   </div>
-                  {a.comentario && <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{a.comentario}</p>}
+                  {a.comentario && <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>{a.comentario}</p>}
                   {a.resposta_comerciante ? (
                     <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: C.blueTint2 }}>
                       <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>Sua resposta</p>
@@ -11163,7 +11184,7 @@ function PrestadorPanel({ siteConfig }) {
                   )}
                 </div>
               ))}
-              {(minhasAvaliacoes ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Ainda não recebeu nenhuma avaliação.</p>}
+              {(minhasAvaliacoes ?? []).length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Ainda não recebeu nenhuma avaliação.</p>}
             </div>
           </div>
         )}
@@ -11268,7 +11289,7 @@ function ModalCadastroFeirante({ onFechar }) {
                 <CheckCircle2 size={26} color={C.blue} />
               </span>
               <p className="font-display font-bold text-lg" style={{ color: C.ink }}>Cadastro enviado!</p>
-              <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>
+              <p className="font-body text-sm mt-1" style={{ color: "#66768A" }}>
                 A organização da feira vai analisar e entrar em contato pelo WhatsApp.
               </p>
               <button onClick={onFechar} className="glow-btn font-body text-sm font-bold text-white rounded-xl py-2.5 px-5 mt-5" style={{ background: C.blue }}>
@@ -11380,7 +11401,7 @@ function PublicidadeBanners({ posicao = "geral", compacto = false }) {
   if (!banners || banners.length === 0) return null;
 
   return (
-    <section className={compacto ? "flex flex-col gap-3" : "max-w-6xl mx-auto px-4 md:px-6 py-4 flex flex-col gap-3"}>
+    <section className={compacto ? "flex flex-col gap-3" : "cg-container mx-auto px-4 md:px-6 py-4 flex flex-col gap-3"}>
       {banners.map((b) => {
         const imagem = (
           <picture>
@@ -11432,7 +11453,7 @@ function CapaComercianteDestaque({ empresas, onAbrir }) {
   const linkWhats = c.whatsapp ? `https://wa.me/55${String(c.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Vim pelo Conecta Comércio e quero saber mais sobre a ${c.nome}.`)}` : null;
 
   return (
-    <section className="max-w-6xl mx-auto px-4 md:px-6 py-4">
+    <section className="cg-container mx-auto px-4 md:px-6 py-4">
       <Reveal>
         <div role="button" tabIndex={0} onClick={() => onAbrir?.(c)} onKeyDown={(ev) => { if (ev.key === "Enter") onAbrir?.(c); }}
           className="glow-card rounded-3xl overflow-hidden relative border-2 cursor-pointer" style={{ background: `linear-gradient(100deg, #14324F, ${C.blueDeep} 55%, ${C.blue})`, borderColor: C.amber, boxShadow: `0 0 0 4px rgba(232,162,61,0.15), 0 20px 45px -15px rgba(10,90,168,0.5)` }}>
@@ -11535,7 +11556,7 @@ function BannerPromocoes() {
   const desconto = promo.precoOriginal > 0 ? Math.round((1 - promo.precoPromo / promo.precoOriginal) * 100) : 0;
 
   return (
-    <section className="max-w-6xl mx-auto px-4 md:px-6 -mt-7 relative z-20">
+    <section className="cg-container mx-auto px-4 md:px-6 -mt-7 relative z-20">
       <Reveal>
         <div className="glow-card rounded-3xl overflow-hidden shadow-2xl relative" style={{ background: `linear-gradient(115deg, ${C.blueDeep}, ${C.blue})` }}>
           <div aria-hidden="true" className="tech-grid absolute inset-0 pointer-events-none" />
@@ -11736,7 +11757,7 @@ function CalendarioEventos() {
   const [mostrarPassados, setMostrarPassados] = useState(false);
 
   const rotuloTipo = { feira: "Feira", curso: "Curso", festa: "Festa", institucional: "Institucional", outro: "Evento" };
-  const corTipo = { feira: C.amberDark, curso: C.blue, festa: "#C6389E", institucional: C.blueDeep, outro: "#5C7186" };
+  const corTipo = { feira: C.amberDark, curso: C.blue, festa: "#C6389E", institucional: C.blueDeep, outro: "#66768A" };
   const formatarData = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
 
   const listaVisivel = eventosDoDia ?? proximosEventos;
@@ -11792,7 +11813,7 @@ function CalendarioEventos() {
 
       <div className="mt-4 pt-4 border-t" style={{ borderColor: C.line }}>
         <div className="flex items-center justify-between mb-2">
-          <p className="font-body text-[11px] font-bold uppercase tracking-wide" style={{ color: "#5C7186" }}>
+          <p className="font-body text-[11px] font-bold uppercase tracking-wide" style={{ color: "#66768A" }}>
             {eventosDoDia ? `Eventos do dia ${diaSelecionado}` : mostrarPassados ? "Eventos que já aconteceram" : "Próximos eventos"}
           </p>
           {!eventosDoDia && (
@@ -11812,18 +11833,18 @@ function CalendarioEventos() {
               {ev.banner_url ? (
                 <img loading="lazy" decoding="async" src={ev.banner_url} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
               ) : (
-                <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: corTipo[ev.tipo] || "#5C7186" }} />
+                <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ background: corTipo[ev.tipo] || "#66768A" }} />
               )}
               <div className="min-w-0 flex-1">
                 <p className="font-body text-xs font-semibold truncate flex items-center gap-1.5" style={{ color: C.ink }}>
                   {ev.titulo}
                   {ev.data_inicio && ev.data_inicio < hojeChave && (
-                    <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#EAF0F7", color: "#5C7186" }}>Já aconteceu</span>
+                    <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#EAF0F7", color: "#66768A" }}>Já aconteceu</span>
                   )}
                   {ev.status === "cancelado" && <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FBEAE5", color: "#B4462F" }}>Cancelado</span>}
                   {ev.status === "adiado" && <span className="font-body text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#FFF6E9", color: "#8A5A12" }}>Adiado</span>}
                 </p>
-                <p className="font-body text-[10px]" style={{ color: "#5C7186" }}>
+                <p className="font-body text-[10px]" style={{ color: "#66768A" }}>
                   {formatarData(ev.data_inicio)}{ev.hora ? ` · ${ev.hora}` : ""}{ev.local ? ` · ${ev.local}` : ""} · {rotuloTipo[ev.tipo] || "Evento"}
                 </p>
                 {ev.relato && (
@@ -11867,7 +11888,7 @@ function CalendarioEventos() {
                     )
                   )}
                   {contagemPresenca[ev.id] > 0 && (
-                    <span className="font-body text-[10px]" style={{ color: "#5C7186" }}>{contagemPresenca[ev.id]} {contagemPresenca[ev.id] === 1 ? "confirmado" : "confirmados"}</span>
+                    <span className="font-body text-[10px]" style={{ color: "#66768A" }}>{contagemPresenca[ev.id]} {contagemPresenca[ev.id] === 1 ? "confirmado" : "confirmados"}</span>
                   )}
                 </div>
                 {formPresencaAberto === ev.id && (
@@ -12941,11 +12962,11 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
   ].filter((n) => !menuOculto.has(n));
 
   return (
-    <div className="font-body min-h-screen pb-16 md:pb-0" style={{ background: "#fff", color: C.ink }}>
+    <div className="font-body min-h-screen pb-16 md:pb-0" style={{ background: C.bg, color: C.ink }}>
       <style>{`[data-oculto="1"]{display:none!important}`}</style>
       {/* Barra institucional */}
-      <div className="text-white text-[11px] font-body" style={{ background: `linear-gradient(90deg, ${C.blueDeep}, ${C.blue})` }}>
-        <div className="max-w-6xl mx-auto px-4 md:px-6 py-1.5 flex items-center justify-between">
+      <div className="text-[11px] font-body border-b" style={{ background: C.blueTint, color: C.blueDark, borderColor: C.line }}>
+        <div className="cg-container mx-auto px-4 md:px-6 py-1.5 flex items-center justify-between">
           <span className="flex items-center gap-1.5 truncate"><MapPinned size={12} /> Feito para fortalecer o comércio de {nomeCidade}</span>
           <span className="hidden sm:inline">Desenvolvido por Gabriel Oliveira</span>
         </div>
@@ -12953,14 +12974,14 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Header */}
       <header
-        className="sticky top-0 z-30 backdrop-blur border-b transition-shadow duration-300"
+        className="sticky top-11 z-30 backdrop-blur border-b transition-shadow duration-300"
         style={{
           borderColor: rolou ? "transparent" : C.line,
           background: rolou ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.95)",
           boxShadow: rolou ? "0 8px 30px -12px rgba(10,34,58,0.18)" : "none",
         }}
       >
-        <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center gap-4">
+        <div className="cg-container mx-auto px-4 md:px-6 h-16 flex items-center gap-4">
           <div className="flex items-center gap-2 shrink-0">
             <LogoMark size={36} url={logoUrl} />
             <span className="font-display font-extrabold text-lg leading-none" style={{ color: C.blue }}>
@@ -12968,9 +12989,9 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
             </span>
           </div>
 
-          <nav className="hidden md:flex items-center gap-6 ml-4">
+          <nav aria-label="Seções do site" className="hidden xl:flex flex-1 min-w-0 items-center gap-4 ml-2 overflow-x-auto no-scrollbar">
             {nav.map((n) => (
-              <a key={n} href="#" onClick={(e) => { e.preventDefault(); irParaSecaoNav(n); }} className="nav-link font-body text-sm font-semibold cursor-pointer" style={{ color: "#425A70" }}>{n}</a>
+              <a key={n} href="#" onClick={(e) => { e.preventDefault(); irParaSecaoNav(n); }} className="nav-link font-body text-[13px] font-semibold cursor-pointer whitespace-nowrap shrink-0" style={{ color: "#425A70" }}>{n}</a>
             ))}
           </nav>
 
@@ -13001,13 +13022,13 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                     </p>
                   )}
                   {notificacoesFavoritas.lista.length === 0 ? (
-                    <p className="font-body text-xs" style={{ color: "#5C7186" }}>Nada por aqui ainda. Favorite empresas (❤) pra ver as promoções delas.</p>
+                    <p className="font-body text-xs" style={{ color: "#66768A" }}>Nada por aqui ainda. Favorite empresas (❤) pra ver as promoções delas.</p>
                   ) : (
                     <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
                       {notificacoesFavoritas.lista.map((n) => (
                         <div key={n.id} className="rounded-lg px-2.5 py-2" style={{ background: C.blueTint2 }}>
                           <p className="font-body text-[11px] font-bold" style={{ color: C.ink }}>{n.empresaNome}</p>
-                          <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{n.titulo}</p>
+                          <p className="font-body text-[11px]" style={{ color: "#66768A" }}>{n.titulo}</p>
                         </div>
                       ))}
                     </div>
@@ -13016,7 +13037,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
               )}
             </div>
 
-            <div className="hidden md:flex items-center gap-3">
+            <div className="hidden xl:flex items-center gap-2 shrink-0">
               <button data-oculto={oc("botao_entrar")} onClick={() => onAuth?.("entrar")} className="glow-btn font-body text-sm font-semibold px-4 py-2 rounded-lg border" style={{ borderColor: C.blue, color: C.blue }}>
                 Entrar
               </button>
@@ -13025,25 +13046,28 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
               </button>
             </div>
 
-            <button className="md:hidden" onClick={() => setMenuOpen((v) => !v)} aria-label={menuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={menuOpen}>
+            <button className="xl:hidden w-10 h-10 rounded-lg flex items-center justify-center" onClick={() => setMenuOpen((v) => !v)} aria-label={menuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={menuOpen}>
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </div>
         </div>
 
         {menuOpen && (
-          <div className="mobile-menu-in md:hidden border-t px-4 py-3 flex flex-col gap-3" style={{ borderColor: C.line }}>
+          <div className="mobile-menu-in xl:hidden border-t px-4 py-3 grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1" style={{ borderColor: C.line }}>
             {nav.map((n) => (
-              <a key={n} href="#" onClick={(e) => { e.preventDefault(); irParaSecaoNav(n); }} className="nav-link font-body text-sm font-semibold cursor-pointer" style={{ color: "#425A70" }}>{n}</a>
+              <a key={n} href="#" onClick={(e) => { e.preventDefault(); setMenuOpen(false); irParaSecaoNav(n); }} className="nav-link font-body text-sm font-semibold cursor-pointer py-2.5" style={{ color: "#425A70" }}>{n}</a>
             ))}
-            <button data-oculto={oc("botao_cadastrar")} onClick={() => onAuth?.("cadastro")} className="font-body text-sm font-bold px-4 py-2 rounded-lg text-white text-center" style={{ background: C.blue }}>
+            <button data-oculto={oc("botao_entrar")} onClick={() => { setMenuOpen(false); onAuth?.("entrar"); }} className="font-body text-sm font-semibold px-4 py-2.5 rounded-lg border text-center sm:col-span-2 lg:col-span-3 mt-2" style={{ borderColor: C.blue, color: C.blue }}>
+              Entrar
+            </button>
+            <button data-oculto={oc("botao_cadastrar")} onClick={() => onAuth?.("cadastro")} className="font-body text-sm font-bold px-4 py-2.5 rounded-lg text-white text-center sm:col-span-2 lg:col-span-3" style={{ background: C.blue }}>
               Cadastrar empresa
             </button>
           </div>
         )}
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="topo" compacto /></div>
+      <div className="cg-container mx-auto px-4 md:px-6"><PublicidadeBanners posicao="topo" compacto /></div>
 
       {/* Hero */}
       <section className="relative overflow-hidden" style={{ background: `linear-gradient(160deg, ${C.blue} 0%, ${C.blueDeep} 100%)` }}>
@@ -13054,7 +13078,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
           <div className="blob blob-c absolute bottom-[-6rem] left-1/3 w-72 h-72 rounded-full" style={{ background: "#5FC6E8", opacity: 0.3 }} />
         </div>
 
-        <div className="max-w-6xl mx-auto px-4 md:px-6 pt-14 md:pt-20 pb-10 grid md:grid-cols-[1.1fr_0.9fr] gap-10 items-center relative">
+        <div className="cg-container mx-auto px-4 md:px-6 pt-14 md:pt-20 pb-10 grid md:grid-cols-[1.1fr_0.9fr] gap-10 items-center relative">
           <div className="hero-in-left">
             <div className="flex items-center gap-2 mb-3">
               <span className="relative flex h-2 w-2">
@@ -13071,7 +13095,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
             </p>
 
             <div className="mt-7 bg-white rounded-2xl p-2 flex items-center gap-2 shadow-2xl max-w-lg glow-card" style={{ borderColor: "transparent" }}>
-              <Search size={18} className="ml-2 shrink-0" color="#5C7186" />
+              <Search size={18} className="ml-2 shrink-0" color="#66768A" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -13152,7 +13176,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       </section>
 
       {/* Como funciona — timeline */}
-      <section data-oculto={oc("como_funciona")} className="max-w-6xl mx-auto px-4 md:px-6 py-14">
+      <section data-oculto={oc("como_funciona")} className="cg-container mx-auto px-4 md:px-6 py-14">
         <Reveal>
           <SectionHeader eyebrow="Passo a passo" title="Como funciona o Conecta Comércio" sub="Do cadastro até aparecer pra cidade toda, em poucos minutos" />
         </Reveal>
@@ -13174,7 +13198,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                   </span>
                   <div>
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{etapa.titulo}</p>
-                    <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{etapa.desc}</p>
+                    <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>{etapa.desc}</p>
                   </div>
                 </div>
               </Reveal>
@@ -13186,11 +13210,11 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       {vis("publicidade") && <PublicidadeBanners />}
       <div ref={promocoesSecaoRef} data-oculto={oc("promocoes")}><BannerPromocoes /></div>
       {vis("destaque") && <CapaComercianteDestaque empresas={listaBase} onAbrir={abrirEmpresa} />}
-      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="apos_destaques" compacto /></div>
+      <div className="cg-container mx-auto px-4 md:px-6"><PublicidadeBanners posicao="apos_destaques" compacto /></div>
 
       {/* O que abriu essa semana — empresas e prestadores aprovados nos últimos 7 dias */}
       {novidadesSemana.length > 0 && (
-        <section data-oculto={oc("novidades")} className="max-w-6xl mx-auto px-4 md:px-6 py-10">
+        <section data-oculto={oc("novidades")} className="cg-container mx-auto px-4 md:px-6 py-10">
           <Reveal><SectionHeader eyebrow="Novidades" title="O que abriu essa semana" sub="Comércios e prestadores recém-chegados na plataforma" /></Reveal>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {novidadesSemana.slice(0, 6).map((item, i) => (
@@ -13211,7 +13235,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Empresas em destaque */}
       <section ref={empresasSecaoRef} data-oculto={oc("empresas")} className="py-12" style={{ background: C.blueTint2 }}>
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
+        <div className="cg-container mx-auto px-4 md:px-6">
           <div className="flex items-end justify-between gap-3 flex-wrap">
             <Reveal><SectionHeader eyebrow="Vitrine local" title="Empresas em destaque" linkLabel="Ver mapa de empresas" onLinkClick={() => window.open("https://www.google.com/maps/search/com%C3%A9rcio+Ivatuba+PR", "_blank")} /></Reveal>
             <select value={ordenacaoEmpresas} onChange={(e) => setOrdenacaoEmpresas(e.target.value)}
@@ -13228,7 +13252,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
               </Reveal>
             ))}
             {empresasFiltradas.length === 0 && (
-              <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>
+              <p className="font-body text-sm col-span-full" style={{ color: "#66768A" }}>
                 {query.trim() ? `Nenhuma empresa encontrada para "${query}".` : "Nenhuma empresa cadastrada ainda. Assim que a primeira for aprovada, aparece aqui."}
               </p>
             )}
@@ -13243,10 +13267,10 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
           )}
         </div>
       </section>
-      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="entre_empresas" compacto /></div>
+      <div className="cg-container mx-auto px-4 md:px-6"><PublicidadeBanners posicao="entre_empresas" compacto /></div>
 
       {/* Produtos em destaque */}
-      <section ref={produtosSecaoRef} data-oculto={oc("produtos")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section ref={produtosSecaoRef} data-oculto={oc("produtos")} className="cg-container mx-auto px-4 md:px-6 py-12">
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <Reveal><SectionHeader eyebrow="Ofertas" title="Produtos em destaque" linkLabel="Ver todos" onLinkClick={() => setQtdProdutosVisiveis(produtosFiltrados.length)} /></Reveal>
           {(produtosReais ?? []).length > 0 && (
@@ -13271,10 +13295,10 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
             </Reveal>
           ))}
           {(produtosReais ?? []).length === 0 && (
-            <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhum produto cadastrado ainda. Assim que um empresário publicar, aparece aqui.</p>
+            <p className="font-body text-sm col-span-full" style={{ color: "#66768A" }}>Nenhum produto cadastrado ainda. Assim que um empresário publicar, aparece aqui.</p>
           )}
           {(produtosReais ?? []).length > 0 && produtosFiltrados.length === 0 && (
-            <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhum produto encontrado para "{queryProdutos}".</p>
+            <p className="font-body text-sm col-span-full" style={{ color: "#66768A" }}>Nenhum produto encontrado para "{queryProdutos}".</p>
           )}
         </div>
         {produtosFiltrados.length > qtdProdutosVisiveis && (
@@ -13288,7 +13312,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       </section>
 
       {/* Categorias */}
-      <section data-oculto={oc("categorias")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section data-oculto={oc("categorias")} className="cg-container mx-auto px-4 md:px-6 py-12">
         <Reveal>
           <SectionHeader eyebrow="Explorar" title="Categorias de empresas" sub="Tudo que Ivatuba tem para oferecer, organizado por perto de você" />
         </Reveal>
@@ -13298,14 +13322,14 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
           ))}
         </div>
       </section>
-      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="entre_categorias" compacto /></div>
+      <div className="cg-container mx-auto px-4 md:px-6"><PublicidadeBanners posicao="entre_categorias" compacto /></div>
 
       {/* Serviços do Empreendedor — em destaque */}
       <section ref={servicosSecaoRef} data-oculto={oc("servicos")} className="relative overflow-hidden py-14" style={{ background: `linear-gradient(155deg, ${C.blueDeep} 0%, ${C.blue} 100%)` }}>
         <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="blob absolute -top-16 right-[-4rem] w-72 h-72 rounded-full" style={{ background: C.amber, opacity: 0.25 }} />
         </div>
-        <div className="relative max-w-6xl mx-auto px-4 md:px-6">
+        <div className="relative cg-container mx-auto px-4 md:px-6">
           <Reveal>
             <div className="flex items-center gap-2 mb-3">
               <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.amber }}>
@@ -13336,7 +13360,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                     </div>
                     <div>
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{s.titulo}</p>
-                      <p className="font-body text-xs mt-1 leading-snug" style={{ color: "#5C7186" }}>{s.descricao}</p>
+                      <p className="font-body text-xs mt-1 leading-snug" style={{ color: "#66768A" }}>{s.descricao}</p>
                     </div>
                   </a>
                 </Reveal>
@@ -13351,7 +13375,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Fomento Paraná — linhas de crédito */}
       {siteConfig?.fomento_ativo && (
-        <section data-oculto={oc("fomento_home")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("fomento_home")} className="cg-container mx-auto px-4 md:px-6 py-12">
           <Reveal>
             <div className="rounded-3xl overflow-hidden relative border" style={{ borderColor: C.line }}>
               <div className="grid md:grid-cols-[1fr_1.1fr]">
@@ -13370,7 +13394,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                     <span className="font-display text-xs font-bold tracking-[0.16em] uppercase" style={{ color: C.blue }}>Crédito para o seu negócio</span>
                   </div>
                   <h2 className="font-display font-extrabold text-xl md:text-2xl" style={{ color: C.ink }}>Fomento Paraná</h2>
-                  <p className="font-body text-sm" style={{ color: "#5C7186" }}>
+                  <p className="font-body text-sm" style={{ color: "#66768A" }}>
                     {siteConfig?.fomento_texto || "Precisa de crédito para sua empresa? Conheça as linhas de crédito da Fomento Paraná, agência oficial do Governo do Paraná."}
                   </p>
 
@@ -13381,7 +13405,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                     <div className="px-3 pb-3 flex flex-col gap-3">
                       <div>
                         <p className="font-body text-xs font-bold mb-1" style={{ color: C.ink }}>Quanto posso solicitar (regras gerais):</p>
-                        <ul className="font-body text-xs list-disc list-inside space-y-0.5" style={{ color: "#5C7186" }}>
+                        <ul className="font-body text-xs list-disc list-inside space-y-0.5" style={{ color: "#66768A" }}>
                           <li>Trabalha sem CNPJ (informal), há menos de 1 ano: até R$ 5 mil</li>
                           <li>Trabalha sem CNPJ (informal), há mais de 1 ano: até R$ 10 mil (com avalista)</li>
                           <li>MEI com menos de 1 ano de CNPJ: até R$ 5 mil</li>
@@ -13396,7 +13420,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                       </div>
                       <div>
                         <p className="font-body text-xs font-bold mb-1" style={{ color: C.ink }}>Documentos que costumam ser pedidos:</p>
-                        <ul className="font-body text-xs list-disc list-inside space-y-0.5" style={{ color: "#5C7186" }}>
+                        <ul className="font-body text-xs list-disc list-inside space-y-0.5" style={{ color: "#66768A" }}>
                           <li>Documento de identidade (RG, CNH) — seu e do cônjuge, se tiver</li>
                           <li>Comprovante de endereço seu e da empresa (conta de luz, água, internet — vencida há no máximo 60 dias)</li>
                           <li>Comprovante de renda (holerite, Imposto de Renda, DASN se for MEI, ou declaração de autônomo)</li>
@@ -13469,7 +13493,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Agência do Trabalhador */}
       {siteConfig?.agencia_ativo && (
-        <section data-oculto={oc("agencia")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("agencia")} className="cg-container mx-auto px-4 md:px-6 py-12">
           <Reveal>
             <div className="rounded-3xl overflow-hidden relative border" style={{ borderColor: C.line }}>
               <div className="grid md:grid-cols-[1fr_1.1fr]">
@@ -13484,11 +13508,11 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                     <span className="font-display text-xs font-bold tracking-[0.16em] uppercase" style={{ color: C.blue }}>Emprego</span>
                   </div>
                   <h2 className="font-display font-extrabold text-xl md:text-2xl" style={{ color: C.ink }}>Agência do Trabalhador</h2>
-                  <p className="font-body text-sm" style={{ color: "#5C7186" }}>
+                  <p className="font-body text-sm" style={{ color: "#66768A" }}>
                     {siteConfig?.agencia_texto || "Procurando emprego ou precisa contratar? A Agência do Trabalhador conecta candidatos e empresas locais."}
                   </p>
                   {(siteConfig?.agencia_endereco || siteConfig?.agencia_horario) && (
-                    <div className="font-body text-xs flex flex-col gap-1" style={{ color: "#5C7186" }}>
+                    <div className="font-body text-xs flex flex-col gap-1" style={{ color: "#66768A" }}>
                       {siteConfig?.agencia_endereco && <span className="flex items-center gap-1"><MapPin size={12} /> {siteConfig.agencia_endereco}</span>}
                       {siteConfig?.agencia_horario && <span className="flex items-center gap-1"><Clock size={12} /> {siteConfig.agencia_horario}</span>}
                     </div>
@@ -13514,7 +13538,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Editais e Licitações */}
       {licitacoesAbertasPublicas.length > 0 && (
-        <section data-oculto={oc("licitacoes")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("licitacoes")} className="cg-container mx-auto px-4 md:px-6 py-12">
           <Reveal><SectionHeader eyebrow="Compras públicas" title="Editais e Licitações" sub="Oportunidades abertas pra empresas locais participarem" /></Reveal>
           <div className="grid sm:grid-cols-2 gap-4 mt-4">
             {licitacoesAbertasPublicas.map((l) => {
@@ -13524,8 +13548,8 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                 <Reveal key={l.id}>
                   <div className="rounded-2xl border p-4 bg-white h-full flex flex-col gap-1.5" style={{ borderColor: C.line }}>
                     <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{l.titulo}</p>
-                    {l.orgao && <p className="font-body text-xs" style={{ color: "#5C7186" }}>{l.orgao}</p>}
-                    {l.descricao && <p className="font-body text-xs" style={{ color: "#5C7186" }}>{l.descricao}</p>}
+                    {l.orgao && <p className="font-body text-xs" style={{ color: "#66768A" }}>{l.orgao}</p>}
+                    {l.descricao && <p className="font-body text-xs" style={{ color: "#66768A" }}>{l.descricao}</p>}
                     <div className="flex flex-wrap gap-2 mt-1">
                       {l.valor_estimado && (
                         <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint, color: C.blue }}>
@@ -13574,14 +13598,14 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Resultados de editais e licitações já divulgados */}
       {licitacoesComResultadoPublicas.length > 0 && (
-        <section data-oculto={oc("licitacoes")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("licitacoes")} className="cg-container mx-auto px-4 md:px-6 py-12">
           <Reveal><SectionHeader eyebrow="Compras públicas" title="Resultados de editais" sub="Resultados já divulgados de editais e licitações anteriores" /></Reveal>
           <div className="grid sm:grid-cols-2 gap-4 mt-4">
             {licitacoesComResultadoPublicas.map((l) => (
               <Reveal key={l.id}>
                 <div className="rounded-2xl border p-4 bg-white h-full flex flex-col gap-1.5" style={{ borderColor: C.line }}>
                   <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{l.titulo}</p>
-                  {l.orgao && <p className="font-body text-xs" style={{ color: "#5C7186" }}>{l.orgao}</p>}
+                  {l.orgao && <p className="font-body text-xs" style={{ color: "#66768A" }}>{l.orgao}</p>}
                   <div className="rounded-lg px-2.5 py-2 mt-1" style={{ background: C.blueTint2 }}>
                     <p className="font-body text-[10px] font-bold mb-0.5" style={{ color: C.blue }}>
                       Resultado{l.data_resultado ? ` — ${l.data_resultado.split("-").reverse().join("/")}` : ""}
@@ -13602,7 +13626,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Sala do Empreendedor — dashboard tecnológico */}
       {relatorioSalaPublico.linhas.length > 0 && (
-        <section data-oculto={oc("sala_numeros")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("sala_numeros")} className="cg-container mx-auto px-4 md:px-6 py-12">
           <Reveal>
             <div className="flex items-end justify-between flex-wrap gap-3">
               <SectionHeader eyebrow="Empreendedorismo · dados em tempo real" title="Sala do Empreendedor" sub={`Atendimentos prestados em ${anoSalaPublico} — números oficiais (fonte: Sebrae)`} />
@@ -13658,7 +13682,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
           <Reveal>
             <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: C.line }}>
-              <p className="font-body text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: "#5C7186" }}>Por categoria de serviço</p>
+              <p className="font-body text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: "#66768A" }}>Por categoria de serviço</p>
               <div className="flex flex-col gap-2.5">
                 {relatorioSalaPublico.linhas.map((l) => {
                   const pct = relatorioSalaPublico.totalGeral > 0 ? Math.round((l.total / relatorioSalaPublico.totalGeral) * 100) : 0;
@@ -13682,7 +13706,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       )}
 
       {/* Feira do Empreendedor — em destaque */}
-      <section ref={feiraSecaoRef} data-oculto={oc("feira")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section ref={feiraSecaoRef} data-oculto={oc("feira")} className="cg-container mx-auto px-4 md:px-6 py-12">
         <Reveal>
           <div className="rounded-3xl overflow-hidden relative" style={{ background: `linear-gradient(120deg, ${C.amber}, ${C.amberDark})` }}>
             <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -13726,7 +13750,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                     </span>
                     <div className="min-w-0">
                       <p className="font-display font-bold text-xs truncate" style={{ color: C.ink }}>{f.titulo}</p>
-                      <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>{f.data_inicio} · {f.local}</p>
+                      <p className="font-body text-[11px]" style={{ color: "#66768A" }}>{f.data_inicio} · {f.local}</p>
                     </div>
                   </div>
                 ))}
@@ -13752,13 +13776,13 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                     <div className="p-3.5 flex-1 flex flex-col">
                       <button type="button" onClick={() => setFeiranteAberto(f)} className="text-left">
                         <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{f.nome}</p>
-                        <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{f.produto}</p>
+                        <p className="font-body text-xs mt-0.5" style={{ color: "#66768A" }}>{f.produto}</p>
                       </button>
                       {f.categoria && (
                         <span className="font-body text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 w-fit" style={{ background: C.blueTint, color: C.blue }}>{f.categoria}</span>
                       )}
                       {(f.local || f.numero_estande) && (
-                        <p className="font-body text-[11px] mt-1.5 flex items-center gap-1" style={{ color: "#5C7186" }}>
+                        <p className="font-body text-[11px] mt-1.5 flex items-center gap-1" style={{ color: "#66768A" }}>
                           <MapPin size={11} /> {[f.local, f.numero_estande ? `Barraca ${f.numero_estande}` : null].filter(Boolean).join(" · ")}
                         </p>
                       )}
@@ -13781,7 +13805,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       {feiranteAberto && <ModalDetalheFeirante f={feiranteAberto} onFechar={() => setFeiranteAberto(null)} />}
 
       {/* Calendário de eventos — só o administrador edita, todo mundo vê */}
-      <section data-oculto={oc("calendario")} className="max-w-6xl mx-auto px-4 md:px-6 pb-12">
+      <section data-oculto={oc("calendario")} className="cg-container mx-auto px-4 md:px-6 pb-12">
         <Reveal><SectionHeader eyebrow="Agenda da cidade" title="Calendário de eventos" sub="Feiras, cursos e eventos do comércio local — atualizado pelo administrador" /></Reveal>
         <div ref={calendarioSecaoRef} className="max-w-md">
           <CalendarioEventos />
@@ -13790,7 +13814,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Vagas */}
       <section ref={vagasSecaoRef} data-oculto={oc("vagas")} className="py-12" style={{ background: C.blueTint2 }}>
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
+        <div className="cg-container mx-auto px-4 md:px-6">
           <div className="flex items-end justify-between gap-3 flex-wrap">
             <Reveal><SectionHeader eyebrow="Trabalhe em Ivatuba" title="Vagas de emprego" linkLabel="Ver todas as vagas" onLinkClick={() => setQtdVagasVisiveis(vagasFiltradas.length)} /></Reveal>
             {(vagasReais ?? []).length > 0 && (
@@ -13812,10 +13836,10 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {vagasFiltradas.slice(0, qtdVagasVisiveis).map((v, i) => <Reveal key={`${v.cargo}-${i}`} delay={i * 70}><VagaCard v={v} /></Reveal>)}
             {(vagasReais ?? []).length === 0 && (
-              <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhuma vaga publicada ainda.</p>
+              <p className="font-body text-sm col-span-full" style={{ color: "#66768A" }}>Nenhuma vaga publicada ainda.</p>
             )}
             {(vagasReais ?? []).length > 0 && vagasFiltradas.length === 0 && (
-              <p className="font-body text-sm col-span-full" style={{ color: "#5C7186" }}>Nenhuma vaga encontrada com esse filtro.</p>
+              <p className="font-body text-sm col-span-full" style={{ color: "#66768A" }}>Nenhuma vaga encontrada com esse filtro.</p>
             )}
           </div>
           {vagasFiltradas.length > qtdVagasVisiveis && (
@@ -13830,7 +13854,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       </section>
 
       {/* Cursos e Notícias */}
-      <section ref={cursosNoticiasSecaoRef} data-oculto={!vis("cursos") && !vis("noticias") ? "1" : undefined} className={`max-w-6xl mx-auto px-4 md:px-6 py-12 grid grid-cols-1 ${vis("cursos") && vis("noticias") ? "md:grid-cols-2" : ""} gap-10`}>
+      <section ref={cursosNoticiasSecaoRef} data-oculto={!vis("cursos") && !vis("noticias") ? "1" : undefined} className={`cg-container mx-auto px-4 md:px-6 py-12 grid grid-cols-1 ${vis("cursos") && vis("noticias") ? "md:grid-cols-2" : ""} gap-10`}>
         <div data-oculto={oc("cursos")}>
           <SectionHeader eyebrow="Sala do Empreendedor" title="Cursos e eventos" />
           <div className="flex flex-col gap-3">
@@ -13858,7 +13882,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                       {n.titulo}
                       {n.destaque && <Sparkles size={12} color={C.amberDark} />}
                     </p>
-                    <p className="font-body text-xs flex items-center gap-1 mt-0.5" style={{ color: "#5C7186" }}><Clock size={10} /> {dataExibida}{n.categoria ? ` · ${n.categoria}` : ""}</p>
+                    <p className="font-body text-xs flex items-center gap-1 mt-0.5" style={{ color: "#66768A" }}><Clock size={10} /> {dataExibida}{n.categoria ? ` · ${n.categoria}` : ""}</p>
                   </div>
                   <ChevronRight size={16} color="#B7C6D6" />
                 </button>
@@ -13879,7 +13903,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                   <X size={16} color="#425A70" />
                 </button>
               </div>
-              <p className="font-body text-xs mb-3" style={{ color: "#5C7186" }}>
+              <p className="font-body text-xs mb-3" style={{ color: "#66768A" }}>
                 {noticiaAberta.publicada_em ? new Date(noticiaAberta.publicada_em).toLocaleDateString("pt-BR") : ""}
                 {noticiaAberta.autor ? ` · ${noticiaAberta.autor}` : ""}{noticiaAberta.categoria ? ` · ${noticiaAberta.categoria}` : ""}
               </p>
@@ -13910,7 +13934,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
       {/* Prestadores de serviço */}
       {(prestadoresReais ?? []).length > 0 && (
-        <section data-oculto={oc("prestadores")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+        <section data-oculto={oc("prestadores")} className="cg-container mx-auto px-4 md:px-6 py-12">
           <Reveal>
             <SectionHeader eyebrow="Autônomos e informais" title="Prestadores de serviço" sub="Encontre quem faz de tudo um pouco aqui em Ivatuba" />
           </Reveal>
@@ -13925,7 +13949,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       )}
 
       {/* Depoimentos */}
-      <section ref={depoimentosSecaoRef} data-oculto={oc("depoimentos")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section ref={depoimentosSecaoRef} data-oculto={oc("depoimentos")} className="cg-container mx-auto px-4 md:px-6 py-12">
         <Reveal>
           <SectionHeader eyebrow="Quem já usa" title="O que dizem sobre o Conecta Comércio" />
         </Reveal>
@@ -13956,7 +13980,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                     )}
                     <div>
                       <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{nomeExibido}</p>
-                      <p className="font-body text-xs" style={{ color: "#5C7186" }}>{papelExibido}</p>
+                      <p className="font-body text-xs" style={{ color: "#66768A" }}>{papelExibido}</p>
                     </div>
                   </div>
                 </div>
@@ -14014,7 +14038,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       </section>
 
       {/* FAQ */}
-      <section ref={faqSecaoRef} data-oculto={oc("faq")} className="max-w-6xl mx-auto px-4 md:px-6 py-12">
+      <section ref={faqSecaoRef} data-oculto={oc("faq")} className="cg-container mx-auto px-4 md:px-6 py-12">
         <Reveal>
           <SectionHeader eyebrow="Dúvidas" title="Perguntas frequentes" />
         </Reveal>
@@ -14022,7 +14046,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
           {categoriasFaq.map((cat) => (
             <div key={cat}>
               {categoriasFaq.length > 1 && (
-                <p className="font-display font-bold text-xs uppercase tracking-wide mb-2" style={{ color: "#5C7186" }}>{cat}</p>
+                <p className="font-display font-bold text-xs uppercase tracking-wide mb-2" style={{ color: "#66768A" }}>{cat}</p>
               )}
               <div className="flex flex-col gap-3">
                 {faqPorCategoria[cat].map((item, i) => {
@@ -14036,7 +14060,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                           <ChevronRight size={18} color={C.blue} style={{ transform: aberta ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .3s ease", flexShrink: 0 }} />
                         </button>
                         <div style={{ maxHeight: aberta ? 300 : 0, overflow: "hidden", transition: "max-height .35s ease" }}>
-                          <p className="font-body text-sm px-5 pb-4" style={{ color: "#5C7186" }}>{item.resposta}</p>
+                          <p className="font-body text-sm px-5 pb-4" style={{ color: "#66768A" }}>{item.resposta}</p>
                         </div>
                       </div>
                     </Reveal>
@@ -14049,7 +14073,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
       </section>
 
       {/* CTA PWA / Cartão do Servidor */}
-      <section data-oculto={oc("app")} className="max-w-6xl mx-auto px-4 md:px-6 pb-4">
+      <section data-oculto={oc("app")} className="cg-container mx-auto px-4 md:px-6 pb-4">
         <div className="rounded-3xl p-8 md:p-10 grid md:grid-cols-[1fr_auto] gap-6 items-center"
           style={{ background: `linear-gradient(120deg, ${C.blueDeep}, ${C.blue})` }}>
           <div>
@@ -14106,11 +14130,11 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto px-4 md:px-6"><PublicidadeBanners posicao="rodape" compacto /></div>
+      <div className="cg-container mx-auto px-4 md:px-6"><PublicidadeBanners posicao="rodape" compacto /></div>
 
       {/* Footer */}
       <footer ref={contatoSecaoRef} className="mt-10 pt-12 pb-6 text-white" style={{ background: C.blueDeep }}>
-        <div className="max-w-6xl mx-auto px-4 md:px-6 grid sm:grid-cols-2 md:grid-cols-5 gap-8">
+        <div className="cg-container mx-auto px-4 md:px-6 grid sm:grid-cols-2 md:grid-cols-5 gap-8">
           <div>
             <span className="font-display font-extrabold text-lg">Conecta Comércio</span>
             <p className="font-body text-white/60 text-xs mt-2 leading-relaxed">
@@ -14174,7 +14198,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
             </ul>
           </div>
         </div>
-        <div className="max-w-6xl mx-auto px-4 md:px-6 mt-10 pt-5 border-t border-white/10 flex flex-col sm:flex-row justify-between gap-2">
+        <div className="cg-container mx-auto px-4 md:px-6 mt-10 pt-5 border-t border-white/10 flex flex-col sm:flex-row justify-between gap-2">
           <p className="font-body text-white/40 text-xs">© 2026 Conecta Comércio · Desenvolvido por Gabriel Oliveira</p>
           <div className="flex items-center gap-3">
             <a href="#/termos" className="font-body text-white/40 text-xs hover:text-white">Termos de uso</a>
@@ -14214,7 +14238,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
 
             <div className="p-5 flex flex-col gap-5">
               {gruposCarrinho.length === 0 && (
-                <p className="font-body text-sm text-center py-6" style={{ color: "#5C7186" }}>Seu carrinho está vazio.</p>
+                <p className="font-body text-sm text-center py-6" style={{ color: "#66768A" }}>Seu carrinho está vazio.</p>
               )}
 
               {gruposCarrinho.length > 0 && (
@@ -14250,7 +14274,7 @@ function SiteHome({ onAuth, logoUrl, frase, siteConfig, sessao, perfil, irParaMo
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="font-body text-xs font-semibold truncate" style={{ color: C.ink }}>{item.nome}</p>
-                          <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>R$ {item.preco.toFixed(2).replace(".", ",")} cada</p>
+                          <p className="font-body text-[11px]" style={{ color: "#66768A" }}>R$ {item.preco.toFixed(2).replace(".", ",")} cada</p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button onClick={() => alterarQuantidadeCarrinho(grupo.empresaId, item.itemId, -1)} className="w-6 h-6 rounded-full border flex items-center justify-center font-body text-xs font-bold" style={{ borderColor: C.line, color: "#425A70" }}>–</button>
@@ -14378,7 +14402,7 @@ function MinhaConta({ perfil, sessao }) {
       <div className="mt-6">
         <p className="font-display font-bold text-sm mb-2" style={{ color: C.ink }}>Empresas favoritadas</p>
         {favoritas === null && <Skeleton className="h-10 w-full" />}
-        {favoritas && favoritas.length === 0 && <p className="font-body text-xs" style={{ color: "#5C7186" }}>Você ainda não favoritou nenhuma empresa.</p>}
+        {favoritas && favoritas.length === 0 && <p className="font-body text-xs" style={{ color: "#66768A" }}>Você ainda não favoritou nenhuma empresa.</p>}
         <div className="flex flex-col gap-2">
           {(favoritas || []).map((f) => (
             <div key={f.id} className="rounded-lg border px-3 py-2 flex items-center justify-between" style={{ borderColor: C.line }}>
@@ -14418,16 +14442,16 @@ function NovaSenhaModal({ onFechar }) {
           <div className="text-center py-4">
             <CheckCircle2 size={32} color={C.blue} className="mx-auto" />
             <p className="font-display font-extrabold text-lg mt-2" style={{ color: C.ink }}>Senha alterada!</p>
-            <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>Você já está conectado com a senha nova.</p>
+            <p className="font-body text-sm mt-1" style={{ color: "#66768A" }}>Você já está conectado com a senha nova.</p>
             <button onClick={onFechar} className="mt-5 w-full font-body text-sm font-bold py-3 rounded-xl text-white" style={{ background: C.blue }}>Continuar</button>
           </div>
         ) : (
           <form onSubmit={salvar} className="flex flex-col gap-3">
             <p className="font-display font-extrabold text-lg" style={{ color: C.ink }}>Criar nova senha</p>
-            <p className="font-body text-sm -mt-1" style={{ color: "#5C7186" }}>Digite a nova senha da sua conta do Conecta Comércio.</p>
+            <p className="font-body text-sm -mt-1" style={{ color: "#66768A" }}>Digite a nova senha da sua conta do Conecta Comércio.</p>
             <input type={ver ? "text" : "password"} autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="Nova senha (mínimo 8 caracteres)" className={campo} style={{ borderColor: C.line }} />
             <input type={ver ? "text" : "password"} autoComplete="new-password" value={confirma} onChange={(e) => setConfirma(e.target.value)} placeholder="Repita a nova senha" className={campo} style={{ borderColor: C.line }} />
-            <label className="flex items-center gap-2 font-body text-xs" style={{ color: "#5C7186" }}><input type="checkbox" checked={ver} onChange={(e) => setVer(e.target.checked)} /> Mostrar senha</label>
+            <label className="flex items-center gap-2 font-body text-xs" style={{ color: "#66768A" }}><input type="checkbox" checked={ver} onChange={(e) => setVer(e.target.checked)} /> Mostrar senha</label>
             {estado.erro && <p className="rounded-xl px-3 py-2 font-body text-xs" style={{ background: "#FBEAE5", color: "#B4462F" }}>{estado.erro}</p>}
             <button type="submit" disabled={estado.carregando} className="w-full font-body text-sm font-bold py-3 rounded-xl text-white disabled:opacity-60" style={{ background: C.blue }}>{estado.carregando ? "Salvando..." : "Salvar nova senha"}</button>
             <button type="button" onClick={onFechar} className="font-body text-xs font-semibold" style={{ color: "#8A9BAE" }}>Agora não</button>
@@ -14447,7 +14471,7 @@ function PortalPlataforma({ siteConfig }) {
   const secoes = [
     {
       chave: "conecta",
-      marca: <span className="flex items-center gap-2.5"><LogoMark size={44} url={siteConfig?.logo_url} /><span className="text-left leading-tight"><span className="block font-display font-extrabold text-xl" style={{ color: C.blueDeep }}>Conecta Comércio</span><span className="block font-body text-[11px] font-semibold" style={{ color: "#5C7186" }}>Comércio local de Ivatuba</span></span></span>,
+      marca: <span className="flex items-center gap-2.5"><LogoMark size={44} url={siteConfig?.logo_url} /><span className="text-left leading-tight"><span className="block font-display font-extrabold text-xl" style={{ color: C.blueDeep }}>Conecta Comércio</span><span className="block font-body text-[11px] font-semibold" style={{ color: "#66768A" }}>Comércio local de Ivatuba</span></span></span>,
       opcoes: [
         { chave: "c-pub", icon: Globe, titulo: "Área pública", texto: "Empresas, produtos, promoções, vagas, turismo e notícias da cidade. Sem login.", cor: C.blue, href: "#/" },
         { chave: "c-emp", icon: Briefcase, titulo: "Área do comerciante", texto: "Perfil da empresa, produtos, promoções e vagas. Com login.", cor: "#0E7C86", href: "#/empresa" },
@@ -14474,10 +14498,10 @@ function PortalPlataforma({ siteConfig }) {
     },
   ];
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-6 py-10">
+    <div className="cg-container mx-auto px-4 md:px-6 py-10">
       <div className="text-center max-w-2xl mx-auto mb-10">
         <h1 className="font-display font-extrabold text-3xl md:text-4xl" style={{ color: C.ink }}>Como você quer entrar?</h1>
-        <p className="font-body text-sm mt-2" style={{ color: "#5C7186" }}>Uma plataforma, três ambientes. Escolha o ambiente e a área de acordo com o seu perfil.</p>
+        <p className="font-body text-sm mt-2" style={{ color: "#66768A" }}>Uma plataforma, três ambientes. Escolha o ambiente e a área de acordo com o seu perfil.</p>
         <div className="flex justify-center gap-2 mt-4 flex-wrap">
           <a href="#/conta" className="inline-flex items-center gap-1.5 font-body text-xs font-bold rounded-full px-4 py-2 border" style={{ borderColor: C.line, color: C.blue }}><UserCircle2 size={14} /> Minha conta · entrar ou criar conta</a>
         </div>
@@ -14515,8 +14539,8 @@ function SsoFomento({ sessao, perfil }) {
   const voltarConecta = () => { window.location.hash = "#/"; window.location.reload(); };
   if (sessao === undefined) return <LoadingBrand texto="Verificando seu acesso..." />;
   if (!sessao) return ( // ainda não entrou no Conecta: login em tela cheia, depois volta para cá
-    <div className="font-body min-h-screen" style={{ background: "#fff" }}>
-      <div className="px-4 py-3 text-center font-body text-sm font-semibold" style={{ background: "#EAF2FB", color: C.blue }}>
+    <div className="font-body min-h-screen" style={{ background: C.bg }}>
+      <div className="px-4 py-3 text-center font-body text-sm font-semibold" style={{ background: "#EAF3FA", color: C.blue }}>
         Login único: entre com a sua conta do Conecta Comércio e depois continue na Fomento Paraná, sem digitar a senha de novo.
       </div>
       <ContaAcesso abaInicial="entrar" mensagem="" onSucesso={() => {}} />
@@ -14530,7 +14554,7 @@ function SsoFomento({ sessao, perfil }) {
           <p className="font-display font-extrabold text-xl mt-1" style={{ color: C.ink }}>Entrar na Fomento Paraná com a conta do Conecta</p>
           {(
             <>
-              <p className="font-body text-sm mt-2" style={{ color: "#5C7186" }}>Você está conectado como <b style={{ color: C.ink }}>{perfil?.nome || sessao.user?.email}</b>. Continuar para a {volta === "admin" ? "administração" : "área do agente"} da Fomento Paraná?</p>
+              <p className="font-body text-sm mt-2" style={{ color: "#66768A" }}>Você está conectado como <b style={{ color: C.ink }}>{perfil?.nome || sessao.user?.email}</b>. Continuar para a {volta === "admin" ? "administração" : "área do agente"} da Fomento Paraná?</p>
               {estado.erro && <p className="rounded-xl px-3.5 py-2.5 mt-3 font-body text-sm" style={{ background: "#FBEAE5", color: "#B4462F" }}>{estado.erro}</p>}
               <button onClick={continuar} disabled={estado.carregando} className="mt-5 w-full font-body text-sm font-bold py-3 rounded-xl text-white disabled:opacity-60" style={{ background: C.blue }}>
                 {estado.carregando ? "Abrindo a Fomento..." : "Continuar na Fomento Paraná"}
@@ -14776,7 +14800,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               <p className="font-display font-bold text-lg" style={{ color: C.ink }}>
                 {tela === "entrar" ? "Login realizado!" : "Conta criada com sucesso!"}
               </p>
-              <p className="font-body text-sm mt-1" style={{ color: "#5C7186" }}>
+              <p className="font-body text-sm mt-1" style={{ color: "#66768A" }}>
                 {tela === "cadastro-empresario"
                   ? "Sua empresa entrará em análise para aprovação."
                   : "Você já pode explorar a plataforma."}
@@ -14791,7 +14815,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 </span>
                 <div>
                   <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Sou Cliente</p>
-                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
+                  <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>
                     Quero explorar empresas, favoritar produtos, me candidatar a vagas e acompanhar promoções.
                   </p>
                 </div>
@@ -14804,7 +14828,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 </span>
                 <div>
                   <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Tenho uma Empresa</p>
-                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
+                  <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>
                     Quero cadastrar meu negócio, publicar produtos, promoções e vagas de emprego.
                   </p>
                 </div>
@@ -14817,7 +14841,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
                 </span>
                 <div>
                   <p className="font-display font-bold text-sm" style={{ color: C.ink }}>Sou Prestador de Serviço</p>
-                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>
+                  <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>
                     Quero divulgar meu serviço (autônomo ou informal) no site oficial, com contato e endereço.
                   </p>
                 </div>
@@ -14851,7 +14875,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               </div>
               <label className="flex items-start gap-2 mt-1">
                 <input required type="checkbox" className="mt-0.5" />
-                <span className="font-body text-xs" style={{ color: "#5C7186" }}>
+                <span className="font-body text-xs" style={{ color: "#66768A" }}>
                   Li e aceito os termos de uso da plataforma e a política de privacidade.
                 </span>
               </label>
@@ -14939,7 +14963,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               </div>
               <label className="flex items-start gap-2 mt-1">
                 <input required type="checkbox" className="mt-0.5" />
-                <span className="font-body text-xs" style={{ color: "#5C7186" }}>
+                <span className="font-body text-xs" style={{ color: "#66768A" }}>
                   Li e aceito os termos de uso da plataforma e a política de privacidade.
                 </span>
               </label>
@@ -15010,7 +15034,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               </div>
               <label className="flex items-start gap-2 mt-1">
                 <input required type="checkbox" className="mt-0.5" />
-                <span className="font-body text-xs" style={{ color: "#5C7186" }}>
+                <span className="font-body text-xs" style={{ color: "#66768A" }}>
                   Li e aceito os termos de uso da plataforma e a política de privacidade.
                 </span>
               </label>
@@ -15036,7 +15060,7 @@ function ContaAcesso({ abaInicial = "cadastro", mensagem = "", onSucesso }) {
               <button type="submit" disabled={carregando} className="glow-btn font-body font-bold text-sm text-white rounded-xl py-3 mt-1 disabled:opacity-60" style={{ background: C.blue }}>
                 {carregando ? "Entrando..." : "Entrar"}
               </button>
-              <p className="font-body text-xs text-center mt-1" style={{ color: "#5C7186" }}>
+              <p className="font-body text-xs text-center mt-1" style={{ color: "#66768A" }}>
                 Não tem uma conta?{" "}
                 <button type="button" onClick={() => irPara("escolha")} className="font-bold" style={{ color: C.blue }}>Cadastre-se aqui</button>
               </p>
@@ -15084,11 +15108,12 @@ function BotaoCompartilhar() {
   };
 
   return (
-    <button onClick={compartilhar} aria-label="Compartilhar essa página"
-      className="fixed top-20 right-3 z-40 flex items-center gap-1.5 pl-3 pr-3.5 h-10 rounded-full shadow-lg bg-white border font-body text-xs font-bold"
-      style={{ borderColor: C.line, color: C.blue }}>
-      {copiado ? <CheckCircle2 size={15} /> : <Share2 size={15} />}
-      {copiado ? "Link copiado!" : "Compartilhar"}
+    // Fica dentro da barra azul-marinho do topo (não cobre conteúdo nem menus).
+    <button onClick={compartilhar} aria-label="Compartilhar essa página" title="Compartilhar essa página"
+      className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg font-body text-[12.5px] font-semibold shrink-0"
+      style={{ color: "#D5E2EE", background: "rgba(255,255,255,.08)" }}>
+      {copiado ? <CheckCircle2 size={14} /> : <Share2 size={14} />}
+      <span className="hidden sm:inline">{copiado ? "Link copiado!" : "Compartilhar"}</span>
     </button>
   );
 }
@@ -15169,7 +15194,7 @@ function ChatWidget() {
               </div>
             ))}
             {carregando && (
-              <div className="self-start font-body text-xs px-3.5 py-2.5 rounded-2xl" style={{ background: C.blueTint, color: "#5C7186" }}>
+              <div className="self-start font-body text-xs px-3.5 py-2.5 rounded-2xl" style={{ background: C.blueTint, color: "#66768A" }}>
                 digitando...
               </div>
             )}
@@ -15212,7 +15237,7 @@ function LoadingBrand({ texto = "Carregando..." }) {
         <span className="absolute inset-0 rounded-full border-4 animate-spin" style={{ borderColor: C.blueTint, borderTopColor: C.blue }} />
         <LogoMark size={34} />
       </span>
-      <p className="font-body text-sm font-semibold" style={{ color: "#5C7186" }}>{texto}</p>
+      <p className="font-body text-sm font-semibold" style={{ color: "#66768A" }}>{texto}</p>
     </div>
   );
 }
@@ -15229,7 +15254,7 @@ function AcessoRestrito({ tipo, onEntrar }) {
         <ShieldCheck size={24} color="#B4462F" />
       </span>
       <p className="font-display font-bold text-lg" style={{ color: C.ink }}>Você não tem acesso a esse painel</p>
-      <p className="font-body text-sm mt-2" style={{ color: "#5C7186" }}>
+      <p className="font-body text-sm mt-2" style={{ color: "#66768A" }}>
         {tipo === "admin"
           ? "Essa área é exclusiva para administradores da plataforma."
           : tipo === "prestador"
@@ -15301,7 +15326,7 @@ function PaginaLegal({ titulo, texto }) {
             <p key={i} className="font-body text-sm leading-relaxed" style={{ color: "#425A70" }}>{par}</p>
           ))
         ) : (
-          <p className="font-body text-sm" style={{ color: "#5C7186" }}>Conteúdo ainda não cadastrado.</p>
+          <p className="font-body text-sm" style={{ color: "#66768A" }}>Conteúdo ainda não cadastrado.</p>
         )}
       </div>
     </div>
@@ -15614,7 +15639,7 @@ function PaginaVotacao() {
       )}
       {lista === null && <Skeleton className="h-64 w-full rounded-3xl" />}
       {lista && visiveis.length === 0 && (
-        <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhuma votação no momento. Volte em breve!</p>
+        <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhuma votação no momento. Volte em breve!</p>
       )}
       <div className="flex flex-col gap-6">
         {visiveis.map((eq) => <React.Fragment key={eq.id}>{Cartao({ eq })}</React.Fragment>)}
@@ -15706,7 +15731,7 @@ function PaginaMural({ perfil }) {
       <div className="mt-8 flex flex-col gap-3">
         {publicacoes === null && <Skeleton className="h-24 w-full" />}
         {publicacoes && publicacoes.length === 0 && (
-          <p className="font-body text-sm" style={{ color: "#5C7186" }}>Ainda não tem nenhuma publicação — seja o primeiro a escrever.</p>
+          <p className="font-body text-sm" style={{ color: "#66768A" }}>Ainda não tem nenhuma publicação — seja o primeiro a escrever.</p>
         )}
         {(publicacoes || []).map((m) => (
           <div key={m.id} className="rounded-2xl border p-4 bg-white" style={{ borderColor: C.line }}>
@@ -15790,7 +15815,7 @@ function AvaliacaoTurismoForm({ pontoId, onEnviado }) {
         <button type="submit" disabled={enviando} className="font-body text-xs font-bold rounded-lg px-4 py-2 text-white disabled:opacity-60" style={{ background: C.blue }}>
           {enviando ? "Enviando..." : "Enviar"}
         </button>
-        <button type="button" onClick={() => setAberto(false)} className="font-body text-xs font-bold rounded-lg px-4 py-2 border" style={{ borderColor: C.line, color: "#5C7186" }}>
+        <button type="button" onClick={() => setAberto(false)} className="font-body text-xs font-bold rounded-lg px-4 py-2 border" style={{ borderColor: C.line, color: "#66768A" }}>
           Cancelar
         </button>
       </div>
@@ -15843,7 +15868,7 @@ function ModalDetalhePontoTuristico({ p, avaliacoes, onFechar, onEnviado }) {
           {avaliacoes.slice(0, 3).map((a) => (
             <div key={a.id} className="mt-2 pl-2 border-l-2" style={{ borderColor: C.line }}>
               <p className="font-body text-xs font-bold" style={{ color: C.ink }}>{a.nome}</p>
-              {a.comentario && <p className="font-body text-xs" style={{ color: "#5C7186" }}>{a.comentario}</p>}
+              {a.comentario && <p className="font-body text-xs" style={{ color: "#66768A" }}>{a.comentario}</p>}
             </div>
           ))}
 
@@ -15886,7 +15911,7 @@ function CardPontoTuristico({ p, destaqueGrande, nota, onAbrir, delay }) {
       </div>
       {p.descricao && (
         <div className="p-3.5">
-          <p className="font-body text-xs line-clamp-2" style={{ color: "#5C7186" }}>{p.descricao}</p>
+          <p className="font-body text-xs line-clamp-2" style={{ color: "#66768A" }}>{p.descricao}</p>
         </div>
       )}
     </button>
@@ -15947,7 +15972,7 @@ function PaginaTurismo({ siteConfig }) {
           </div>
           <div className="p-6 md:p-8">
             <h2 className="font-display font-extrabold text-lg" style={{ color: C.ink }}>Um pouco da nossa história</h2>
-            <p className="font-body text-sm mt-2 whitespace-pre-line" style={{ color: "#5C7186" }}>{siteConfig?.historia_cidade}</p>
+            <p className="font-body text-sm mt-2 whitespace-pre-line" style={{ color: "#66768A" }}>{siteConfig?.historia_cidade}</p>
           </div>
         </div>
       )}
@@ -15958,7 +15983,7 @@ function PaginaTurismo({ siteConfig }) {
           <div className="grid sm:grid-cols-2 gap-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-3xl" />)}</div>
         )}
         {pontos && pontos.length === 0 && (
-          <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum ponto turístico cadastrado ainda.</p>
+          <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhum ponto turístico cadastrado ainda.</p>
         )}
         <div className="grid sm:grid-cols-2 gap-4">
           {(pontos || []).map((p, i) => {
@@ -16025,7 +16050,7 @@ function PaginaUtilidadePublica() {
       )}
 
       {itens && itens.length === 0 && (
-        <p className="font-body text-sm mt-6" style={{ color: "#5C7186" }}>Nenhuma informação cadastrada ainda.</p>
+        <p className="font-body text-sm mt-6" style={{ color: "#66768A" }}>Nenhuma informação cadastrada ainda.</p>
       )}
 
       <div className="flex flex-col gap-8 mt-6">
@@ -16048,10 +16073,10 @@ function PaginaUtilidadePublica() {
                           <Phone size={11} /> {item.telefone}
                         </a>
                       )}
-                      {item.horario && <span className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}><Clock size={11} /> {item.horario}</span>}
-                      {item.endereco && <span className="font-body text-xs flex items-center gap-1" style={{ color: "#5C7186" }}><MapPin size={11} /> {item.endereco}</span>}
+                      {item.horario && <span className="font-body text-xs flex items-center gap-1" style={{ color: "#66768A" }}><Clock size={11} /> {item.horario}</span>}
+                      {item.endereco && <span className="font-body text-xs flex items-center gap-1" style={{ color: "#66768A" }}><MapPin size={11} /> {item.endereco}</span>}
                     </div>
-                    {item.descricao && <p className="font-body text-xs mt-1.5" style={{ color: "#5C7186" }}>{item.descricao}</p>}
+                    {item.descricao && <p className="font-body text-xs mt-1.5" style={{ color: "#66768A" }}>{item.descricao}</p>}
                   </div>
                 ))}
               </div>
@@ -16288,7 +16313,7 @@ function PaginaClassificados() {
         {["todos", "venda", "doacao", "procura"].map((t) => (
           <button key={t} onClick={() => setFiltroTipo(t)}
             className="font-body text-xs font-bold px-3 py-1.5 rounded-full border"
-            style={{ borderColor: filtroTipo === t ? C.blue : C.line, background: filtroTipo === t ? C.blueTint : "transparent", color: filtroTipo === t ? C.blue : "#5C7186" }}>
+            style={{ borderColor: filtroTipo === t ? C.blue : C.line, background: filtroTipo === t ? C.blueTint : "transparent", color: filtroTipo === t ? C.blue : "#66768A" }}>
             {t === "todos" ? "Todos" : labelTipo[t]}
           </button>
         ))}
@@ -16341,7 +16366,7 @@ function PaginaClassificados() {
         <div className="grid sm:grid-cols-2 gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}</div>
       )}
       {itens && itensFiltrados.length === 0 && (
-        <p className="font-body text-sm" style={{ color: "#5C7186" }}>Nenhum anúncio por aqui ainda.</p>
+        <p className="font-body text-sm" style={{ color: "#66768A" }}>Nenhum anúncio por aqui ainda.</p>
       )}
       <div className="grid sm:grid-cols-2 gap-3">
         {itensFiltrados.map((item) => {
@@ -16353,7 +16378,7 @@ function PaginaClassificados() {
                 <span className="w-fit font-body text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.blueTint2, color: corTipo[item.tipo] }}>{labelTipo[item.tipo]}</span>
                 <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{item.titulo}</p>
                 {item.preco != null && <p className="font-body text-xs font-bold" style={{ color: C.blue }}>R$ {Number(item.preco).toFixed(2).replace(".", ",")}</p>}
-                <p className="font-body text-xs" style={{ color: "#5C7186" }}>{item.descricao}</p>
+                <p className="font-body text-xs" style={{ color: "#66768A" }}>{item.descricao}</p>
                 {linkWhats && (
                   <a href={linkWhats} target="_blank" rel="noreferrer" className="mt-auto pt-2 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold font-body text-white" style={{ background: "#25A85B" }}>
                     <MessageCircle size={13} /> WhatsApp
@@ -16452,7 +16477,7 @@ function EstatisticasPublicas() {
                 <div key={c.label} className="rounded-xl border p-5 bg-white" style={{ borderColor: C.line }}>
                   <Icon size={18} style={{ color: C.blue }} />
                   <p className="font-display text-3xl font-extrabold mt-2" style={{ color: C.ink }}>{c.valor}</p>
-                  <p className="font-body text-xs mt-1" style={{ color: "#5C7186" }}>{c.label}</p>
+                  <p className="font-body text-xs mt-1" style={{ color: "#66768A" }}>{c.label}</p>
                 </div>
               );
             })}
@@ -16504,7 +16529,7 @@ function CredencialDigital({ codigo }) {
   if (!credencial) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: C.blueTint2 }}>
-        <p className="font-body text-sm" style={{ color: "#5C7186" }}>Credencial não encontrada.</p>
+        <p className="font-body text-sm" style={{ color: "#66768A" }}>Credencial não encontrada.</p>
       </div>
     );
   }
@@ -16572,7 +16597,7 @@ function CredencialDigital({ codigo }) {
           )}
           <div className="text-center">
             <p className="font-display font-bold text-lg" style={{ color: C.ink }}>{credencial.nome}</p>
-            <p className="font-body text-xs mt-0.5" style={{ color: "#5C7186" }}>{credencial.tipo}</p>
+            <p className="font-body text-xs mt-0.5" style={{ color: "#66768A" }}>{credencial.tipo}</p>
           </div>
           <img loading="lazy" decoding="async"
             src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(String(credencial.codigo))}`}
@@ -16582,7 +16607,7 @@ function CredencialDigital({ codigo }) {
             {credencial.status === "ativa" ? "Credencial ativa" : "Credencial inativa"}
           </span>
           {credencial.checkin_feito && (
-            <p className="font-body text-[11px]" style={{ color: "#5C7186" }}>
+            <p className="font-body text-[11px]" style={{ color: "#66768A" }}>
               Check-in feito{credencial.checkin_em ? ` em ${new Date(credencial.checkin_em).toLocaleString("pt-BR")}` : ""}
             </p>
           )}
@@ -16618,7 +16643,7 @@ const moduloAtivo = (cfg, mod) => (mod.vis ? visivelNoSite(cfg, mod.id) : !!cfg?
 // visibilidade["estado_<id>"]: "oculto" (padrão), "preparacao" ou "desativado".
 const ESTADOS_MODULO = {
   publicado: { rotulo: "Publicado", cor: "#1E8E5A", fundo: "#E6F5EC" },
-  oculto: { rotulo: "Oculto", cor: "#5C7186", fundo: "#F1F4F8" },
+  oculto: { rotulo: "Oculto", cor: "#66768A", fundo: "#F1F4F8" },
   preparacao: { rotulo: "Em preparação", cor: "#8A5A12", fundo: "#FFF6E9" },
   desativado: { rotulo: "Desativado", cor: "#B42318", fundo: "#FDECEC" },
 };
@@ -16690,7 +16715,7 @@ function ModuloProtegido({ id, siteConfig, carregado, perfil, children }) {
   return (
     <div className="max-w-md mx-auto px-4 py-24 text-center">
       <p className="font-display font-bold text-lg" style={{ color: C.ink }}>{estado === "preparacao" ? `${mod.nome}: em breve` : `${mod.nome} não está disponível no momento`}</p>
-      <p className="font-body text-sm mt-2" style={{ color: "#5C7186" }}>{estado === "preparacao" ? "Estamos preparando esta seção. Volte em alguns dias!" : estado === "desativado" ? "Esta seção foi desativada." : "Esta seção foi temporariamente retirada do site."}</p>
+      <p className="font-body text-sm mt-2" style={{ color: "#66768A" }}>{estado === "preparacao" ? "Estamos preparando esta seção. Volte em alguns dias!" : estado === "desativado" ? "Esta seção foi desativada." : "Esta seção foi temporariamente retirada do site."}</p>
       <a href="#/" className="inline-block font-body text-sm font-bold mt-6 px-5 py-2.5 rounded-xl text-white" style={{ background: C.blue }}>Voltar ao início</a>
     </div>
   );
@@ -16768,7 +16793,7 @@ export default function ConectaComercio() {
         <div className="max-w-sm w-full text-center rounded-2xl border p-8" style={{ borderColor: C.line, background: "#fff" }}>
           <ShieldCheck size={32} style={{ color: "#B4462F", margin: "0 auto 12px" }} />
           <h1 className="font-display text-lg font-bold mb-2" style={{ color: C.ink }}>Conta bloqueada</h1>
-          <p className="font-body text-sm mb-4" style={{ color: "#5C7186" }}>
+          <p className="font-body text-sm mb-4" style={{ color: "#66768A" }}>
             Sua conta foi bloqueada pela administração. Entre em contato para mais informações.
           </p>
           <button onClick={() => setContaBloqueada(false)} className="font-body text-sm font-bold px-4 py-2 rounded-xl" style={{ background: C.blue, color: "#fff" }}>
@@ -16921,25 +16946,28 @@ export default function ConectaComercio() {
 
   return (
     <CidadeContext.Provider value={{ nomeCidade: siteConfig?.nome_cidade || "Ivatuba", nomeCidadeUF: siteConfig?.nome_cidade_uf || "Ivatuba - PR" }}>
-    <div className="font-body min-h-screen" style={{ background: "#fff" }}>
+    <div className="font-body min-h-screen" style={{ background: C.bg }}>
       <style>{fontImport}</style>
 
-      <div className="sticky top-0 z-40 flex justify-center px-3 pt-3">
-        <div className="flex items-center gap-1 bg-white rounded-full border shadow-lg p-1 max-w-full overflow-x-auto no-scrollbar" style={{ borderColor: C.line }}>
+      {/* Barra institucional de navegação (padrão Conecta Gestão 360): faixa azul-marinho
+          em toda a largura, módulo atual destacado, rolagem lateral no celular. */}
+      <nav aria-label="Áreas da plataforma" className="sticky top-0 z-40 w-full" style={{ background: C.blueDark, boxShadow: "0 1px 0 rgba(255,255,255,.06), 0 2px 8px rgba(14,49,80,.18)" }}>
+        <div className="cg-container mx-auto px-2 md:px-4 h-11 flex items-center gap-1 overflow-x-auto no-scrollbar">
           {modos.filter((m) => !m.oculto).map((m) => {
             const Icon = m.icon;
             const active = modo === m.id;
             const bloqueado = m.restrito && supabaseConfigurado && !sessao;
             return (
-              <a key={m.id} href={ROTA_HASH[m.id]}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full font-body text-xs font-bold transition-colors cursor-pointer shrink-0"
-                style={{ background: active ? C.blue : "transparent", color: active ? "#fff" : "#425A70" }}>
-                <Icon size={13} /> {m.label} {bloqueado && <ShieldCheck size={11} style={{ opacity: 0.5 }} />}
+              <a key={m.id} href={ROTA_HASH[m.id]} aria-current={active ? "page" : undefined}
+                className={`flex items-center gap-1.5 px-3 h-8 rounded-lg font-body text-[12.5px] font-semibold transition-colors cursor-pointer shrink-0 ${m.id === "portal" ? "md:ml-auto" : ""}`}
+                style={{ background: active ? "#fff" : m.id === "portal" ? "rgba(255,255,255,.12)" : "transparent", color: active ? C.blueDark : "#D5E2EE" }}>
+                <Icon size={14} /> {m.label} {bloqueado && <ShieldCheck size={11} style={{ opacity: 0.6 }} />}
               </a>
             );
           })}
+          <span className="shrink-0 ml-auto md:ml-1"><BotaoCompartilhar /></span>
         </div>
-      </div>
+      </nav>
 
       <div key={modo} className="page-transition">
       {modo === "site" && <SiteHome onAuth={(aba) => { setAbaConta(aba); setDestinoPosLogin(null); setModo("conta"); }} logoUrl={siteConfig?.logo_url} frase={siteConfig?.frase} siteConfig={siteConfig} sessao={sessao} perfil={perfil} irParaModo={setModo} />}
@@ -16966,10 +16994,10 @@ export default function ConectaComercio() {
         sessao === undefined ? (
           <LoadingBrand texto="Verificando seu acesso..." />
         ) : podeVer("admin") ? (
-          <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
+          <div className="cg-container mx-auto px-4 md:px-6 py-8">
             <SectionHeader eyebrow="Área restrita" title="Painel administrativo" sub={perfil?.nome ? `Olá, ${perfil.nome}` : "Visível só para administradores da plataforma"} />
             {NOME_PAPEL_ADMIN[perfil?.tipo] && (
-              <p className="rounded-xl px-4 py-2.5 mb-4 font-body text-sm" style={{ background: "#EAF2FB", color: C.blue }}>
+              <p className="rounded-xl px-4 py-2.5 mb-4 font-body text-sm" style={{ background: "#EAF3FA", color: C.blue }}>
                 Você entrou como <b>{NOME_PAPEL_ADMIN[perfil.tipo]}</b>: {perfil.tipo === "editor" ? "cuida de notícias, banners, vagas, eventos, cursos, turismo, enquetes, FAQ e da moderação da comunidade." : "vê os números do painel, sem alterar nada."}
               </p>
             )}
@@ -16984,7 +17012,7 @@ export default function ConectaComercio() {
         sessao === undefined ? (
           <LoadingBrand texto="Verificando seu acesso..." />
         ) : podeVer("empresario") ? (
-          <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
+          <div className="cg-container mx-auto px-4 md:px-6 py-8">
             <SectionHeader eyebrow="Área restrita" title="Painel do empresário" sub={perfil?.nome ? `Olá, ${perfil.nome}` : "Visível só para o dono da empresa, após login"} />
             <EmpresarioPanel siteConfig={siteConfig} />
           </div>
@@ -16997,7 +17025,7 @@ export default function ConectaComercio() {
         sessao === undefined ? (
           <LoadingBrand texto="Verificando seu acesso..." />
         ) : podeVer("prestador") ? (
-          <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
+          <div className="cg-container mx-auto px-4 md:px-6 py-8">
             <SectionHeader eyebrow="Área restrita" title="Painel do prestador" sub={perfil?.nome ? `Olá, ${perfil.nome}` : "Visível só para o prestador de serviço, após login"} />
             <PrestadorPanel siteConfig={siteConfig} />
           </div>
@@ -17007,7 +17035,6 @@ export default function ConectaComercio() {
       )}
       </div>
 
-      <BotaoCompartilhar />
       <ChatWidget />
       {recuperandoSenha && <NovaSenhaModal onFechar={() => setRecuperandoSenha(false)} />}
     </div>
