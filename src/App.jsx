@@ -3574,6 +3574,29 @@ export function AdminPanel({ papel = "admin" }) {
 
   // Gerenciamento de módulos — liga/desliga um módulo público na hora (só a chave dele).
   const [salvandoModulo, setSalvandoModulo] = useState("");
+  // 4 estados (só para as páginas/módulos do topo): grava o liga/desliga de sempre
+  // e o motivo em visibilidade.estado_<id>. Se a coluna visibilidade ainda não
+  // existir no banco, Publicado/Oculto continuam funcionando como antes.
+  const definirEstadoModulo = async (mod, estado) => {
+    const visivel = estado === "publicado";
+    const anterior = { ...(siteConfigAdmin || {}) };
+    const vis = { ...(siteConfigAdmin?.visibilidade || {}), [`estado_${mod.id}`]: estado };
+    if (mod.vis) vis[mod.id] = visivel;
+    const patch = mod.vis ? { visibilidade: vis } : { [mod.chave]: visivel, visibilidade: vis };
+    setSiteConfigAdmin((v) => ({ ...(v || {}), ...patch }));
+    if (!supabaseConfigurado) return;
+    setSalvandoModulo(mod.id);
+    let { error } = await supabase.from("site_config").update(patch).eq("id", 1);
+    if (error && !mod.vis && /visibilidade/.test(error.message || "") && ["publicado", "oculto"].includes(estado)) {
+      ({ error } = await supabase.from("site_config").update({ [mod.chave]: visivel }).eq("id", 1));
+    }
+    setSalvandoModulo("");
+    if (error) {
+      setSiteConfigAdmin(anterior);
+      notificar(/visibilidade/.test(error.message || "") ? "Para usar Em preparação/Desativado, falta rodar o arquivo supabase-visibilidade-site.sql no Supabase." : `Não foi possível salvar: ${error.message}`, "erro");
+    } else notificar(`${mod.nome}: ${ESTADOS_MODULO[estado].rotulo}.`);
+  };
+
   const alternarModulo = async (mod, valor) => {
     // mod.vis (ou seções da home): grava em site_config.visibilidade (jsonb)
     const chave = mod.vis ? "visibilidade" : mod.chave;
@@ -9198,7 +9221,8 @@ export function AdminPanel({ papel = "admin" }) {
           <div className="max-w-3xl">
             <p className="font-body text-sm mb-4" style={{ color: "#5C7186" }}>
               Escolha o que aparece no site público. Ocultar não apaga nada: os dados continuam aqui no painel e você pode publicar de novo quando quiser.
-              Módulo oculto também não abre pelo link direto para o público.
+              Módulo fora do ar também não abre pelo link direto para o público.
+              Para as páginas do topo, escolha: <b>Publicado</b>, <b>Oculto</b>, <b>Em preparação</b> (o público vê "em breve") ou <b>Desativado</b>.
             </p>
             {siteConfigAdmin === null && supabaseConfigurado ? (
               <p className="font-body text-sm" style={{ color: "#5C7186" }}>Carregando...</p>
@@ -9226,11 +9250,21 @@ export function AdminPanel({ papel = "admin" }) {
                               <p className="font-display font-bold text-sm" style={{ color: C.ink }}>{mod.nome}</p>
                               <p className="font-body text-xs" style={{ color: "#5C7186" }}>{mod.descricao}{pagina && <> · <a href={`#/${mod.id}`} className="underline" target="_blank" rel="noopener">abrir</a></>}</p>
                             </div>
+                            {pagina ? (
+                              <>
+                                <span className="hidden sm:inline font-body text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: ESTADOS_MODULO[estadoModulo(siteConfigAdmin, mod)].fundo, color: ESTADOS_MODULO[estadoModulo(siteConfigAdmin, mod)].cor }}>{ESTADOS_MODULO[estadoModulo(siteConfigAdmin, mod)].rotulo}</span>
+                                <select disabled={salvandoModulo === mod.id} value={estadoModulo(siteConfigAdmin, mod)} onChange={(e) => definirEstadoModulo(mod, e.target.value)}
+                                  aria-label={`Estado de ${mod.nome}`} className="font-body text-xs font-bold rounded-lg px-2 py-2 border shrink-0 bg-white" style={{ borderColor: C.line, color: "#425A70", opacity: salvandoModulo === mod.id ? 0.6 : 1 }}>
+                                  {Object.entries(ESTADOS_MODULO).map(([k, v]) => <option key={k} value={k}>{v.rotulo}</option>)}
+                                </select>
+                              </>
+                            ) : (<>
                             <span className="font-body text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={ativo ? { background: "#E6F5EC", color: "#1E8E5A" } : { background: "#F1F4F8", color: "#5C7186" }}>{ativo ? "Publicado" : "Oculto"}</span>
                             <button disabled={salvandoModulo === mod.id} onClick={() => alternarModulo(mod, !ativo)}
                               className="font-body text-xs font-bold rounded-lg px-3 py-2 border min-w-[92px] shrink-0" style={{ borderColor: ativo ? C.line : C.blue, color: ativo ? "#425A70" : "#fff", background: ativo ? "#fff" : C.blue, opacity: salvandoModulo === mod.id ? 0.6 : 1 }}>
                               {salvandoModulo === mod.id ? "Salvando..." : ativo ? "Ocultar" : "Publicar"}
                             </button>
+                            </>)}
                           </div>
                         );
                       })}
@@ -16579,6 +16613,20 @@ function CredencialDigital({ codigo }) {
 // { votacao: false, faq: false... } — o que não estiver lá aparece normalmente.
 const visivelNoSite = (cfg, chave) => cfg?.visibilidade?.[chave] !== false;
 const moduloAtivo = (cfg, mod) => (mod.vis ? visivelNoSite(cfg, mod.id) : !!cfg?.[mod.chave]);
+// Projeto Master · seção 10 — 4 estados por página/módulo. "Publicado" é o
+// liga/desliga de antes; quando desligado, o motivo fica em
+// visibilidade["estado_<id>"]: "oculto" (padrão), "preparacao" ou "desativado".
+const ESTADOS_MODULO = {
+  publicado: { rotulo: "Publicado", cor: "#1E8E5A", fundo: "#E6F5EC" },
+  oculto: { rotulo: "Oculto", cor: "#5C7186", fundo: "#F1F4F8" },
+  preparacao: { rotulo: "Em preparação", cor: "#8A5A12", fundo: "#FFF6E9" },
+  desativado: { rotulo: "Desativado", cor: "#B42318", fundo: "#FDECEC" },
+};
+const estadoModulo = (cfg, mod) => {
+  if (moduloAtivo(cfg, mod)) return "publicado";
+  const e = cfg?.visibilidade?.[`estado_${mod.id}`];
+  return ESTADOS_MODULO[e] && e !== "publicado" ? e : "oculto";
+};
 
 // Seções e botões da página inicial (todos ligados por padrão)
 const SECOES_HOME = [
@@ -16625,14 +16673,14 @@ function ModuloProtegido({ id, siteConfig, carregado, perfil, children }) {
   const mod = MODULOS_PUBLICOS.find((m) => m.id === id);
   if (!mod || !supabaseConfigurado) return children;
   if (!carregado) return <LoadingBrand />;
-  const ativo = moduloAtivo(siteConfig, mod);
-  if (ativo) return children;
+  const estado = estadoModulo(siteConfig, mod);
+  if (estado === "publicado") return children;
   if (perfil?.tipo === "admin") {
     return (
       <div>
         <div className="max-w-3xl mx-auto px-4 pt-4">
           <div className="rounded-xl border px-4 py-2.5 font-body text-xs font-semibold flex items-center gap-2" style={{ background: "#FFF6E9", borderColor: "#F3D9A8", color: "#8A5A12" }}>
-            <EyeOff size={14} /> {mod.nome} está oculto: só administradores veem esta página. Para publicar, use Painel Admin → Módulos do site.
+            <EyeOff size={14} /> {mod.nome} está {ESTADOS_MODULO[estado].rotulo.toLowerCase()}: só administradores veem esta página. Para publicar, use Painel Admin → Módulos do site.
           </div>
         </div>
         {children}
@@ -16641,8 +16689,8 @@ function ModuloProtegido({ id, siteConfig, carregado, perfil, children }) {
   }
   return (
     <div className="max-w-md mx-auto px-4 py-24 text-center">
-      <p className="font-display font-bold text-lg" style={{ color: C.ink }}>{mod.nome} não está disponível no momento</p>
-      <p className="font-body text-sm mt-2" style={{ color: "#5C7186" }}>Esta seção foi temporariamente retirada do site.</p>
+      <p className="font-display font-bold text-lg" style={{ color: C.ink }}>{estado === "preparacao" ? `${mod.nome}: em breve` : `${mod.nome} não está disponível no momento`}</p>
+      <p className="font-body text-sm mt-2" style={{ color: "#5C7186" }}>{estado === "preparacao" ? "Estamos preparando esta seção. Volte em alguns dias!" : estado === "desativado" ? "Esta seção foi desativada." : "Esta seção foi temporariamente retirada do site."}</p>
       <a href="#/" className="inline-block font-body text-sm font-bold mt-6 px-5 py-2.5 rounded-xl text-white" style={{ background: C.blue }}>Voltar ao início</a>
     </div>
   );
