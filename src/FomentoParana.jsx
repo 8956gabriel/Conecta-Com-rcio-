@@ -28,18 +28,29 @@ const CentralProspeccao = lazy(() => import("./central/Central.jsx"));
 // Identidade do módulo — azul + branco com detalhes em verde, no mesmo padrão
 // de tokens do Conecta Comércio (a cor principal do site continua mandando).
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Identidade do módulo — azul + branco com detalhes em verde, no mesmo padrão
+// de tokens do Conecta Comércio (a cor principal do site continua mandando).
+// ---------------------------------------------------------------------------
+// Cores da logomarca da Fomento Paraná (azul, amarelo e verde).
+// O azul dos botões é um tom mais escuro que o da logo (#0080C9) para o texto
+// branco ter contraste suficiente (5,6:1). Fixas: não seguem a cor do Conecta.
 const F = {
-  blue: "var(--cor-principal, #0A5AA8)",
-  blueDeep: "var(--cor-principal-profunda, #052A4D)",
-  blueTint: "#EAF2FB",
-  blueTint2: "#F5F9FD",
+  blue: "#006DAB",
+  blueLogo: "#0080C9",
+  blueDeep: "#003F66",
+  blueTint: "#E6F2FA",
+  blueTint2: "#F4F9FC",
+  amarelo: "#FFDD00",
+  amareloTint: "#FFF8CC",
+  verde: "#879D0E",
   green: "#1E8E5A",
   greenBright: "#25A85B",
   greenTint: "#E7F6EE",
-  ink: "#0E2233",
-  muted: "#5C7186",
-  soft: "#8896A6",
-  line: "#DCE7F2",
+  ink: "#1A1A1A",
+  muted: "#5C5C5C",
+  soft: "#878787",
+  line: "#E2E5D6",
   danger: "#B4462F",
 };
 
@@ -1023,10 +1034,10 @@ export function FomentoAdmin({ sessao, perfil, embutido = false, area = "todos",
 
   if (embutido) return conteudo;
   return (
-    <PainelLateral logo={config?.logo_url || ""} logoAlt="Fomento Paraná"
+    <PainelLateral logo={config?.logo_url || "/fomento-parana-logo.png"} logoAlt="Fomento Paraná"
       marca={{ icone: Landmark, nome: "Fomento Paraná", sub: "Agente de Crédito · Ivatuba-PR" }}
       ambiente={area === "admin" ? "Administração" : "Área do agente"}
-      cor={F.blue} corProfunda={F.blueDeep} destaque={F.greenBright}
+      cor={F.blue} corProfunda={F.blueDeep} destaque={F.amarelo}
       grupos={grupos} atual={aba} onSelecionar={setAba} chave={`fomento-${area}`}>
       {conteudo}
     </PainelLateral>

@@ -60,19 +60,23 @@ export const LOGO_SALA = "/sala-do-empreendedor-logo.png";
 export const SITE_SALA = import.meta.env.VITE_SITE === "sala";
 export const LINKS_SALA = SITE_SALA ? { publico: "/publico", agente: "/agente", admin: "/admin" } : { publico: "/sala", agente: "/sala/agente", admin: "/sala/admin" };
 
+// Cores da logomarca da Sala do Empreendedor (azul-marinho + laranja).
+// Fixas: não seguem a cor principal escolhida para o Conecta Comércio.
 const S = {
-  blue: "var(--cor-principal, #0A5AA8)",
-  blueDeep: "var(--cor-principal-profunda, #052A4D)",
-  blueTint: "#EAF2FB",
-  blueTint2: "#F5F9FD",
-  amber: "#F5B700",
+  blue: "#0B2474",
+  blueDeep: "#06164A",
+  blueTint: "#ECEFF8",
+  blueTint2: "#F7F8FC",
+  amber: "#F29E72",
+  laranja: "#F29E72",
+  laranjaTint: "#FDF1EA",
   green: "#1E8E5A",
   greenBright: "#25A85B",
   greenTint: "#E7F6EE",
-  ink: "#0E2233",
-  muted: "#5C7186",
+  ink: "#14213D",
+  muted: "#4A5578",
   soft: "#8896A6",
-  line: "#DCE7F2",
+  line: "#E1E5EF",
   danger: "#B4462F",
 };
 

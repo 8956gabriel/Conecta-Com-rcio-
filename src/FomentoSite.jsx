@@ -17,7 +17,9 @@ import { supabase, supabaseReal, supabaseConfigurado, usarClienteDemonstracao } 
 import { criarClienteDemonstracao, lerPasse, salvarPasse, apagarPasse, marcarPagina } from "./fomentoDemo";
 import { FomentoPublico, FomentoAdmin } from "./FomentoParana.jsx";
 
-const AZUL = "#0A5AA8", AZUL_ESC = "#052A4D", AMARELO = "#F5B700", LINHA = "#DCE7F2", MUTED = "#5C7186", INK = "#0E2233";
+// Cores da logomarca da Fomento Paraná (azul escurecido para contraste com texto branco).
+const AZUL = "#006DAB", AZUL_ESC = "#003F66", AMARELO = "#FFDD00", LINHA = "#E2E5D6", MUTED = "#5C5C5C", INK = "#1A1A1A";
+const LOGO_FOMENTO = "/fomento-parana-logo.png";
 const ROTAS = { "/": "inicio", "/acesso": "inicio", "/publico": "publico", "/agente": "agente", "/admin": "admin", "/entrar": "entrar" };
 // Login único (seção 15): o botão leva ao Conecta, que devolve um código de uso único
 const CONECTA_URL = "https://conectacomercio.app.br";
@@ -114,8 +116,8 @@ function FomentoSiteNormal() {
       <header className="sticky top-0 z-50 shadow-md" style={{ background: `linear-gradient(110deg, ${AZUL_ESC}, ${AZUL})` }}>
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3 flex-wrap">
           <button onClick={() => ir("inicio")} className="flex items-center gap-2 mr-auto">
-            <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: AMARELO }}><Landmark size={19} color={AZUL_ESC} /></span>
-            <span className="text-left leading-tight"><span className="block font-display font-extrabold text-white text-[15px]">Fomento Paraná</span><span className="block font-body text-[11px] font-semibold" style={{ color: AMARELO }}>Agente de Crédito · Ivatuba-PR</span></span>
+            <span className="bg-white rounded-xl px-2.5 py-1.5 flex items-center"><img src={LOGO_FOMENTO} alt="Fomento Paraná" className="h-7 w-auto" /></span>
+            <span className="text-left leading-tight"><span className="block font-body text-[11px] font-semibold" style={{ color: AMARELO }}>Agente de Crédito · Ivatuba-PR</span></span>
           </button>
           <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             <NavBtn r="inicio" icon={Home}>Início</NavBtn>
@@ -269,8 +271,8 @@ function FomentoDemo() {
       <header className="sticky top-0 z-50 shadow-md" style={{ background: `linear-gradient(110deg, ${AZUL_ESC}, ${AZUL})` }}>
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 mr-auto">
-            <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: AMARELO }}><Landmark size={19} color={AZUL_ESC} /></span>
-            <span className="text-left leading-tight"><span className="block font-display font-extrabold text-white text-[15px]">Fomento Paraná</span><span className="block font-body text-[11px] font-semibold" style={{ color: AMARELO }}>Olá, {passe.nome.split(" ")[0]} · {passe.cidade}</span></span>
+            <span className="bg-white rounded-xl px-2.5 py-1.5 flex items-center"><img src={LOGO_FOMENTO} alt="Fomento Paraná" className="h-7 w-auto" /></span>
+            <span className="text-left leading-tight"><span className="block font-body text-[11px] font-semibold" style={{ color: AMARELO }}>Olá, {passe.nome.split(" ")[0]} · {passe.cidade}</span></span>
           </div>
           <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             <Aba r="publico" icon={Home} />
