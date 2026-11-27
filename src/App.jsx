@@ -345,8 +345,8 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):focus, select:foc
   border-color: var(--cor-principal, #165D99) !important; box-shadow: 0 0 0 3px rgba(22, 93, 153, .14); outline: none;
 }
 /* Containers fluidos (padrão Gestão 360): 94–97% da largura no computador,
-   sem passar de 1640px; no celular, a largura toda com respiro lateral. */
-.cg-container { width: 100%; max-width: 1640px; }
+   sem passar de 1840px; no celular, a largura toda com respiro lateral. */
+.cg-container { width: 100%; max-width: 1840px; }
 @media (min-width: 1024px) { .cg-container { width: 96%; } }
 /* Tabelas largas: rolam dentro do próprio quadro, nunca a página inteira */
 .tabela-rolavel { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
